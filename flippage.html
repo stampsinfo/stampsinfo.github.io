@@ -3,96 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sách lật trang PDF - Google Drive</title>
+    <title>Sách lật trang PDF</title>
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
         body {
-            margin: 0;
-            padding: 0;
+            margin: 0; padding: 0;
             background-color: #2f3542;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            font-family: Arial, sans-serif;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            min-height: 100vh; font-family: Arial, sans-serif;
             overflow-x: hidden;
         }
         #loading {
-            color: #ffffff;
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 10px;
+            color: #ffffff; font-size: 18px; font-weight: bold;
+            text-align: center; margin: 20px;
         }
         .flip-book-container {
-            display: none;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             margin: 20px auto;
         }
         .page {
-            background-color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background-color: white; display: flex;
+            justify-content: center; align-items: center;
         }
-        canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        .controls {
-            display: none;
-            gap: 15px;
-            margin-top: 15px;
-            z-index: 100;
-        }
+        canvas { width: 100%; height: 100%; object-fit: contain; }
+        .controls { display: none; gap: 15px; margin-top: 15px; z-index: 100; }
         button {
-            padding: 10px 20px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            background-color: #70a1ff;
-            color: white;
-            border-radius: 6px;
-            transition: background 0.2s;
+            padding: 10px 20px; font-size: 15px; font-weight: bold;
+            cursor: pointer; border: none; background-color: #70a1ff;
+            color: white; border-radius: 6px; transition: background 0.2s;
         }
-        button:hover {
-            background-color: #1e90ff;
-        }
+        button:hover { background-color: #1e90ff; }
     </style>
 </head>
 <body>
 
-    <div id="loading">Đang tải và xử lý tài liệu PDF từ Google Drive...</div>
-    
-    <!-- Container chứa sách -->
+    <div id="loading">Đang tải tài liệu PDF...</div>
     <div id="book" class="flip-book-container"></div>
 
-    <!-- Điều hướng trang -->
     <div class="controls" id="controls">
         <button id="prevBtn">« Trang trước</button>
         <button id="nextBtn">Trang sau »</button>
     </div>
 
-    <!-- Thư viện PDF.js và Page-Flip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
 
     <script>
-        // Cấu hình worker cho PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         // =========================================================
-        // 1. THAY FILE ID GOOGLE DRIVE CỦA BẠN VÀO ĐÂY:
-        const GOOGLE_DRIVE_FILE_ID = '1_1CdjWItrNkP5x2gH-ccUqMX-YMMWI5J'; 
+        // ĐẶT TÊN FILE PDF CỦA BẠN VÀO ĐÂY (CÙNG THƯ MỤC VỚI INDEX.HTML)
+        const PDF_FILE_PATH = './vietminh.pdf'; 
         // =========================================================
-
-        // Chuyển link Drive thành Direct Download Link + qua Proxy để tránh chặn CORS
-        const driveDirectUrl = `https://drive.google.com/uc?id=${GOOGLE_DRIVE_FILE_ID}&export=download`;
-        const pdfUrl = `https://corsproxy.io/?${encodeURIComponent(driveDirectUrl)}`;
 
         const bookElement = document.getElementById('book');
         const loadingElement = document.getElementById('loading');
@@ -100,16 +63,13 @@
 
         async function initBook() {
             try {
-                // Tải file PDF bằng PDF.js
-                const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
+                const pdf = await pdfjsLib.getDocument(PDF_FILE_PATH).promise;
                 
-                // Tải trang 1 trước để lấy tỉ lệ tiêu chuẩn
                 const page1 = await pdf.getPage(1);
                 const viewport1 = page1.getViewport({ scale: 1.5 });
                 const width = viewport1.width;
                 const height = viewport1.height;
 
-                // Render toàn bộ các trang PDF thành HTML Canvas
                 for (let num = 1; num <= pdf.numPages; num++) {
                     const page = await pdf.getPage(num);
                     const viewport = page.getViewport({ scale: 1.5 });
@@ -122,43 +82,35 @@
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
 
-                    await page.render({
-                        canvasContext: context,
-                        viewport: viewport
-                    }).promise;
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
 
                     pageDiv.appendChild(canvas);
                     bookElement.appendChild(pageDiv);
                 }
 
-                // Ẩn thông báo Loading, hiển thị Sách
                 loadingElement.style.display = 'none';
                 bookElement.style.display = 'block';
                 controlsElement.style.display = 'flex';
 
-                // Khởi tạo hiệu ứng Lật Trang St.PageFlip
                 const pageFlip = new St.PageFlip(bookElement, {
-                    width: width / 2, // Độ rộng mỗi trang đơn
+                    width: width / 2,
                     height: height,
                     size: "stretch",
-                    minWidth: 300,
-                    maxWidth: 1000,
-                    minHeight: 400,
-                    maxHeight: 1400,
+                    minWidth: 300, maxWidth: 1000,
+                    minHeight: 400, maxHeight: 1400,
                     maxShadowOpacity: 0.5,
-                    showCover: true, // Trang đầu tiên làm bìa sách
+                    showCover: true,
                     mobileScrollSupport: false
                 });
 
                 pageFlip.loadFromHTML(document.querySelectorAll('.page'));
 
-                // Gán sự kiện cho các nút điều hướng
                 document.getElementById('prevBtn').addEventListener('click', () => pageFlip.flipPrev());
                 document.getElementById('nextBtn').addEventListener('click', () => pageFlip.flipNext());
 
             } catch (error) {
-                loadingElement.innerText = 'Không thể tải file PDF. Hãy đảm bảo tệp Google Drive đã được mở quyền công khai!';
-                console.error('Lỗi chi tiết:', error);
+                loadingElement.innerHTML = `<span style="color:#ff6b6b">Lỗi: Không tìm thấy file "${PDF_FILE_PATH}" trong GitHub Repository!</span>`;
+                console.error(error);
             }
         }
 
