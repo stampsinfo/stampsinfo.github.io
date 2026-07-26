@@ -234,6 +234,14 @@
           const urlParams = new URLSearchParams(code.substring(code.indexOf('?')));
           if (urlParams.has('id')) code = urlParams.get('id');
         }
+        if (code.includes("/label/")) {
+        // 1. Tách chuỗi tại "/label/" và lấy phần nằm sau cùng (.pop)
+        let afterLabel = code.split("/label/").pop(); 
+        
+        // 2. Đề phòng trường hợp URL có dấu "/" ở cuối (VD: .../label/MA05/)
+        // Hoặc có chứa tham số theo dõi phía sau (VD: .../label/MA05?source=qr)
+        code = afterLabel.split('/')[0].split('?')[0]; 
+    }
         processLookup(code);
       }, () => {});
     }
