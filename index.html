@@ -228,7 +228,6 @@
       }
       
       html5QrcodeScanner.render((decodedText) => {
-        if (!decodedText) return;
         let code = decodedText.trim();
         const code = decodedText.split('|')[0].trim();
         // Nếu QR chứa đường dẫn URL (ví dụ https://domain.com/?id=MA01), lấy riêng giá trị id
