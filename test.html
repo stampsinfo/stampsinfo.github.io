@@ -176,7 +176,7 @@
         text.split('\n').forEach(line => {
             if(line.trim()) {
                 let p = line.split('|');
-                if(p[0]) records.push({ id: p[0].trim(), title: p[1], date: p[2], status: p[3], content: p[4] });
+                if(p[0]) records.push({ id: p[0].trim(), title: p[1], date: p[2], status: p[3], status: p[4], status: p[5], content: p[6] });
             }
         });
     }
@@ -260,10 +260,12 @@
             box.innerHTML = `
                 <div class="result-card res-success">
                     <h3 style="color: #065f46; margin: 0 0 10px 0;">✅ THÔNG TIN HỒ SƠ</h3>
-                    <p style="margin:5px 0;"><b>Mã số:</b> ${result.id}</p>
-                    <p style="margin:5px 0;"><b>Tên VB:</b> ${result.title}</p>
-                    <p style="margin:5px 0;"><b>Ngày cấp:</b> ${result.date}</p>
-                    <p style="margin:5px 0;"><b>Trạng thái:</b> <span class="status-badge">${result.status}</span></p>
+                    <p style="margin:5px 0;"><b>Mã số:</b> <span class="status-badge">${result.id}</span></p>
+                    <p style="margin:5px 0;"><b>Tên:</b> ${result.title}</p>
+                    <p style="margin:5px 0;"><b>Ngày phát hành:</b> ${result.date}</p>
+                    <p style="margin:5px 0;"><b>Hoạ sĩ:</b> ${result.status}</p>
+                    <p style="margin:5px 0;"><b>Nhà in:</b> ${result.print}</p>
+                    <p style="margin:5px 0;"><b>Số lượng:</b> ${result.qty}</p>
                     <hr style="border: none; border-top: 1px dashed #a7f3d0; margin: 10px 0;">
                     <div style="font-size: 0.95rem; line-height: 1.5;">${result.content}</div>
                 </div>
