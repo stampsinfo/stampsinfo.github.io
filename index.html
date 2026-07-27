@@ -176,7 +176,7 @@
         text.split('\n').forEach(line => {
             if(line.trim()) {
                 let p = line.split('|');
-                if(p[0]) records.push({ id: p[0].trim(), title: p[1], date: p[2], status: p[3], status: p[4], status: p[5], content: p[6] });
+                if(p[0]) records.push({ id: p[0].trim(), title: p[1], date: p[2], status: p[3], print: p[4], qty: p[5], content: p[6] });
             }
         });
     }
