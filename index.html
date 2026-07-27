@@ -202,7 +202,20 @@
         if(mode === 'redirect') document.getElementById('cameraTitle').innerText = "🚀 Quét QR để Chuyển Trang";
 
         html5QrCode = new Html5Qrcode("reader");
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+        videoConstraints: {
+            facingMode: "environment", // Dùng camera sau
+            width: { min: 1280, ideal: 1920 }, // Ép Full HD để rõ nét QR nhỏ
+            height: { min: 720, ideal: 1080 },
+            advanced: [
+                { focusMode: "continuous" }, 
+                { zoom: 1.5 } // Phóng to 1.5x để bắt nét dễ hơn
+            ]
+        }
+      };
 
         html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
         .catch(err => {
