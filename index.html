@@ -203,19 +203,30 @@
 
         html5QrCode = new Html5Qrcode("reader");
         const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-        videoConstraints: {
-            facingMode: "environment", // Dùng camera sau
-            width: { min: 1280, ideal: 1920 }, // Ép Full HD để rõ nét QR nhỏ
-            height: { min: 720, ideal: 1080 },
-            advanced: [
-                { focusMode: "continuous" }, 
-                { zoom: 1.5 } // Phóng to 1.5x để bắt nét dễ hơn
-            ]
-        }
-      };
+    fps: 15, // Tăng tốc độ bắt hình lên 15 khung hình/giây
+    
+    // 1. TĂNG KHUNG QUÉT: Đôi khi mã QR to hơn khung 250px khiến nó không đọc được
+    qrbox: { width: 300, height: 300 }, 
+    
+    // 2. CHỈ QUÉT QR: Ép hệ thống dồn 100% tài nguyên chỉ để quét QR, bỏ qua mã vạch siêu thị
+    formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
+    
+    // 3. VŨ KHÍ BÍ MẬT: Bật bộ giải mã gốc (Native API) của Android/iOS nếu máy có hỗ trợ
+    useBarCodeDetectorIfSupported: true,
+    
+    supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+    
+    videoConstraints: {
+        facingMode: "environment",
+        width: { ideal: 1920 }, // Vẫn giữ độ phân giải cao
+        height: { ideal: 1080 },
+        // Ghi chú: Đã tạm tắt lệnh ép Zoom, vì đôi khi Zoom kỹ thuật số làm mã QR bị vỡ hạt, 
+        // khiến JavaScript không đọc được những mã QR quá đặc chữ.
+        advanced: [
+            { focusMode: "continuous" }
+        ]
+    }
+};
 
         html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
         .catch(err => {
