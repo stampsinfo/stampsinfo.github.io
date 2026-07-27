@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hệ Thống Tra Cứu Thông Tin</title>
+    <!-- Thư viện quét mã QR -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success: #059669;
+            --success-dark: #047857;
+            --bg: #f3f4f6;
+            --card: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0; padding: 20px 15px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        .container {
+            width: 100%; max-width: 500px;
+        }
+
+        .header { text-align: center; margin-bottom: 25px; }
+        .header h1 { margin: 0 0 5px 0; font-size: 1.5rem; color: #111827; }
+        .header p { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+
+        .card {
+            background: var(--card); border-radius: 12px;
+            padding: 20px; margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-title {
+            font-size: 1.1rem; font-weight: bold; margin: 0 0 15px 0;
+            display: flex; align-items: center; gap: 8px;
+            border-bottom: 1px solid #e5e7eb; padding-bottom: 10px;
+        }
+
+        /* Input & Buttons */
+        .search-box { display: flex; gap: 10px; margin-bottom: 15px; }
+        input[type="text"] {
+            flex: 1; padding: 12px; border: 1px solid #d1d5db;
+            border-radius: 8px; font-size: 1rem; outline: none;
+        }
+        input[type="text"]:focus { border-color: var(--primary); }
+
+        .btn {
+            padding: 12px 20px; border: none; border-radius: 8px;
+            font-size: 1rem; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: all 0.2s; width: 100%;
+        }
+        .btn:active { transform: scale(0.98); }
+        
+        .btn-search { background-color: #f3f4f6; color: #374151; width: auto; border: 1px solid #d1d5db; }
+        .btn-search:hover { background-color: #e5e7eb; }
+
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-dark); }
+
+        .btn-success { background-color: var(--success); color: white; }
+        .btn-success:hover { background-color: var(--success-dark); }
+
+        /* Camera Modal Overlay */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); z-index: 1000;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .scanner-container {
+            width: 90%; max-width: 400px; background: white;
+            border-radius: 12px; overflow: hidden; padding: 10px;
+        }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; }
+        .btn-close {
+            margin-top: 20px; background: #ef4444; color: white;
+            padding: 10px 30px; border: none; border-radius: 20px;
+            font-size: 1rem; font-weight: bold; cursor: pointer;
+        }
+
+        /* Result Area */
+        #resultBox { margin-top: 15px; }
+        .result-card {
+            border-radius: 8px; padding: 15px; margin-top: 10px;
+        }
+        .res-success { background: #ecfdf5; border: 1px solid #a7f3d0; }
+        .res-error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+        
+        .status-badge { display: inline-block; padding: 4px 8px; background: #dbeafe; color: #1e40af; border-radius: 4px; font-size: 0.85rem; font-weight: bold;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>🔍 Cổng Tra Cứu Dữ Liệu</h1>
+        <p>Chọn phương thức tra cứu phù hợp dưới đây</p>
+    </div>
+
+    <!-- TÍNH NĂNG 1 & 2: NHẬP TAY / QUÉT QR ĐỂ TRA CỨU TẠI CHỖ -->
+    <div class="card">
+        <div class="card-title">📖 Tra cứu thông tin trên hệ thống</div>
+        
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Nhập mã hồ sơ...">
+            <button class="btn btn-search" onclick="manualSearch()">Tìm</button>
+        </div>
+        
+        <div style="text-align: center; margin-bottom: 15px; color: var(--text-muted); font-size: 0.85rem;">HOẶC</div>
+        
+        <button class="btn btn-primary" onclick="openCamera('search')">
+            📷 Quét QR để Tra Cứu
+        </button>
+
+        <div id="resultBox"></div>
+    </div>
+
+    <!-- TÍNH NĂNG 3: QUÉT QR VÀ CHUYỂN HƯỚNG SANG TRANG KHÁC -->
+    <div class="card">
+        <div class="card-title">🔗 Quét QR đi đến trang thông tin</div>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0;">Quét mã để trích xuất ID và tự động chuyển đến trang xem chi tiết bên ngoài.</p>
+        <button class="btn btn-success" onclick="openCamera('redirect')">
+            🚀 Quét mã & Chuyển Trang
+        </button>
+    </div>
+</div>
+
+<!-- KHUNG CAMERA (ẨN THEO MẶC ĐỊNH) -->
+<div class="modal-overlay" id="cameraModal">
+    <div style="color: white; margin-bottom: 15px; font-weight: bold;" id="cameraTitle">Đang mở Camera...</div>
+    <div class="scanner-container">
+        <div id="reader"></div>
+    </div>
+    <button class="btn-close" onclick="closeCamera()">Hủy / Đóng Camera</button>
+</div>
+
+<script>
+    // ===============================================================
+    // CẤU HÌNH ĐƯỜNG DẪN MẪU CHO TÍNH NĂNG CHUYỂN HƯỚNG
+    // Bạn thay đổi URL này. Hệ thống sẽ tự động ghép ID vào phía sau.
+    // VD: quét được "MA05" -> nó sẽ mở: https://tenmien.com/thongtin/MA05
+    const REDIRECT_BASE_URL = "https://example.com/thongtin/"; 
+    // ===============================================================
+
+    let records = [];
+    let html5QrCode = null;
+    let currentScannerMode = ''; // Lưu trạng thái đang quét để tìm hay để chuyển hướng
+
+    // 1. TẢI DỮ LIỆU DATA.TXT KHI MỞ TRANG
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const currentUrl = window.location.href.split('?')[0];
+            const basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/'));
+            const fileUrl = basePath + '/data.txt?t=' + new Date().getTime();
+            
+            const response = await fetch(fileUrl);
+            if(response.ok) {
+                const text = await response.text();
+                parseData(text);
+            }
+        } catch(e) { console.error("Chưa tải được dữ liệu:", e); }
+    });
+
+    function parseData(text) {
+        records = [];
+        text.split('\n').forEach(line => {
+            if(line.trim()) {
+                let p = line.split('|');
+                if(p[0]) records.push({ id: p[0].trim(), title: p[1], date: p[2], status: p[3], content: p[4] });
+            }
+        });
+    }
+
+    // 2. THUẬT TOÁN "3 TRONG 1" LỌC MÃ ID TỪ CHUỖI QR
+    function getCleanId(rawText) {
+        if (!rawText) return "";
+        let text = rawText.trim();
+        
+        if (text.includes("/label/")) {
+            return text.split("/label/").pop().split('/')[0].split('?')[0].trim();
+        } else {
+            return text.split('|')[0].trim();
+        }
+    }
+
+    // 3. ĐIỀU KHIỂN CAMERA
+    function openCamera(mode) {
+        currentScannerMode = mode;
+        document.getElementById('cameraModal').style.display = 'flex';
+        
+        if(mode === 'search') document.getElementById('cameraTitle').innerText = "📷 Quét QR để Tra Cứu";
+        if(mode === 'redirect') document.getElementById('cameraTitle').innerText = "🚀 Quét QR để Chuyển Trang";
+
+        html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+        .catch(err => {
+            alert("Không thể mở Camera. Hãy kiểm tra quyền truy cập!");
+            closeCamera();
+        });
+    }
+
+    function closeCamera() {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+            }).catch(err => console.log(err));
+        }
+        document.getElementById('cameraModal').style.display = 'none';
+    }
+
+    // 4. XỬ LÝ KHI QUÉT THÀNH CÔNG
+    function onScanSuccess(decodedText) {
+        const searchId = getCleanId(decodedText);
+        
+        // Tắt camera ngay lập tức
+        closeCamera();
+
+        // RẼ NHÁNH TÙY THEO NÚT BẤM BAN ĐẦU
+        if (currentScannerMode === 'search') {
+            document.getElementById('searchInput').value = searchId;
+            executeSearch(searchId);
+        } 
+        else if (currentScannerMode === 'redirect') {
+            // Hiển thị thông báo đang chuyển hướng
+            document.body.innerHTML = `<div style="text-align:center; padding: 50px; font-family:sans-serif;">
+                <h2>Đang chuyển hướng...</h2>
+                <p>Mã tìm được: <b>${searchId}</b></p>
+                <small>Đi đến: ${REDIRECT_BASE_URL}${searchId}</small>
+            </div>`;
+            
+            // Chuyển trang (có thể đổi window.open(url, '_blank') nếu muốn mở tab mới)
+            window.location.href = REDIRECT_BASE_URL + searchId;
+        }
+    }
+
+    // 5. CÁC HÀM TÌM KIẾM DỮ LIỆU TẠI CHỖ
+    function manualSearch() {
+        const val = document.getElementById('searchInput').value.trim();
+        if(val) executeSearch(val);
+        else alert("Vui lòng nhập mã hồ sơ!");
+    }
+
+    function executeSearch(idCanTim) {
+        const box = document.getElementById('resultBox');
+        const result = records.find(item => item.id.toLowerCase() === idCanTim.toLowerCase());
+
+        if (result) {
+            box.innerHTML = `
+                <div class="result-card res-success">
+                    <h3 style="color: #065f46; margin: 0 0 10px 0;">✅ THÔNG TIN HỒ SƠ</h3>
+                    <p style="margin:5px 0;"><b>Mã số:</b> ${result.id}</p>
+                    <p style="margin:5px 0;"><b>Tên VB:</b> ${result.title}</p>
+                    <p style="margin:5px 0;"><b>Ngày cấp:</b> ${result.date}</p>
+                    <p style="margin:5px 0;"><b>Trạng thái:</b> <span class="status-badge">${result.status}</span></p>
+                    <hr style="border: none; border-top: 1px dashed #a7f3d0; margin: 10px 0;">
+                    <div style="font-size: 0.95rem; line-height: 1.5;">${result.content}</div>
+                </div>
+            `;
+        } else {
+            box.innerHTML = `
+                <div class="result-card res-error">
+                    <b>❌ Không tìm thấy dữ liệu!</b><br>
+                    Mã <b>"${idCanTim}"</b> không tồn tại trong hệ thống.
+                </div>
+            `;
+        }
+    }
+</script>
+
+</body>
+</html>
