@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nhận Diện Tem Bưu Chính</title>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -135,9 +134,9 @@
 
 <div class="container">
     <h2>Nhận Diện Tem Bưu Chính</h2>
-    <p class="description">Chụp ảnh hoặc tải ảnh lên để tìm bài viết liên quan.</p>
+    <p class="description">Chụp hoặc tải ảnh tem lên để tìm bài viết chính xác.</p>
 
-    <div id="loadingStatus">⏳ Đang tải cơ sở dữ liệu ảnh, vui lòng đợi...</div>
+    <div id="loadingStatus">⏳ Đang tải cơ sở dữ liệu ảnh...</div>
 
     <div class="action-group">
         <button class="btn-action" id="btnUpload" onclick="document.getElementById('uploadInput').click()" disabled>
@@ -148,7 +147,6 @@
         </button>
     </div>
 
-    <!-- Inputs ẩn xử lý file -->
     <input type="file" id="uploadInput" accept="image/*" style="display: none;" onchange="previewImage(event)">
     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="previewImage(event)">
 
@@ -156,95 +154,88 @@
         <img id="preview" src="" alt="Ảnh xem trước">
     </div>
 
-    <button class="btn-search" id="searchBtn" onclick="findMatchingArticle()">🔍 Tìm Kiếm Tem</button>
+    <button class="btn-search" id="searchBtn" onclick="findMatchingArticle()">🔍 Tìm Kiếm Bài Viết</button>
 
     <div id="result"></div>
 </div>
 
-<!-- Nạp cơ sở dữ liệu từ file rời -->
 <script src="./database.js"></script>
 
-<!-- Logic xử lý chính -->
 <script>
     let currentUploadedHash = "";
 
-    // 1. KIỂM TRA DỮ LIỆU KHI MỞ TRANG
     window.onload = function() {
         if (typeof blogDatabase !== 'undefined' && blogDatabase.length > 0) {
             const statusDiv = document.getElementById('loadingStatus');
             statusDiv.style.backgroundColor = '#d4edda';
             statusDiv.style.color = '#155724';
-            statusDiv.innerHTML = `✅ Đã tải xong cơ sở dữ liệu (${blogDatabase.length} tem).`;
+            statusDiv.innerHTML = `✅ Đã sẵn sàng dữ liệu của ${blogDatabase.length} hình ảnh.`;
             
             document.getElementById('btnUpload').disabled = false;
             document.getElementById('btnCamera').disabled = false;
-            
             setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
         } else {
             const statusDiv = document.getElementById('loadingStatus');
             statusDiv.style.backgroundColor = '#f8d7da';
             statusDiv.style.color = '#721c24';
-            statusDiv.innerHTML = `❌ Lỗi: Không đọc được file database.js.`;
+            statusDiv.innerHTML = `❌ Lỗi: Không thể nạp file database.js!`;
         }
     };
 
-    // 2. HIỂN THỊ ẢNH VÀ TÍNH HASH
     function previewImage(event) {
         const file = event.target.files[0];
         if (!file) return;
 
-        event.target.value = ''; // Reset input
+        event.target.value = '';
         const reader = new FileReader();
 
         reader.onload = function(e) {
             const img = document.getElementById('preview');
             img.src = e.target.result;
             document.getElementById('previewContainer').style.display = 'block';
-            
             document.getElementById('searchBtn').style.display = 'block';
             document.getElementById('result').style.display = 'none';
 
             const tempImg = new Image();
             tempImg.onload = function() {
-                currentUploadedHash = generateHash(tempImg);
+                // Sử dụng thuật toán dHash 256-bit
+                currentUploadedHash = generateDHash256(tempImg);
             };
             tempImg.src = e.target.result;
         }
         reader.readAsDataURL(file);
     }
 
-    // 3. THUẬT TOÁN TẠO MÃ AHASH (64 bit)
-    function generateHash(imageElement) {
+    // THUẬT TOÁN DHASH 16x16 (256-BIT) TRÊN BROWSER
+    function generateDHash256(imageElement) {
         const canvas = document.createElement('canvas');
-        canvas.width = 8;
-        canvas.height = 8;
+        canvas.width = 17;
+        canvas.height = 16;
         const ctx = canvas.getContext('2d');
         
-        ctx.drawImage(imageElement, 0, 0, 8, 8);
-        const imgData = ctx.getImageData(0, 0, 8, 8).data;
+        ctx.drawImage(imageElement, 0, 0, 17, 16);
+        const imgData = ctx.getImageData(0, 0, 17, 16).data;
         
         let grayscale = [];
-        let total = 0;
-
         for (let i = 0; i < imgData.length; i += 4) {
-            const gray = (imgData[i] + imgData[i+1] + imgData[i+2]) / 3;
-            grayscale.push(gray);
-            total += gray;
+            grayscale.push((imgData[i] + imgData[i+1] + imgData[i+2]) / 3);
         }
 
-        const average = total / 64;
         let hash = "";
-
-        for (let i = 0; i < 64; i++) {
-            hash += grayscale[i] >= average ? "1" : "0";
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                let pLeft = grayscale[y * 17 + x];
+                let pRight = grayscale[y * 17 + x + 1];
+                hash += (pLeft > pRight) ? "1" : "0";
+            }
         }
-        return hash;
+        return hash; // 256 bits
     }
 
-    // 4. KHOẢNG CÁCH HAMMING
     function getHammingDistance(hash1, hash2) {
         let distance = 0;
-        for (let i = 0; i < 64; i++) {
+        // So sánh chuỗi 256 bit
+        for (let i = 0; i < hash1.length; i++) {
             if (hash1[i] !== hash2[i]) {
                 distance++;
             }
@@ -252,17 +243,15 @@
         return distance;
     }
 
-    // 5. TÌM KIẾM THEO DATA
     function findMatchingArticle() {
         if (!currentUploadedHash) {
-            alert("Đang xử lý ảnh, vui lòng nhấn lại sau 1 giây!");
+            alert("Đang xử lý ảnh, vui lòng bấm lại sau 1 giây!");
             return;
         }
 
         let bestMatch = null;
-        let lowestDistance = 65; 
+        let lowestDistance = 257; 
 
-        // Duyệt qua biến blogDatabase lấy từ file database.js
         blogDatabase.forEach(item => {
             const distance = getHammingDistance(currentUploadedHash, item.h);
             if (distance < lowestDistance) {
@@ -274,18 +263,20 @@
         const resultDiv = document.getElementById('result');
         resultDiv.style.display = 'block';
 
-        // Sai số chấp nhận được: <= 15 bit
-        if (lowestDistance <= 15 && bestMatch) {
+        // Với 256-bit, ngưỡng sai số chấp nhận được là <= 50 bit (Tương đương 80% độ tương đồng)
+        if (lowestDistance <= 50 && bestMatch) {
+            const matchPercentage = Math.round(((256 - lowestDistance) / 256) * 100);
+            
             resultDiv.className = 'match';
             resultDiv.innerHTML = `
-                <h3 style="margin-top:0;">✅ Đã tìm thấy tem!</h3>
-                <div style="font-size: 14px; color: #155724;">Mức độ sai lệch: <b>${lowestDistance}/64 bit</b></div>
+                <h3 style="margin-top:0;">✅ Đã tìm thấy bài viết!</h3>
+                <div style="font-size: 14px; color: #155724;">Độ chính xác: <b>${matchPercentage}%</b> (Độ lệch: ${lowestDistance}/256 bit)</div>
                 
                 <div class="result-content">
-                    <img src="${bestMatch.img}" alt="Ảnh gốc trên Blog">
+                    <img src="${bestMatch.img}" alt="Ảnh gốc">
                     <div class="result-info">
                         <a href="${bestMatch.u}" target="_blank">🔗 ${bestMatch.t}</a>
-                        <p style="font-size: 13px; color: #555; margin: 0;">(Nhấn vào link để xem bài viết gốc)</p>
+                        <p style="font-size: 13px; color: #555; margin: 0;">(Bấm vào đường dẫn để đọc bài)</p>
                     </div>
                 </div>
             `;
@@ -293,8 +284,8 @@
             resultDiv.className = 'no-match';
             resultDiv.innerHTML = `
                 <h3 style="margin-top:0;">❌ Không tìm thấy!</h3>
-                <p style="margin-bottom:0;">Không có hình ảnh nào trên dữ liệu đủ giống với tem bạn cung cấp.</p>
-                <p style="font-size: 13px; margin-top: 5px;">(Độ lệch nhỏ nhất tìm được: ${lowestDistance}/64 bit - Vượt quá mức cho phép).</p>
+                <p style="margin-bottom:0;">Không có bài viết nào khớp với hình ảnh tem này.</p>
+                <p style="font-size: 13px; margin-top: 5px; color: #721c24;">(Độ sai lệch tốt nhất: ${lowestDistance}/256 bit - Vượt quá ngưỡng cho phép).</p>
             `;
         }
     }
