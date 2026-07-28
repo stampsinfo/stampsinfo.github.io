@@ -86,49 +86,33 @@
     // Trong thực tế, bạn cần tính toán trước mã hash (chuỗi 64 ký tự 0/1) của các ảnh trên blog
     // và lưu vào mảng này cùng đường dẫn bài viết tương ứng.
     JavaScript
-    // 1. CƠ SỞ DỮ LIỆU TỪ FILE JSON
-    let blogDatabase = []; // Khởi tạo mảng rỗng
+    // 1. KHỞI TẠO BIẾN CƠ SỞ DỮ LIỆU
+    let blogDatabase = [];
+    let currentUploadedHash = "";
 
-    // Tự động tải file JSON ngay khi mở trang web
+    // Tạm thời vô hiệu hóa việc chọn ảnh khi chưa có dữ liệu
+    const imageInput = document.getElementById('imageInput');
+    imageInput.disabled = true;
+
+    // 2. TẢI DỮ LIỆU TỪ FILE database.json
     fetch('./database.json')
         .then(response => {
             if (!response.ok) throw new Error("Không thể tải file JSON");
-            return response.json(); // Lệnh này tự động thực hiện JSON.parse() bên dưới
+            return response.json(); // Tự động parse JSON
         })
         .then(data => {
             blogDatabase = data;
-            console.log("Đã tải xong CSDL:", blogDatabase.length, "bài viết");
+            // Đổi thông báo và mở khóa input
+            const statusText = document.getElementById('loadingStatus');
+            statusText.style.color = '#27ae60';
+            statusText.innerHTML = `✅ Đã tải xong dữ liệu của ${blogDatabase.length} hình ảnh. Sẵn sàng tìm kiếm!`;
+            imageInput.disabled = false;
         })
         .catch(error => {
             console.error("Lỗi:", error);
-            alert("Lỗi tải cơ sở dữ liệu ảnh!");
+            document.getElementById('loadingStatus').innerHTML = `❌ Lỗi tải dữ liệu. Vui lòng tải lại trang.`;
+            document.getElementById('loadingStatus').style.color = '#c0392b';
         });
-
-    let currentUploadedHash = "";
-
-    // Hiển thị ảnh xem trước và tính toán mã Hash ngay khi người dùng chọn ảnh
-    function previewImage(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = document.getElementById('preview');
-            img.src = e.target.result;
-            img.style.display = 'inline-block';
-            document.getElementById('searchBtn').style.display = 'inline-block';
-            document.getElementById('result').style.display = 'none';
-
-            // Tạo đối tượng Image để vẽ lên Canvas và tính hash
-            const tempImg = new Image();
-            tempImg.onload = function() {
-                currentUploadedHash = generateHash(tempImg);
-                console.log("Mã Hash của ảnh tải lên:", currentUploadedHash);
-            };
-            tempImg.src = e.target.result;
-        }
-        reader.readAsDataURL(file);
-    }
 
     // 2. THUẬT TOÁN AVERAGE HASH (aHash)
     // Chuyển ảnh thành ma trận 8x8, đưa về trắng đen và tạo chuỗi 64 bit
@@ -187,7 +171,8 @@
 
         // Duyệt qua toàn bộ cơ sở dữ liệu để tìm ảnh giống nhất
         blogDatabase.forEach(item => {
-            const distance = getHammingDistance(currentUploadedHash, item.imageHash);
+            // Sử dụng item.h (mã hash từ dữ liệu của bạn)
+            const distance = getHammingDistance(currentUploadedHash, item.h);
             if (distance < lowestDistance) {
                 lowestDistance = distance;
                 bestMatch = item;
@@ -197,20 +182,23 @@
         const resultDiv = document.getElementById('result');
         resultDiv.style.display = 'block';
 
-        // Đặt ngưỡng khác biệt (Threshold). 
-        // Khoảng cách <= 10: Rất giống; > 15: Có thể là ảnh khác.
-        if (lowestDistance <= 15) {
+        // Đặt ngưỡng threshold. Dưới 15 bit sai số thì coi là cùng 1 ảnh
+        if (lowestDistance <= 15 && bestMatch) {
             resultDiv.className = 'match';
+            // Sử dụng item.u (URL), item.t (Title) và item.img (Ảnh)
             resultDiv.innerHTML = `
                 <h3>✅ Đã tìm thấy bài viết!</h3>
-                <p>Bài viết có hình ảnh tương đồng nhất (Độ lệch: ${lowestDistance}/64):</p>
-                <p><a href="${bestMatch.articleUrl}" target="_blank">${bestMatch.title}</a></p>
+                <p>Mức độ sai lệch: ${lowestDistance}/64 bit</p>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin: 15px 0;">
+                    <img src="${bestMatch.img}" alt="Ảnh gốc" style="max-width: 150px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                </div>
+                <p><a href="${bestMatch.u}" target="_blank" style="font-size: 18px;">🔗 ${bestMatch.t}</a></p>
             `;
         } else {
             resultDiv.className = 'no-match';
             resultDiv.innerHTML = `
                 <h3>❌ Không tìm thấy!</h3>
-                <p>Không có hình ảnh nào trên Blog đủ giống với ảnh bạn cung cấp (Độ lệch nhỏ nhất: ${lowestDistance}/64).</p>
+                <p>Không có hình ảnh nào trên web đủ giống với ảnh bạn cung cấp (Độ lệch nhỏ nhất: ${lowestDistance}/64).</p>
             `;
         }
     }
