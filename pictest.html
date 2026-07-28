@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tìm Kiếm Tem Qua Hình Ảnh</title>
+    <title>Nhận Diện Tem Bưu Chính</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -71,7 +71,7 @@
 
         .preview-container {
             margin: 20px 0;
-            display: none; /* Ẩn khi chưa có ảnh */
+            display: none; 
         }
         #preview {
             max-width: 100%;
@@ -91,7 +91,7 @@
             cursor: pointer;
             transition: background 0.3s;
             width: 100%;
-            display: none; /* Ẩn khi chưa có ảnh */
+            display: none; 
         }
         .btn-search:hover { background: #219150; }
 
@@ -117,6 +117,7 @@
             width: 120px;
             border-radius: 5px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            object-fit: cover;
         }
         .result-info a {
             color: #0056b3;
@@ -135,97 +136,76 @@
     <h2>Nhận Diện Tem Bưu Chính</h2>
     <p class="description">Chụp ảnh hoặc tải ảnh lên để tìm bài viết liên quan.</p>
 
-    <!-- Trạng thái tải dữ liệu -->
     <div id="loadingStatus">⏳ Đang tải cơ sở dữ liệu ảnh, vui lòng đợi...</div>
 
-    <!-- Nút hành động -->
     <div class="action-group">
-        <!-- Nút Tải ảnh lên -->
         <button class="btn-action" id="btnUpload" onclick="document.getElementById('uploadInput').click()" disabled>
             <span class="icon">📁</span> Tải ảnh lên
         </button>
-        <!-- Nút Chụp ảnh (Dùng capture="environment" để mở camera sau trên điện thoại) -->
         <button class="btn-action" id="btnCamera" onclick="document.getElementById('cameraInput').click()" disabled>
             <span class="icon">📷</span> Chụp ảnh
         </button>
     </div>
 
-    <!-- Input ẩn xử lý file -->
+    <!-- Inputs ẩn xử lý file -->
     <input type="file" id="uploadInput" accept="image/*" style="display: none;" onchange="previewImage(event)">
     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="previewImage(event)">
 
-    <!-- Khu vực xem trước ảnh -->
     <div class="preview-container" id="previewContainer">
         <img id="preview" src="" alt="Ảnh xem trước">
     </div>
 
-    <!-- Nút Tìm kiếm -->
-    <button class="btn-search" id="searchBtn" onclick="findMatchingArticle()">🔍 Tìm Kiếm Bài Viết</button>
+    <button class="btn-search" id="searchBtn" onclick="findMatchingArticle()">🔍 Tìm Kiếm Tem</button>
 
-    <!-- Khu vực kết quả -->
     <div id="result"></div>
 </div>
 
+<!-- Nạp cơ sở dữ liệu từ file rời -->
+<script src="./database.js"></script>
+
+<!-- Logic xử lý chính -->
 <script>
-    let blogDatabase = [];
     let currentUploadedHash = "";
 
-    // 1. TẢI DỮ LIỆU JSON KHI MỞ TRANG
+    // 1. KIỂM TRA DỮ LIỆU KHI MỞ TRANG
     window.onload = function() {
-        fetch('./database.json')
-            .then(response => {
-                if (!response.ok) throw new Error("Không thể tải file JSON");
-                return response.json();
-            })
-            .then(data => {
-                blogDatabase = data;
-                
-                // Cập nhật giao diện khi tải xong
-                const statusDiv = document.getElementById('loadingStatus');
-                statusDiv.style.backgroundColor = '#d4edda';
-                statusDiv.style.color = '#155724';
-                statusDiv.innerHTML = `✅ Đã tải xong dữ liệu (${blogDatabase.length} hình ảnh). Sẵn sàng!`;
-                
-                // Mở khóa các nút tải/chụp ảnh
-                document.getElementById('btnUpload').disabled = false;
-                document.getElementById('btnCamera').disabled = false;
-                
-                // Tự động ẩn thông báo sau 3 giây
-                setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
-            })
-            .catch(error => {
-                console.error("Lỗi:", error);
-                const statusDiv = document.getElementById('loadingStatus');
-                statusDiv.style.backgroundColor = '#f8d7da';
-                statusDiv.style.color = '#721c24';
-                statusDiv.innerHTML = `❌ Lỗi tải dữ liệu. Hãy kiểm tra lại file database.json.`;
-            });
+        if (typeof blogDatabase !== 'undefined' && blogDatabase.length > 0) {
+            const statusDiv = document.getElementById('loadingStatus');
+            statusDiv.style.backgroundColor = '#d4edda';
+            statusDiv.style.color = '#155724';
+            statusDiv.innerHTML = `✅ Đã tải xong cơ sở dữ liệu (${blogDatabase.length} tem).`;
+            
+            document.getElementById('btnUpload').disabled = false;
+            document.getElementById('btnCamera').disabled = false;
+            
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+        } else {
+            const statusDiv = document.getElementById('loadingStatus');
+            statusDiv.style.backgroundColor = '#f8d7da';
+            statusDiv.style.color = '#721c24';
+            statusDiv.innerHTML = `❌ Lỗi: Không đọc được file database.js.`;
+        }
     };
 
-    // 2. XỬ LÝ ẢNH XEM TRƯỚC VÀ TÍNH HASH
+    // 2. HIỂN THỊ ẢNH VÀ TÍNH HASH
     function previewImage(event) {
         const file = event.target.files[0];
         if (!file) return;
 
-        // Reset lại input để có thể chọn lại cùng 1 file nếu cần
-        event.target.value = '';
-
+        event.target.value = ''; // Reset input
         const reader = new FileReader();
+
         reader.onload = function(e) {
-            // Hiển thị ảnh xem trước
             const img = document.getElementById('preview');
             img.src = e.target.result;
             document.getElementById('previewContainer').style.display = 'block';
             
-            // Hiển thị nút tìm kiếm và ẩn kết quả cũ
             document.getElementById('searchBtn').style.display = 'block';
             document.getElementById('result').style.display = 'none';
 
-            // Tạo đối tượng Image để tính hash
             const tempImg = new Image();
             tempImg.onload = function() {
                 currentUploadedHash = generateHash(tempImg);
-                console.log("Mã Hash ảnh tải lên:", currentUploadedHash);
             };
             tempImg.src = e.target.result;
         }
@@ -260,7 +240,7 @@
         return hash;
     }
 
-    // 4. THUẬT TOÁN KHOẢNG CÁCH HAMMING
+    // 4. KHOẢNG CÁCH HAMMING
     function getHammingDistance(hash1, hash2) {
         let distance = 0;
         for (let i = 0; i < 64; i++) {
@@ -271,7 +251,7 @@
         return distance;
     }
 
-    // 5. TÌM KIẾM BÀI VIẾT TƯƠNG ĐỒNG
+    // 5. TÌM KIẾM THEO DATA
     function findMatchingArticle() {
         if (!currentUploadedHash) {
             alert("Đang xử lý ảnh, vui lòng nhấn lại sau 1 giây!");
@@ -281,6 +261,7 @@
         let bestMatch = null;
         let lowestDistance = 65; 
 
+        // Duyệt qua biến blogDatabase lấy từ file database.js
         blogDatabase.forEach(item => {
             const distance = getHammingDistance(currentUploadedHash, item.h);
             if (distance < lowestDistance) {
@@ -292,15 +273,15 @@
         const resultDiv = document.getElementById('result');
         resultDiv.style.display = 'block';
 
-        // Mức sai số chấp nhận được: <= 15
+        // Sai số chấp nhận được: <= 15 bit
         if (lowestDistance <= 15 && bestMatch) {
             resultDiv.className = 'match';
             resultDiv.innerHTML = `
-                <h3 style="margin-top:0;">✅ Đã tìm thấy bài viết!</h3>
+                <h3 style="margin-top:0;">✅ Đã tìm thấy tem!</h3>
                 <div style="font-size: 14px; color: #155724;">Mức độ sai lệch: <b>${lowestDistance}/64 bit</b></div>
                 
                 <div class="result-content">
-                    <img src="${bestMatch.img}" alt="Ảnh gốc trên web">
+                    <img src="${bestMatch.img}" alt="Ảnh gốc trên Blog">
                     <div class="result-info">
                         <a href="${bestMatch.u}" target="_blank">🔗 ${bestMatch.t}</a>
                         <p style="font-size: 13px; color: #555; margin: 0;">(Nhấn vào link để xem bài viết gốc)</p>
@@ -311,7 +292,7 @@
             resultDiv.className = 'no-match';
             resultDiv.innerHTML = `
                 <h3 style="margin-top:0;">❌ Không tìm thấy!</h3>
-                <p style="margin-bottom:0;">Không có hình ảnh nào trên web đủ giống với ảnh bạn cung cấp.</p>
+                <p style="margin-bottom:0;">Không có hình ảnh nào trên dữ liệu đủ giống với tem bạn cung cấp.</p>
                 <p style="font-size: 13px; margin-top: 5px;">(Độ lệch nhỏ nhất tìm được: ${lowestDistance}/64 bit - Vượt quá mức cho phép).</p>
             `;
         }
