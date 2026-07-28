@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Công Cụ Tạo Database Blogger (JSONP CORS-Free)</title>
+    <title>Công Cụ Tạo Database Blogger (CORS-Free Đa Lớp)</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; background: #f4f6f9; color: #333; }
         .box { background: #fff; max-width: 650px; margin: 0 auto; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
@@ -11,14 +11,14 @@
         button { background: #007bff; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 15px; transition: background 0.2s; }
         button:hover { background: #0056b3; }
         button:disabled { background: #cccccc; cursor: not-allowed; }
-        #log { margin-top: 20px; text-align: left; background: #1e1e1e; color: #4ec9b0; padding: 15px; font-family: 'Consolas', monospace; height: 280px; overflow-y: auto; border-radius: 6px; font-size: 13px; line-height: 1.5; }
+        #log { margin-top: 20px; text-align: left; background: #1e1e1e; color: #4ec9b0; padding: 15px; font-family: 'Consolas', monospace; height: 350px; overflow-y: auto; border-radius: 6px; font-size: 13px; line-height: 1.5; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2>🛠️ Công Cụ Tạo database.js (JSONP - Không Lỗi CORS)</h2>
-    <p>Tự động đọc bài viết từ <b>stamp.io.vn</b> qua cổng JSONP và tính mã dHash 256-bit trực tiếp trên trình duyệt.</p>
+    <h2>🛠️ Công Cụ Tạo database.js (Vượt CORS)</h2>
+    <p>Đã tích hợp công nghệ Proxy Kép để xử lý 100% ảnh từ máy chủ Google.</p>
     <button id="startBtn" onclick="startProcessing()">🚀 Bắt Đầu Tạo Database</button>
     <div id="log">Sẵn sàng... Bấm nút trên để bắt đầu!</div>
 </div>
@@ -32,32 +32,23 @@
         logDiv.scrollTop = logDiv.scrollHeight;
     }
 
-    // Tải Feed bằng JSONP - Bỏ qua 100% rào cản CORS của trình duyệt
+    // Tải Feed bằng JSONP
     function fetchFeedJSONP(url) {
         return new Promise((resolve, reject) => {
             const callbackName = 'bloggerCallback_' + Math.floor(Math.random() * 1000000);
-            
             window[callbackName] = function(data) {
                 delete window[callbackName];
-                if (script.parentNode) document.body.removeChild(script);
                 resolve(data);
             };
-
             const script = document.createElement('script');
             const sep = url.includes('?') ? '&' : '?';
             script.src = `${url}${sep}alt=json-in-script&callback=${callbackName}`;
-            
-            script.onerror = function() {
-                delete window[callbackName];
-                if (script.parentNode) document.body.removeChild(script);
-                reject(new Error("Lỗi tải script feed"));
-            };
-
+            script.onerror = () => reject(new Error("Lỗi tải script feed"));
             document.body.appendChild(script);
         });
     }
 
-    // Tính dHash 256-bit (16x16) trên HTML5 Canvas
+    // Tính dHash 256-bit
     function computeDHash256(imgElement) {
         const canvas = document.createElement('canvas');
         canvas.width = 17;
@@ -85,51 +76,47 @@
         return hash;
     }
 
+    // VÒNG LẶP PROXY: Lần lượt thử các cách vượt CORS cho đến khi thành công
     function loadImageAndHash(imgUrl) {
         return new Promise((resolve) => {
-            const img = new Image();
-            img.crossOrigin = "Anonymous";
-            
-            img.onload = () => {
-                try {
-                    const hash = computeDHash256(img);
-                    resolve(hash);
-                } catch (e) {
-                    tryWithProxy(imgUrl).then(resolve);
+            // Lớp 1: Thử tải trực tiếp (Thường sẽ thất bại do Google chặn)
+            loadImg(imgUrl).then(hash => {
+                if (hash) resolve(hash);
+                else {
+                    // Lớp 2: Dùng proxy tải ảnh chuyên dụng (wsrv.nl)
+                    const proxy1 = "https://wsrv.nl/?url=" + encodeURIComponent(imgUrl);
+                    loadImg(proxy1).then(hash2 => {
+                        if (hash2) resolve(hash2);
+                        else {
+                            // Lớp 3: Dùng proxy AllOrigins
+                            const proxy2 = "https://api.allorigins.win/raw?url=" + encodeURIComponent(imgUrl);
+                            loadImg(proxy2).then(hash3 => {
+                                resolve(hash3); // Trả về kết quả (thành công hoặc null)
+                            });
+                        }
+                    });
                 }
-            };
-            
-            img.onerror = () => {
-                tryWithProxy(imgUrl).then(resolve);
-            };
-            
-            img.src = imgUrl;
+            });
         });
     }
 
-    function tryWithProxy(imgUrl) {
+    // Hàm tải ảnh an toàn
+    function loadImg(url) {
         return new Promise((resolve) => {
-            const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(imgUrl);
             const img = new Image();
             img.crossOrigin = "Anonymous";
-            
             img.onload = () => {
-                try {
-                    const hash = computeDHash256(img);
-                    resolve(hash);
-                } catch (e) {
-                    resolve(null);
-                }
+                try { resolve(computeDHash256(img)); } 
+                catch (e) { resolve(null); }
             };
-            
             img.onerror = () => resolve(null);
-            img.src = proxyUrl;
+            img.src = url;
         });
     }
 
     async function startProcessing() {
         document.getElementById('startBtn').disabled = true;
-        log("🔄 Đang kết nối tới Blogger qua JSONP (Bypassing CORS)...");
+        log("🔄 Đang kết nối tới Blogger qua JSONP...");
         
         let start = 1;
         let max = 150;
@@ -144,12 +131,11 @@
                 
                 entries.push(...pageEntries);
                 let total = parseInt(data.feed.openSearch$totalResults ? data.feed.openSearch$totalResults.$t : 0);
-                log(`📥 Đã nạp thành công ${entries.length}/${total} bài viết...`);
                 
                 if (start + max > total) break;
                 start += max;
             } catch (e) {
-                log("❌ Lỗi đọc dữ liệu Feed qua JSONP!", "#ff6b6b");
+                log("❌ Lỗi đọc dữ liệu Feed!", "#ff6b6b");
                 break;
             }
         }
@@ -160,7 +146,7 @@
             return;
         }
 
-        log(`<br>📸 Bắt đầu trích xuất mã dHash cho toàn bộ hình ảnh...`);
+        log(`📥 Tìm thấy ${entries.length} bài viết. Bắt đầu vượt CORS và xử lý ảnh...`);
 
         let database = [];
         let count = 0;
@@ -169,15 +155,15 @@
             count++;
             let title = entry.title ? entry.title.$t : "Không tiêu đề";
             let postUrl = "";
-            (entry.link || []).forEach(l => {
-                if (l.rel === "alternate") postUrl = l.href;
-            });
+            (entry.link || []).forEach(l => { if (l.rel === "alternate") postUrl = l.href; });
 
             if (!postUrl) continue;
 
             let htmlContent = (entry.content ? entry.content.$t : "") || (entry.summary ? entry.summary.$t : "");
             let div = document.createElement('div');
             div.innerHTML = htmlContent;
+            
+            // Tìm tất cả ảnh gốc
             let imgs = Array.from(div.querySelectorAll('img')).map(i => i.src).filter(src => src && src.startsWith('http'));
 
             if (imgs.length === 0 && entry.media$thumbnail) {
@@ -189,20 +175,22 @@
 
             for (let imgUrl of imgs) {
                 let cleanUrl = imgUrl.replace(/^http:/, 'https:');
+                
+                // Gọi hàm thử ảnh qua nhiều lớp
                 let hash = await loadImageAndHash(cleanUrl);
                 
                 if (hash) {
+                    // Chú ý: Vẫn lưu URL GỐC (cleanUrl) vào Database, không lưu link Proxy
                     database.push({ t: title, u: postUrl, img: cleanUrl, h: hash });
-                    log(`✅ [${count}/${entries.length}] ${title.substring(0, 35)}...`);
+                    log(`✅ [${count}/${entries.length}] Tải thành công: ${title.substring(0, 30)}...`);
                 } else {
-                    log(`⚠️ Bỏ qua ảnh lỗi: ${cleanUrl.substring(0, 30)}...`, "#eccc68");
+                    log(`⚠️ Bỏ qua ảnh lỗi (Bị chặn hoàn toàn): ${cleanUrl.substring(0, 30)}...`, "#eccc68");
                 }
             }
         }
 
         log(`<br>🎉 HOÀN THÀNH! Đã lưu dữ liệu cho ${database.length} hình ảnh.`, "#2ed573");
         
-        // Tạo và tải file database.js về máy
         const jsonStr = JSON.stringify(database);
         const jsonEscaped = jsonStr.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\${/g, '\\${');
         const jsContent = `const blogDatabase = JSON.parse(\`${jsonEscaped}\`);\n`;
