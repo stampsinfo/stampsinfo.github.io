@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Công Cụ Tạo Database Blogger</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 30px; background: #f4f6f9; color: #333; }
+        .box { background: #fff; max-width: 600px; margin: 0 auto; padding: 25px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
+        button { background: #007bff; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 15px; }
+        button:hover { background: #0056b3; }
+        #log { margin-top: 20px; text-align: left; background: #222; color: #00ff66; padding: 15px; font-family: monospace; height: 250px; overflow-y: auto; border-radius: 5px; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>🛠️ Công Cụ Tạo database.js Chuẩn Xác</h2>
+    <p>Tự động quét trang Blogger <b>stamp.io.vn</b> và tính mã Hash bằng HTML5 Canvas.</p>
+    <button onclick="startProcessing()">🚀 Bắt Đầu Tạo Database</button>
+    <div id="log">Sẵn sàng... Bấm nút trên để bắt đầu!</div>
+</div>
+
+<script>
+    const BLOG_URL = "https://www.stamp.io.vn";
+
+    function log(msg) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML += msg + "<br>";
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // Thuật toán dHash 256-bit chuẩn Canvas (Xử lý nền trong suốt PNG)
+    function computeDHash256(imgElement) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 17;
+        canvas.height = 16;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.drawImage(imgElement, 0, 0, 17, 16);
+        const imgData = ctx.getImageData(0, 0, 17, 16).data;
+        
+        let grayscale = [];
+        for (let i = 0; i < imgData.length; i += 4) {
+            let r = imgData[i], g = imgData[i+1], b = imgData[i+2], a = imgData[i+3] / 255;
+            // Hòa trộn nền trắng cho ảnh PNG có độ trong suốt
+            let gray = (r * 0.299 + g * 0.587 + b * 0.114) * a + 255 * (1 - a);
+            grayscale.push(gray);
+        }
+
+        let hash = "";
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                let pLeft = grayscale[y * 17 + x];
+                let pRight = grayscale[y * 17 + x + 1];
+                hash += (pLeft > pRight) ? "1" : "0";
+            }
+        }
+        return hash;
+    }
+
+    function loadImageAndHash(imgUrl) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = "Anonymous"; 
+            img.onload = () => {
+                try {
+                    const hash = computeDHash256(img);
+                    resolve(hash);
+                } catch (e) {
+                    resolve(null);
+                }
+            };
+            img.onerror = () => resolve(null);
+            img.src = imgUrl;
+        });
+    }
+
+    async function startProcessing() {
+        log("🔄 Đang kết nối tới Blogger Feed API...");
+        let start = 1;
+        let max = 150;
+        let entries = [];
+
+        while (true) {
+            let feedUrl = `${BLOG_URL}/feeds/posts/default?alt=json&max-results=${max}&start-index=${start}`;
+            try {
+                let res = await fetch(feedUrl);
+                if (!res.ok) break;
+                let data = await res.json();
+                let pageEntries = data.feed.entry || [];
+                if (pageEntries.length === 0) break;
+                entries.push(...pageEntries);
+                let total = parseInt(data.feed.openSearch$totalResults.$t || 0);
+                if (start + max > total) break;
+                start += max;
+            } catch (e) {
+                log("❌ Lỗi lấy Feed bài viết!");
+                break;
+            }
+        }
+
+        log(`📥 Tìm thấy ${entries.length} bài viết. Bắt đầu xử lý hình ảnh...`);
+
+        let database = [];
+        let count = 0;
+
+        for (let entry of entries) {
+            count++;
+            let title = entry.title ? entry.title.$t : "Không tiêu đề";
+            let postUrl = "";
+            (entry.link || []).forEach(l => {
+                if (l.rel === "alternate") postUrl = l.href;
+            });
+
+            if (!postUrl) continue;
+
+            let htmlContent = (entry.content ? entry.content.$t : "") || (entry.summary ? entry.summary.$t : "");
+            let div = document.createElement('div');
+            div.innerHTML = htmlContent;
+            let imgs = Array.from(div.querySelectorAll('img')).map(i => i.src).filter(src => src && src.startsWith('http'));
+
+            if (imgs.length === 0 && entry.media$thumbnail) {
+                let thumb = entry.media$thumbnail.url.replace(/\/(s\d+(-c)?|w\d+-h\d+[^/]*)\//, '/s500/');
+                imgs.push(thumb);
+            }
+
+            // Lọc ảnh trùng lặp
+            imgs = [...new Set(imgs)];
+
+            for (let imgUrl of imgs) {
+                // Đảm bảo URL dùng https
+                let cleanUrl = imgUrl.replace(/^http:/, 'https:');
+                let hash = await loadImageAndHash(cleanUrl);
+                if (hash) {
+                    database.push({ t: title, u: postUrl, img: cleanUrl, h: hash });
+                    log(`✅ [${count}/${entries.length}] ${title.substring(0, 30)}...`);
+                } else {
+                    log(`⚠️ Không thể xử lý ảnh: ${cleanUrl}`);
+                }
+            }
+        }
+
+        log(`<br>🎉 HOÀN THÀNH! Đã tạo thành công dữ liệu cho ${database.length} hình ảnh.`);
+        
+        // Tạo và tải file database.js
+        const jsonStr = JSON.stringify(database);
+        const jsonEscaped = jsonStr.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\${/g, '\\${');
+        const jsContent = `const blogDatabase = JSON.parse(\`${jsonEscaped}\`);\n`;
+
+        const blob = new Blob([jsContent], { type: 'text/javascript' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'database.js';
+        a.click();
+
+        log("💾 File 'database.js' đã được tự động tải về máy!");
+    }
+</script>
+
+</body>
+</html>
