@@ -405,7 +405,7 @@ if(!res || !res.ok) throw new Error("Không thể đọc dữ liệu blog, mạn
                 let totalImgs = postsToProcess.reduce((sum, p) => sum + p.images.length, 0);
                 let currentImgIndex = 0;
 
-                appendLog(`Tổng cộng ${totalImgs} hình ảnh cần kiểm tra/trích xuất vector...`);
+                appendLog(`Tổng cộng ${totalImgs} hình ảnh cần kiểm tra/trích xuất vector...`);}
         // --- CƠ CHẾ JSONP BYPASS CORS 100% DÀNH RIÊNG CHO BLOGGER ---
         function fetchBloggerFeedJSONP(blogUrl) {
             return new Promise((resolve, reject) => {
