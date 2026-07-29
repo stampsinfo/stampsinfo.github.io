@@ -323,8 +323,27 @@
 
             try {
                 const rssUrl = `${urlStr}/feeds/posts/default?alt=json&max-results=500`;
-                const res = await fetch(rssUrl);
-                if(!res.ok) throw new Error("Không thể đọc RSS Feed. Kiểm tra lại link blog!");
+let res;
+
+try {
+    // Thử kết nối trực tiếp
+    res = await fetch(rssUrl);
+    if (!res.ok) throw new Error("Direct fetch failed");
+} catch (directErr) {
+    appendLog("⚠️ Bị chặn kết nối chéo (CORS), đang kích hoạt trạm trung chuyển (Proxy)...");
+    try {
+        // Lớp dự phòng 1: Dùng AllOrigins
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`;
+        res = await fetch(proxyUrl);
+    } catch (proxyErr) {
+        // Lớp dự phòng 2: Dùng CorsProxy
+        const proxyUrl2 = `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`;
+        res = await fetch(proxyUrl2);
+    }
+}
+
+if(!res || !res.ok) throw new Error("Không thể đọc dữ liệu blog, mạng không ổn định hoặc link sai!");
+
                 
                 const data = await res.json();
                 const entries = data.feed.entry || [];
