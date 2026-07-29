@@ -13,25 +13,29 @@
         p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
         
         .action-group { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
-        .btn { background: #3b82f6; border: none; padding: 12px 20px; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 14px; }
-        .btn:hover { background: #2563eb; }
-        .btn-camera { background: #10b981; } .btn-camera:hover { background: #059669; }
-        .btn-stop { background: #ef4444; } .btn-stop:hover { background: #dc2626; }
+        .btn { border: none; padding: 12px 24px; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 15px; }
+        .btn:hover { opacity: 0.9; }
+        .btn-choose { background: #3b82f6; }
+        .btn-camera { background: #10b981; } 
+        .btn-capture { background: #06b6d4; font-size: 16px; padding: 14px 28px; }
+        .btn-stop { background: #ef4444; } 
 
         .drop-zone { border: 2px dashed #475569; padding: 25px; border-radius: 8px; background: #334155; cursor: pointer; transition: 0.2s; margin-bottom: 20px; }
         .drop-zone:hover { border-color: #38bdf8; background: #334155aa; }
         input[type="file"] { display: none; }
         
-        /* Khu vực hiển thị camera và ảnh xem trước */
+        /* Khu vực hiển thị camera và các nút điều khiển bên trong */
+        #videoBox { display: none; background: #0f172a; border-radius: 12px; border: 2px solid #10b981; margin: 20px auto; padding: 15px; max-width: 450px; text-align: center; }
+        .video-container { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 15px; }
+        video { width: 100%; height: auto; display: block; max-height: 350px; object-fit: cover; }
+
+        /* Bảng điều khiển camera riêng biệt, giãn cách thoáng, không bị dính */
+        .camera-controls { display: flex; gap: 15px; justify-content: center; align-items: center; flex-wrap: wrap; }
+
         .media-container { margin: 15px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
         #previewImg { max-width: 220px; max-height: 220px; border-radius: 6px; display: none; border: 2px solid #64748b; }
-        
-        #videoBox { display: none; position: relative; width: 100%; max-width: 400px; background: #000; border-radius: 8px; overflow: hidden; border: 2px solid #10b981; margin: 0 auto; }
-        video { width: 100%; height: auto; display: block; }
 
         #resultBox { margin-top: 25px; background: #020617; padding: 20px; border-radius: 8px; text-align: left; border: 1px solid #334155; display: none; }
-        #resultBox h3 { color: #4ade80; margin-top: 0; margin-bottom: 15px; }
-        
         .result-item { border-bottom: 1px dashed #334155; padding: 12px 0; }
         .result-item:last-child { border-bottom: none; }
         .result-title { margin: 0 0 5px 0; font-size: 15px; }
@@ -46,21 +50,23 @@
 
 <div class="box">
     <h2>🔍 TRA CỨU TEM THÔNG MINH</h2>
-    <p>Chọn file ảnh có sẵn, kéo thả hoặc sử dụng Camera trực tiếp để quét tìm bài viết.</p>
+    <p>Chọn file ảnh có sẵn hoặc mở Camera trực tiếp để quét tìm bài viết.</p>
     
     <div class="action-group">
-        <button class="btn" onclick="document.getElementById('fileInput').click()">📁 Chọn Ảnh Từ Máy</button>
+        <button class="btn btn-choose" onclick="document.getElementById('fileInput').click()">📁 Chọn Ảnh Từ Máy</button>
         <button id="btnToggleCam" class="btn btn-camera" onclick="toggleCamera()">📷 Mở Camera Chụp Ảnh</button>
     </div>
 
     <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
 
-    <!-- Khu vực hiển thị Video từ Camera -->
+    <!-- KHU VỰC CAMERA TỐI ƯU GIAO DIỆN DI ĐỘNG -->
     <div id="videoBox">
-        <video id="webcam" autoplay playsinline></video>
-        <div style="padding: 10px; background: #1e293b; text-align: center;">
-            <button class="btn btn-camera" onclick="captureSnapshot()">📸 Chụp Ảnh Ngay</button>
-            <button class="btn btn-stop" onclick="stopCamera()">✖ Đóng Camera</button>
+        <div class="video-container">
+            <video id="webcam" autoplay playsinline></video>
+        </div>
+        <div class="camera-controls">
+            <button class="btn btn-capture" onclick="captureSnapshot()">📸 Chụp Ngay</button>
+            <button class="btn btn-stop" onclick="stopCamera()">✖ Đóng</button>
         </div>
     </div>
 
@@ -79,7 +85,6 @@
 <script>
     let mediaStream = null;
 
-    // --- 1. XỬ LÝ CHỌN FILE HOẶC KÉO THẢ ---
     function handleFileSelect(event) {
         const file = event.target.files[0];
         if (file) {
@@ -96,7 +101,6 @@
         reader.readAsDataURL(file);
     }
 
-    // --- 2. XỬ LÝ CAMERA (MỞ / TẮT / CHỤP) ---
     async function toggleCamera() {
         const videoBox = document.getElementById('videoBox');
         const webcam = document.getElementById('webcam');
@@ -108,19 +112,23 @@
 
         try {
             mediaStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" }, // Ưu tiên camera sau trên điện thoại
+                video: { facingMode: "environment" }, 
                 audio: false 
             });
             webcam.srcObject = mediaStream;
             videoBox.style.display = 'block';
-            document.getElementById('btnToggleCam').innerText = "🔴 Đang Mở Camera";
-            document.getElementById('btnToggleCam').className = "btn btn-stop";
             
-            // Ẩn ảnh xem trước cũ khi bật camera
+            // Cuộn màn hình tự động xuống khung camera để người dùng di động dễ nhìn thấy ngay
+            videoBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            let btn = document.getElementById('btnToggleCam');
+            btn.innerText = "🔴 Đang Mở Camera";
+            btn.className = "btn btn-stop";
+            
             document.getElementById('previewImg').style.display = 'none';
             document.getElementById('resultBox').style.display = 'none';
         } catch (err) {
-            alert("Không thể truy cập Camera! Vui lòng kiểm tra quyền cấp phép của trình duyệt. Lỗi: " + err.message);
+            alert("Không thể truy cập Camera! Vui lòng cấp quyền camera cho trình duyệt. Lỗi: " + err.message);
         }
     }
 
@@ -150,7 +158,6 @@
         loadImageAndRun(dataUrl);
     }
 
-    // --- 3. ĐỌC ẢNH VÀ CHẠY THUẬT TOÁN HASH ---
     function loadImageAndRun(dataUrl) {
         const preview = document.getElementById('previewImg');
         preview.src = dataUrl;
@@ -174,7 +181,6 @@
         img.src = dataUrl;
     }
 
-    // --- 4. THUẬT TOÁN dHash 256-bit (Chuẩn tỷ lệ 17x16) ---
     function computeDHash256(imgElement) {
         const canvas = document.createElement('canvas');
         canvas.width = 17; 
@@ -208,7 +214,6 @@
         return hash;
     }
 
-    // --- 5. TÍNH KHOẢNG CÁCH HAMMING ---
     function hammingDistance(hash1, hash2) {
         let dist = 0;
         for (let i = 0; i < hash1.length; i++) {
@@ -217,12 +222,11 @@
         return dist;
     }
 
-    // --- 6. TÌM KIẾM VÀ HIỂN THỊ BẢNG XẾP HẠNG (ĐÃ LOẠI BỎ LINK ẢNH) ---
     function searchDatabase(inputHash) {
         document.getElementById('loadingText').style.display = 'none';
 
         if (typeof blogDatabase === 'undefined' || !Array.isArray(blogDatabase) || blogDatabase.length === 0) {
-            alert("Không tìm thấy dữ liệu trong file database.js hoặc file chưa được nạp đúng cách!");
+            alert("Không tìm thấy dữ liệu trong file database.js!");
             return;
         }
 
@@ -232,17 +236,13 @@
             results.push({ item: item, cost: cost });
         }
 
-        // Sắp xếp theo độ sai số từ thấp đến cao (càng thấp càng khớp chính xác)
         results.sort((a, b) => a.cost - b.cost);
-
-        // Lấy Top 5 kết quả tối ưu nhất
         let topResults = results.slice(0, 5);
 
         let resultContent = document.getElementById('resultContent');
         let htmlContent = `<h3 style="margin-top:0; color:#4ade80;">✨ Top 5 Bài Viết Phù Hợp Nhất:</h3>`;
         
         topResults.forEach((res, index) => {
-            // Phân loại màu sắc theo mức độ sai số (nới lỏng ngưỡng lên tới 75 bits để bao quát tốt ảnh thực tế)
             let color = res.cost <= 40 ? "#4ade80" : (res.cost <= 75 ? "#f59e0b" : "#ef4444");
             let badgeText = res.cost <= 40 ? "Khớp rất tốt" : (res.cost <= 75 ? "Khớp tương đối" : "Sai số cao");
 
