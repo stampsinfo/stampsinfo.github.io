@@ -17,7 +17,7 @@
         <!-- Header -->
         <header class="mb-6 text-center">
             <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tìm bài viết Blogger theo hình ảnh</h1>
-            <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Thu thập 100% bài viết &bull; Đồng bộ đa thiết bị qua JSON</p>
+            <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Thu thập 100% bài viết &bull; Đồng bộ tự động qua Repo & JSON</p>
         </header>
 
         <!-- Trạng thái Hệ thống & Model AI -->
@@ -27,7 +27,7 @@
                     <span id="model-badge" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
                     <span id="model-status" class="text-sm font-medium text-gray-700">Đang khởi tạo hệ thống...</span>
                 </div>
-                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-semibold">Cache: 0 bài</span>
+                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-semibold">Cache: 0 bài (0 ảnh)</span>
             </div>
             <div id="progress-bar-container" class="w-full bg-gray-200 rounded-full h-2 mt-3 hidden overflow-hidden">
                 <div id="progress-bar" class="bg-blue-600 h-2 transition-all duration-300" style="width: 0%"></div>
@@ -173,12 +173,32 @@
             matchCountBadge: document.getElementById('match-count-badge')
         };
 
-        // --- 1. KHỞI TẠO HỆ THỐNG & HIỂN THỊ % TẢI AI ---
+        // --- 1. KHỞI TẠO HỆ THỐNG & TỰ ĐỘNG NẠP CACHE TỪ REPO ---
         async function init() {
             try {
                 await initDB();
-                await updateCacheBadge();
+                
+                // Tự động kiểm tra nếu cache trống thì nạp ngay file cache.json từ Repo
+                const existing = await dbGetAllPosts();
+                if (existing.length === 0) {
+                    try {
+                        ui.modelStatus.textContent = "Đang tải sẵn dữ liệu Cache từ Repository...";
+                        const res = await fetch('./cache.json');
+                        if (res.ok) {
+                            const posts = await res.json();
+                            if (Array.isArray(posts) && posts.length > 0) {
+                                for (const post of posts) {
+                                    await dbSavePost(post);
+                                }
+                                console.log("Đã tự động nạp cache từ file cache.json trên repo!");
+                            }
+                        }
+                    } catch (e) {
+                        console.log("Chưa có file cache.json trên repo, bỏ qua bước tự động nạp.");
+                    }
+                }
 
+                await updateCacheBadge();
                 ui.modelStatus.textContent = "Đang bắt đầu tải mô hình AI Vision...";
 
                 const onProgress = (data) => {
@@ -199,9 +219,9 @@
                 ui.btnSync.classList.replace('bg-gray-400', 'bg-blue-600');
                 ui.btnSync.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
 
-                // Tự động kiểm tra nếu chưa có cache thì đồng bộ ngay
-                const existing = await dbGetAllPosts();
-                if (existing.length === 0) {
+                // Tự động quét nếu chưa có dữ liệu nào
+                const checkAfterInit = await dbGetAllPosts();
+                if (checkAfterInit.length === 0) {
                     syncBlogger();
                 }
                 
@@ -387,9 +407,13 @@
                     const doc = parser.parseFromString(html, 'text/html');
                     const imgElements = Array.from(doc.querySelectorAll('img')).map(img => img.src).filter(Boolean);
                     
-                    if (imgElements.length > 0) {
-                        postsToProcess.push({ postId, title, link, images: imgElements, embeddings: [] });
-                    }
+                    postsToProcess.push({ 
+                        postId, 
+                        title, 
+                        link, 
+                        images: imgElements, 
+                        embeddings: [] 
+                    });
                 });
 
                 const existingPosts = await dbGetAllPosts();
@@ -432,7 +456,7 @@
 
                             URL.revokeObjectURL(blobUrl);
                         } catch (err) {
-                            // Bỏ qua ảnh lỗi
+                            // Bỏ qua ảnh lỗi tải
                         }
 
                         currentImgIndex++;
@@ -557,7 +581,7 @@
                 let maxScore = -1;
                 let bestImg = "";
 
-                for (const imgItem of post.embeddings) {
+                for (const imgItem of (post.embeddings || [])) {
                     const score = cosineSimilarity(queryVector, imgItem.vector);
                     if (score > maxScore) {
                         maxScore = score;
