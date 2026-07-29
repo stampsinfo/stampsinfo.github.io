@@ -3,108 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cập Nhật Tăng Dần Database Tem (Tự Động Tải Từ Repo)</title>
+    <title>Công Cụ Cập Nhật Database Tem (Auto GitHub)</title>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background: #0f172a; color: #fff; }
-        .box { background: #1e293b; max-width: 850px; margin: 0 auto; padding: 30px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); text-align: center; }
-        h2 { color: #38bdf8; margin-top: 0; }
-        p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
-        
-        .upload-section { background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #475569; text-align: left; }
-        .upload-section label { font-weight: bold; color: #cbd5e1; display: block; margin-bottom: 8px; font-size: 13px; }
-        
-        .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
-        button { border: none; padding: 12px 20px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; color: white; }
-        .btn-start { background: #10b981; } .btn-start:hover { background: #059669; }
-        .btn-download { background: #8b5cf6; } .btn-download:hover { background: #7c3aed; }
-        button:disabled { background: #475569 !important; cursor: not-allowed; opacity: 0.6; }
-
-        #statusBox { background: #0f172a; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; color: #f59e0b; border: 1px solid #334155; }
-        #log { text-align: left; background: #020617; color: #4ade80; padding: 15px; font-family: 'Consolas', monospace; height: 350px; overflow-y: auto; border-radius: 8px; font-size: 13px; line-height: 1.6; border: 1px solid #334155; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f6f9; color: #333; }
+        .box { background: #fff; max-width: 700px; margin: 0 auto; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; margin-top: 0; text-align: center; }
+        p { color: #666; font-size: 15px; text-align: center; margin-bottom: 25px; }
+        button { background: #28a745; color: white; border: none; padding: 14px 20px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s; width: 100%; }
+        button:hover { background: #218838; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #log { margin-top: 20px; text-align: left; background: #1e1e1e; color: #4ec9b0; padding: 15px; font-family: 'Consolas', monospace; height: 400px; overflow-y: auto; border-radius: 8px; font-size: 13px; line-height: 1.6; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2>⚡ CẬP NHẬT TĂNG DẦN DATABASE (TỰ ĐỘNG TỪ REPO)</h2>
-    <p>Hệ thống sẽ tự động lấy file <code>database.js</code> đang có sẵn trên cùng thư mục GitHub để so sánh và bổ sung tem mới.</p>
+    <h2>🛠️ Quản Lý Database Nhận Diện Tem</h2>
+    <p>Hệ thống tự động tìm <code>database.js</code> trên GitHub, giữ tỷ lệ ảnh gốc (Letterboxing) và chỉ quét các tem mới.</p>
     
-    <div id="statusBox">⏳ Đang tự động tải database.js từ repo...</div>
-
-    <div class="btn-group">
-        <button id="btnStartUpdate" class="btn-start" onclick="startIncrementalScan()" disabled>🚀 Bắt Đầu Quét & Cập Nhật Mới</button>
-        <button id="btnDownload" class="btn-download" onclick="downloadUpdatedDB()" disabled>💾 Tải database.js Đã Cập Nhật</button>
-    </div>
-
-    <!-- Phần dự phòng nếu chạy test dưới máy tính bị lỗi CORS -->
-    <details class="upload-section">
-        <summary style="cursor: pointer; color: #38bdf8; font-weight: bold; font-size: 13px;">⚙️ Tùy chọn nâng cao: Tải file thủ công (Nếu chạy dưới máy tính cá nhân)</summary>
-        <br>
-        <label>📂 Chọn file <code>database.js</code> thủ công từ máy:</label>
-        <input type="file" id="oldDbFile" accept=".js" onchange="loadManualDatabase(event)">
-    </details>
+    <button id="startBtn" onclick="startProcessing()">🚀 Bắt Đầu Quét & Cập Nhật</button>
     
-    <div id="log">Hệ thống sẵn sàng...</div>
+    <div id="log">Sẵn sàng...</div>
 </div>
 
 <script>
-    const BLOG_URL = "https://www.stamp.io.vn"; // URL Blog của bạn
-    let existingDatabase = [];
-    let existingImageUrls = new Set();
-    let updatedDatabase = [];
-    let isRunning = false;
+    const BLOG_URL = "https://www.stamp.io.vn"; // Thay URL blog của bạn nếu cần
+    let oldDatabase = [];
+    let existingImgUrls = new Set();
 
-    function log(msg, color = "#4ade80") {
+    function log(msg, color = "#4ec9b0") {
         const logDiv = document.getElementById('log');
         logDiv.innerHTML += `<span style="color: ${color}">${msg}</span><br>`;
         logDiv.scrollTop = logDiv.scrollHeight;
     }
 
-    function setStatus(msg) {
-        document.getElementById('statusBox').innerHTML = msg;
-    }
-
-    // --- 1. TỰ ĐỘNG TẢI DATABASE TỪ REPO KHI MỞ TRANG ---
-    window.onload = async function() {
-        try {
-            log("[Hệ thống] Đang cố gắng tải database.js từ cùng thư mục trên Repo...", "#38bdf8");
-            let response = await fetch('./database.js?t=' + new Date().getTime());
-            if (!response.ok) throw new Error("Không tìm thấy file database.js cùng thư mục.");
-            
-            let content = await response.text();
-            parseAndLoadDatabase(content);
-            log("✅ Tự động tải database.js từ Repo thành công!", "#4ade80");
-        } catch (err) {
-            setStatus("⚠️ Không thể tự động tải file từ Repo (Có thể do chạy trực tiếp từ máy tính). Vui lòng dùng mục tùy chọn bên dưới để chọn file thủ công.");
-            log("⚠️ Không thể tự động tải file: " + err.message, "#f59e0b");
-        }
-    };
-
-    function parseAndLoadDatabase(content) {
-        let match = content.match(/\[[\s\S]*\]/);
-        if (match) {
-            existingDatabase = JSON.parse(match[0]);
-            existingImageUrls = new Set(existingDatabase.map(item => item.img));
-            
-            setStatus(`✅ Đã nạp thành công từ Repo: <b>${existingDatabase.length}</b> tem. Sẵn sàng cập nhật!`);
-            document.getElementById('btnStartUpdate').disabled = false;
-            log(`[Hệ thống] Đã nạp thành công database cũ gồm ${existingDatabase.length} tem.`, "#38bdf8");
-        } else {
-            alert("Cấu trúc file database.js không hợp lệ!");
-        }
-    }
-
-    function loadManualDatabase(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            parseAndLoadDatabase(e.target.result);
-        };
-        reader.readAsText(file);
-    }
-
-    // --- 2. THUẬT TOÁN HASH & FEED BLOGGER ---
     function fetchFeedJSONP(url) {
         return new Promise((resolve, reject) => {
             const callbackName = 'bloggerCallback_' + Math.floor(Math.random() * 1000000);
@@ -116,6 +48,7 @@
         });
     }
 
+    // Hàm tính Hash 256-bit (ĐÃ CẬP NHẬT GIỮ TỶ LỆ KHUNG HÌNH)
     function computeDHash256(imgElement) {
         const canvas = document.createElement('canvas');
         canvas.width = 17; canvas.height = 16;
@@ -148,11 +81,13 @@
         return hash;
     }
 
+    // Vượt CORS & Chống Cache 304
     function loadImageAndHash(imgUrl) {
         return new Promise((resolve) => {
+            const cacheBuster = "?t=" + new Date().getTime() + Math.random();
             const urlWithCacheBuster = imgUrl + (imgUrl.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
+
             const proxy1 = "https://api.allorigins.win/raw?url=" + encodeURIComponent(urlWithCacheBuster);
-            
             loadImg(proxy1).then(hash1 => {
                 if (hash1) resolve(hash1);
                 else {
@@ -176,105 +111,83 @@
         });
     }
 
-    // --- 3. TIẾN TRÌNH QUÉT VÀ CẬP NHẬT TĂNG DẦN ---
-    async function startIncrementalScan() {
-        if (existingDatabase.length === 0) {
-            alert("Chưa có dữ liệu database cũ được tải!");
-            return;
-        }
+    async function startProcessing() {
+        document.getElementById('startBtn').disabled = true;
+        log("🔄 Đang tìm file <code>database.js</code> trên GitHub...");
+        
+        await new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'database.js?t=' + new Date().getTime(); 
+            script.onload = () => {
+                if (typeof blogDatabase !== 'undefined') {
+                    oldDatabase = blogDatabase;
+                    existingImgUrls = new Set(oldDatabase.map(item => item.img));
+                    log(`✅ Đã nạp Database cũ: <b>${oldDatabase.length}</b> hình ảnh.`, "#ffdd59");
+                }
+                resolve();
+            };
+            script.onerror = () => { log("⚠️ Không tìm thấy Database cũ. Quét mới hoàn toàn.", "#eccc68"); resolve(); };
+            document.head.appendChild(script);
+        });
 
-        isRunning = true;
-        document.getElementById('btnStartUpdate').disabled = true;
+        log("<br>🔄 Đang quét bài viết từ Blogger...");
+        let start = 1; let max = 150; let entries = [];
 
-        log("<br>🔄 <b>Đang quét danh sách bài viết từ Blogger để tìm điểm mới...</b>", "#38bdf8");
-
-        let allEntries = [];
-        let start = 1; let max = 150;
         while (true) {
             try {
                 let data = await fetchFeedJSONP(`${BLOG_URL}/feeds/posts/default?max-results=${max}&start-index=${start}`);
                 let pageEntries = data.feed ? (data.feed.entry || []) : [];
                 if (pageEntries.length === 0) break;
-                
-                allEntries.push(...pageEntries);
-                let total = parseInt(data.feed.openSearch$totalResults.$t);
-                if (start + max > total) break;
+                entries.push(...pageEntries);
+                if (start + max > parseInt(data.feed.openSearch$totalResults.$t)) break;
                 start += max;
-            } catch (e) { 
-                log("❌ Lỗi khi đọc feed từ Blogger!", "#ef4444"); 
-                isRunning = false;
-                document.getElementById('btnStartUpdate').disabled = false;
-                return; 
-            }
+            } catch (e) { log("❌ Lỗi đọc Feed!", "#ff6b6b"); break; }
         }
 
-        log(`📦 Đã đọc thấy tổng cộng ${allEntries.length} bài viết trên blog. Đang lọc các bài mới...`, "#38bdf8");
+        log(`📥 Tìm thấy ${entries.length} bài viết. Bắt đầu đối chiếu và xử lý ảnh...`);
+        let newRecords = []; 
+        let skipCount = 0;   
 
-        let newlyAddedCount = 0;
-        updatedDatabase = [...existingDatabase];
-
-        for (let i = 0; i < allEntries.length; i++) {
-            let entry = allEntries[i];
+        for (let entry of entries) {
             let title = entry.title ? entry.title.$t : "Không tiêu đề";
             let postUrl = (entry.link || []).find(l => l.rel === "alternate")?.href;
             if (!postUrl) continue;
-
-            setStatus(`⏳ Đang kiểm tra [Bài ${i + 1}/${allEntries.length}]: ${title.substring(0, 30)}...`);
 
             let htmlContent = (entry.content?.t || entry.summary?.t || "");
             let div = document.createElement('div'); div.innerHTML = htmlContent;
             
             let imgs = Array.from(div.querySelectorAll('img')).map(i => i.src).filter(src => src && src.startsWith('http'));
-            if (imgs.length === 0 && entry.media$thumbnail) {
-                imgs.push(entry.media$thumbnail.url.replace(/\/(s\d+(-c)?|w\d+-h\d+[^/]*)\//, '/s500/'));
-            }
-            imgs = [...new Set(imgs)];
-
-            let newImgsForThisPost = imgs.filter(imgUrl => {
+            if (imgs.length === 0 && entry.media$thumbnail) imgs.push(entry.media$thumbnail.url.replace(/\/(s\d+(-c)?|w\d+-h\d+[^/]*)\//, '/s500/'));
+            
+            for (let imgUrl of [...new Set(imgs)]) {
                 let cleanUrl = imgUrl.replace(/^http:/, 'https:');
-                return !existingImageUrls.has(cleanUrl);
-            });
-
-            if (newImgsForThisPost.length === 0) continue; 
-
-            log(`✨ Phát hiện bài viết mới/có ảnh mới: <b>${title}</b> (${newImgsForThisPost.length} ảnh mới)`, "#f59e0b");
-
-            for (let imgUrl of newImgsForThisPost) {
-                let cleanUrl = imgUrl.replace(/^http:/, 'https:');
-                if (existingImageUrls.has(cleanUrl)) continue;
-
+                if (existingImgUrls.has(cleanUrl)) { skipCount++; continue; }
+                
                 let hash = await loadImageAndHash(cleanUrl);
                 if (hash) {
-                    let newItem = { t: title, u: postUrl, img: cleanUrl, h: hash };
-                    updatedDatabase.push(newItem);
-                    existingImageUrls.add(cleanUrl);
-                    newlyAddedCount++;
-                    log(`➕ Thêm tem mới [#${newlyAddedCount}]: ${cleanUrl.substring(0, 50)}...`);
+                    newRecords.push({ t: title, u: postUrl, img: cleanUrl, h: hash });
+                    existingImgUrls.add(cleanUrl); 
+                    log(`✨ [Thêm Mới] ${title.substring(0, 30)}...`);
                 }
             }
         }
 
-        isRunning = false;
-        setStatus(`🎉 Cập nhật hoàn tất! Đã thêm mới ${newlyAddedCount} tem. Tổng cộng: ${updatedDatabase.length} tem.`);
-        log(`<br>🎉 <b>QUÉT CẬP NHẬT HOÀN TẤT!</b> Đã bổ sung thành công <b>${newlyAddedCount}</b> tem mới.`, "#4ade80");
-        document.getElementById('btnDownload').disabled = false;
-        document.getElementById('btnStartUpdate').disabled = false;
-    }
-
-    // --- 4. TẢI FILE DATABASE.JS MỚI ---
-    function downloadUpdatedDB() {
-        if (updatedDatabase.length === 0) {
-            alert("Chưa có dữ liệu!");
-            return;
-        }
-        let jsonStr = JSON.stringify(updatedDatabase);
-        let jsContent = `var blogDatabase = JSON.parse(String.raw\`${jsonStr}\`);\n`;
+        let finalDatabase = oldDatabase.concat(newRecords);
+        log(`<br>🎉 <b>HOÀN THÀNH!</b>`, "#2ed573");
+        log(`- Giữ nguyên: ${oldDatabase.length} | Bỏ qua trùng: ${skipCount} | Thêm mới: <b>${newRecords.length}</b>`);
+        log(`👉 Tổng database hiện tại: <b>${finalDatabase.length} ảnh</b>.`);
         
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([jsContent], { type: 'text/javascript' }));
-        a.download = 'database.js';
-        a.click();
-        log("💾 Đã tải file <b>database.js</b> phiên bản cập nhật mới nhất!", "#38bdf8");
+        if (newRecords.length > 0) {
+            const jsContent = `var blogDatabase = JSON.parse(\`${JSON.stringify(finalDatabase).replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\${/g, '\\${')}\`);\n`;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([jsContent], { type: 'text/javascript' }));
+            a.download = 'database.js';
+            a.click();
+            log("<br>💾 Đã tải file <b>database.js</b> về máy. Vui lòng upload đè lên GitHub!", "#2ed573");
+        } else {
+            log("<br>💡 Database đã ở trạng thái mới nhất!", "#ffdd59");
+        }
+        document.getElementById('startBtn').disabled = false;
     }
 </script>
 </body>
