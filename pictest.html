@@ -219,7 +219,7 @@
                 ui.btnSync.classList.replace('bg-gray-400', 'bg-blue-600');
                 ui.btnSync.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
 
-                // Tự động quét nếu chưa có dữ liệu nào
+                // Tự động quét nhẹ nếu hoàn toàn chưa có cache nào cả
                 const checkAfterInit = await dbGetAllPosts();
                 if (checkAfterInit.length === 0) {
                     syncBlogger();
@@ -422,17 +422,22 @@
                 let totalImgs = postsToProcess.reduce((sum, p) => sum + p.images.length, 0);
                 let currentImgIndex = 0;
 
-                appendLog(`Tổng cộng có ${totalImgs} hình ảnh cần xử lý vector AI...`);
+                appendLog(`Tổng cộng có ${postsToProcess.length} bài viết với ${totalImgs} hình ảnh cần xử lý...`);
 
                 for (let i = 0; i < postsToProcess.length; i++) {
                     const post = postsToProcess[i];
                     const cachedPost = existingMap.get(post.postId);
                     const updatedEmbeddings = [];
+                    const totalPostImgs = post.images.length;
 
-                    for (const rawImgUrl of post.images) {
+                    for (let j = 0; j < totalPostImgs; j++) {
+                        const rawImgUrl = post.images[j];
                         const cleanUrl = normalizeBloggerUrl(rawImgUrl);
                         const cached = cachedPost?.embeddings?.find(e => e.url === cleanUrl || e.rawUrl === rawImgUrl);
                         
+                        // HIỂN THỊ TIẾN ĐỘ CHI TIẾT TỪNG BÀI VÀ SỐ LƯỢNG ẢNH
+                        ui.modelStatus.textContent = `Bài ${i + 1}/${postsToProcess.length}: "${post.title.substring(0, 30)}..." (Ảnh ${j + 1}/${totalPostImgs})`;
+
                         if (cached) {
                             updatedEmbeddings.push(cached);
                             currentImgIndex++;
@@ -467,11 +472,13 @@
                     await dbSavePost(post);
                 }
 
+                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
                 appendLog("🎉 Hoàn tất đồng bộ toàn bộ dữ liệu vào Cache!");
                 await updateCacheBadge();
 
             } catch (err) {
                 appendLog(`❌ Lỗi đồng bộ: ${err.message}`);
+                ui.modelStatus.textContent = "Lỗi đồng bộ dữ liệu.";
             } finally {
                 ui.btnSync.disabled = false;
                 ui.syncSpinner.classList.add('hidden');
@@ -509,7 +516,7 @@
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(posts));
             const dlAnchorElem = document.createElement('a');
             dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", `blogger_ai_cache_${Date.now()}.json`);
+            dlAnchorElem.setAttribute("download", `cache.json`);
             dlAnchorElem.click();
         }
 
