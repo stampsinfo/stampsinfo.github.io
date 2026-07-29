@@ -139,41 +139,44 @@
         return dist;
     }
 
-    // --- 4. TÌM KIẾM TRONG MẢNG blogDatabase (từ file database.js) ---
-    function searchDatabase(inputHash) {
+function searchDatabase(inputHash) {
         document.getElementById('loadingText').style.display = 'none';
 
         if (typeof blogDatabase === 'undefined' || !Array.isArray(blogDatabase) || blogDatabase.length === 0) {
-            alert("Không tìm thấy dữ liệu trong file database.js hoặc file chưa được nạp đúng cách!");
+            alert("Không tìm thấy dữ liệu trong file database.js!");
             return;
         }
 
-        let bestMatch = null;
-        let minCost = 999;
+        let results = [];
 
-        // Quét toàn bộ database để tìm bản ghi có khoảng cách Hamming nhỏ nhất
+        // Tính toán khoảng cách Hamming cho TOÀN BỘ database
         for (let item of blogDatabase) {
             let cost = hammingDistance(inputHash, item.h);
-            if (cost < minCost) {
-                minCost = cost;
-                bestMatch = item;
-            }
+            results.push({ item: item, cost: cost });
         }
 
-        // Ngưỡng sai số chấp nhận (Ví dụ: dưới 45 bit khác biệt trên tổng số 256 bit)
-        const THRESHOLD = 45;
+        // Sắp xếp từ độ sai số thấp nhất đến cao nhất (càng thấp càng giống)
+        results.sort((a, b) => a.cost - b.cost);
 
-        if (bestMatch && minCost <= THRESHOLD) {
-            document.getElementById('resTitle').innerText = "✨ " + bestMatch.t;
-            let linkEl = document.getElementById('resLink');
-            linkEl.href = bestMatch.u;
-            linkEl.innerText = bestMatch.u;
-            document.getElementById('resImgUrl').innerText = bestMatch.img;
-            document.getElementById('resScore').innerText = `${minCost} bit khác biệt (Khớp rất tốt)`;
-            document.getElementById('resultBox').style.display = 'block';
-        } else {
-            alert("Không tìm thấy bài viết nào khớp với hình ảnh này trong Database! (Sai số quá cao: " + minCost + " bits)");
-        }
+        // Lấy top 5 kết quả tốt nhất để phân tích
+        let topResults = results.slice(0, 5);
+
+        let resultBox = document.getElementById('resultBox');
+        let htmlContent = `<h3>🔍 Top 5 kết quả gần nhất:</h3>`;
+        
+        topResults.forEach((res, index) => {
+            let color = res.cost <= 45 ? "#4ade80" : (res.cost <= 75 ? "#f59e0b" : "#ef4444");
+            htmlContent += `
+                <div style="border-bottom: 1px dashed #334155; padding: 10px 0;">
+                    <p style="margin: 0; color: #fff;"><b>#${index + 1}. Bài viết:</b> <a href="${res.item.u}" target="_blank" style="color: #38bdf8;">${res.item.t}</a></p>
+                    <p style="margin: 4px 0 0 0; font-size: 13px; color: ${color};">Sai số Hamming: <b>${res.cost} bits</b></p>
+                    <p style="margin: 2px 0 0 0; font-size: 11px; color: #94a3b8; word-break: break-all;">Ảnh: ${res.item.img}</p>
+                </div>
+            `;
+        });
+
+        resultBox.innerHTML = htmlContent;
+        resultBox.style.display = 'block';
     }
 </script>
 
