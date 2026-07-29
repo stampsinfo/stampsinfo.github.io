@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tra Cứu Tem Thông Minh (Hỗ Trợ Tem Ngang & Dọc)</title>
+    <title>Tra Cứu Tem Thông Minh (Chọn Tem Ngang / Dọc)</title>
     <!-- Nhúng sẵn file database.js vào trang -->
     <script src="database.js"></script>
     <style>
@@ -13,25 +13,33 @@
         p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
         
         .action-group { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
-        .btn { border: none; padding: 12px 24px; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 15px; }
+        .btn { border: none; padding: 12px 20px; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 14px; }
         .btn:hover { opacity: 0.9; }
         .btn-choose { background: #3b82f6; }
-        .btn-camera { background: #10b981; } 
-        .btn-capture { background: #06b6d4; font-size: 16px; padding: 14px 28px; }
+        .btn-camera-vert { background: #10b981; } 
+        .btn-camera-horiz { background: #8b5cf6; } 
+        .btn-capture { background: #06b6d4; font-size: 15px; padding: 12px 24px; }
         .btn-stop { background: #ef4444; } 
 
         .drop-zone { border: 2px dashed #475569; padding: 25px; border-radius: 8px; background: #334155; cursor: pointer; transition: 0.2s; margin-bottom: 20px; }
         .drop-zone:hover { border-color: #38bdf8; background: #334155aa; }
         input[type="file"] { display: none; }
         
-        #videoBox { display: none; background: #0f172a; border-radius: 12px; border: 2px solid #10b981; margin: 20px auto; padding: 15px; max-width: 450px; text-align: center; }
-        .video-container { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 15px; }
-        video { width: 100%; height: auto; display: block; max-height: 350px; object-fit: cover; }
+        #videoBox { display: none; background: #0f172a; border-radius: 12px; border: 2px solid #38bdf8; margin: 20px auto; padding: 15px; max-width: 450px; text-align: center; }
+        
+        /* Thay đổi khung hình xem trước camera tương ứng Ngang / Dọc */
+        .video-container { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 15px; display: flex; justify-content: center; align-items: center; }
+        video { width: 100%; height: auto; display: block; object-fit: cover; }
+        
+        /* Tỷ lệ khung hình hiển thị camera */
+        .video-vertical { max-height: 400px; }
+        .video-horizontal { max-height: 250px; }
 
         .camera-controls { display: flex; gap: 15px; justify-content: center; align-items: center; flex-wrap: wrap; }
+        #camModeTitle { color: #f59e0b; font-weight: bold; margin-bottom: 10px; font-size: 15px; }
 
         .media-container { margin: 15px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        #previewImg { max-width: 220px; max-height: 220px; border-radius: 6px; display: none; border: 2px solid #64748b; }
+        #previewImg { max-width: 200px; max-height: 200px; border-radius: 6px; display: none; border: 2px solid #64748b; }
 
         #resultBox { margin-top: 25px; background: #020617; padding: 20px; border-radius: 8px; text-align: left; border: 1px solid #334155; display: none; }
         .result-item { border-bottom: 1px dashed #334155; padding: 12px 0; }
@@ -47,23 +55,26 @@
 <body>
 
 <div class="box">
-    <h2>🔍 TRA CỨU TEM THÔNG MINH (HỖ TRỢ TEM NGANG/DỌC)</h2>
-    <p>Chọn file ảnh hoặc mở Camera để quét tìm bài viết (Tự động thích ứng tem ngang và dọc).</p>
+    <h2>🔍 TRA CỨU TEM THÔNG MINH</h2>
+    <p>Chọn ảnh có sẵn từ máy hoặc chọn chế độ chụp Camera phù hợp với loại tem.</p>
     
     <div class="action-group">
         <button class="btn btn-choose" onclick="document.getElementById('fileInput').click()">📁 Chọn Ảnh Từ Máy</button>
-        <button id="btnToggleCam" class="btn btn-camera" onclick="toggleCamera()">📷 Mở Camera Chụp Ảnh</button>
+        <button class="btn btn-camera-vert" onclick="startCamera('vertical')">🔲 Chụp Tem Dọc</button>
+        <button class="btn btn-camera-horiz" onclick="startCamera('horizontal')">🖼️ Chụp Tem Ngang</button>
     </div>
 
     <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
 
+    <!-- KHU VỰC CAMERA TÙY CHỌN -->
     <div id="videoBox">
-        <div class="video-container">
+        <div id="camModeTitle">Đang mở chế độ: Tem Dọc</div>
+        <div class="video-container" id="videoContainerDiv">
             <video id="webcam" autoplay playsinline></video>
         </div>
         <div class="camera-controls">
             <button class="btn btn-capture" onclick="captureSnapshot()">📸 Chụp Ngay</button>
-            <button class="btn btn-stop" onclick="stopCamera()">✖ Đóng</button>
+            <button class="btn btn-stop" onclick="stopCamera()">✖ Đóng Camera</button>
         </div>
     </div>
 
@@ -71,7 +82,7 @@
         <img id="previewImg" alt="Ảnh xem trước">
     </div>
 
-    <div id="loadingText" class="loading">⏳ Đang xử lý và phân tích mã băm ảnh thích ứng...</div>
+    <div id="loadingText" class="loading">⏳ Đang xử lý mã băm và tìm kiếm...</div>
 
     <div id="resultBox">
         <div id="resultContent"></div>
@@ -80,6 +91,7 @@
 
 <script>
     let mediaStream = null;
+    let currentMode = 'vertical'; // Mặc định dọc
 
     function handleFileSelect(event) {
         const file = event.target.files[0];
@@ -92,18 +104,28 @@
     function processImageFile(file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            loadImageAndRun(e.target.result);
+            loadImageAndRun(e.target.result, 'auto');
         };
         reader.readAsDataURL(file);
     }
 
-    async function toggleCamera() {
+    async function startCamera(mode) {
+        currentMode = mode;
         const videoBox = document.getElementById('videoBox');
         const webcam = document.getElementById('webcam');
+        const containerDiv = document.getElementById('videoContainerDiv');
+        const modeTitle = document.getElementById('camModeTitle');
 
         if (mediaStream) {
             stopCamera();
-            return;
+        }
+
+        if (mode === 'vertical') {
+            modeTitle.innerText = "📌 Đang mở: Chế độ Chụp Tem Dọc";
+            containerDiv.className = "video-container video-vertical";
+        } else {
+            modeTitle.innerText = "📌 Đang mở: Chế độ Chụp Tem Ngang";
+            containerDiv.className = "video-container video-horizontal";
         }
 
         try {
@@ -115,10 +137,6 @@
             videoBox.style.display = 'block';
             videoBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-            let btn = document.getElementById('btnToggleCam');
-            btn.innerText = "🔴 Đang Mở Camera";
-            btn.className = "btn btn-stop";
-            
             document.getElementById('previewImg').style.display = 'none';
             document.getElementById('resultBox').style.display = 'none';
         } catch (err) {
@@ -132,9 +150,6 @@
             mediaStream = null;
         }
         document.getElementById('videoBox').style.display = 'none';
-        let btn = document.getElementById('btnToggleCam');
-        btn.innerText = "📷 Mở Camera Chụp Ảnh";
-        btn.className = "btn btn-camera";
     }
 
     function captureSnapshot() {
@@ -148,11 +163,12 @@
         ctx.drawImage(webcam, 0, 0, canvas.width, canvas.height);
 
         const dataUrl = canvas.toDataURL('image/jpeg');
+        let modeToRun = currentMode;
         stopCamera();
-        loadImageAndRun(dataUrl);
+        loadImageAndRun(dataUrl, modeToRun);
     }
 
-    function loadImageAndRun(dataUrl) {
+    function loadImageAndRun(dataUrl, mode) {
         const preview = document.getElementById('previewImg');
         preview.src = dataUrl;
         preview.style.display = 'inline-block';
@@ -164,7 +180,7 @@
         img.onload = function() {
             setTimeout(() => {
                 try {
-                    let inputHash = computeAdaptiveDHash(img);
+                    let inputHash = computeFixedDHash(img, mode);
                     searchDatabase(inputHash);
                 } catch (err) {
                     alert("Lỗi xử lý ảnh: " + err.message);
@@ -175,20 +191,23 @@
         img.src = dataUrl;
     }
 
-    // --- THUẬT TOÁN dHash Thích Ứng (Tự động nhận diện Ngang / Dọc) ---
-    function computeAdaptiveDHash(imgElement) {
+    // --- HÀM BĂM dHash THEO LỰA CHỌN CỐ ĐỊNH (NGANG / DỌC) ---
+    function computeFixedDHash(imgElement, mode) {
+        let isLandscape = false;
+        if (mode === 'horizontal') isLandscape = true;
+        else if (mode === 'vertical') isLandscape = false;
+        else {
+            // Trường hợp tải ảnh có sẵn từ máy -> tự nhận diện theo tỷ lệ ảnh
+            isLandscape = imgElement.width > imgElement.height;
+        }
+
         const canvas = document.createElement('canvas');
+        // Tem dọc: Lưới 17x16 | Tem ngang: Lưới 16x17
+        canvas.width = isLandscape ? 17 : 17;
+        canvas.height = isLandscape ? 16 : 16;
         
-        // Kiểm tra tỷ lệ khung hình thực tế của ảnh đầu vào
-        const isLandscape = imgElement.width > imgElement.height;
-        
-        // Nếu là tem ngang: Dùng khung 16x17. Nếu là tem dọc: Dùng khung 17x16.
-        const targetW = isLandscape ? 17 : 17;
-        const targetH = isLandscape ? 16 : 16;
-        
-        // Cấu hình khung lưới băm phù hợp chiều hướng
-        canvas.width = isLandscape ? 16 : 17;
-        canvas.height = isLandscape ? 17 : 16;
+        const cols = isLandscape ? 17 : 17;
+        const rows = isLandscape ? 16 : 16;
         
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = "white";
@@ -210,9 +229,6 @@
         }
 
         let hash = "";
-        let rows = canvas.height;
-        let cols = canvas.width;
-        
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols - 1; x++) {
                 hash += (grayscale[y * cols + x] > grayscale[y * cols + x + 1]) ? "1" : "0";
@@ -230,6 +246,7 @@
         return dist;
     }
 
+    // --- TÌM KIẾM VÀ GOM NHÓM TÊN BÀI VIẾT DUY NHẤT ---
     function searchDatabase(inputHash) {
         document.getElementById('loadingText').style.display = 'none';
 
@@ -238,14 +255,23 @@
             return;
         }
 
-        let results = [];
+        let resultsMap = new Map(); // Dùng Map để gom nhóm theo đường dẫn bài viết (u)
+
         for (let item of blogDatabase) {
             let cost = hammingDistance(inputHash, item.h);
-            results.push({ item: item, cost: cost });
+            
+            // Nếu bài viết này chưa có trong danh sách, hoặc có điểm số tốt hơn (cost nhỏ hơn), cập nhật lại
+            if (!resultsMap.has(item.u) || resultsMap.get(item.u).cost > cost) {
+                resultsMap.set(item.u, { item: item, cost: cost });
+            }
         }
 
-        results.sort((a, b) => a.cost - b.cost);
-        let topResults = results.slice(0, 5);
+        // Chuyển Map thành mảng và sắp xếp theo độ sai số tăng dần (khớp nhất lên đầu)
+        let uniqueResults = Array.from(resultsMap.values());
+        uniqueResults.sort((a, b) => a.cost - b.cost);
+
+        // Lấy Top 5 bài viết độc lập tốt nhất
+        let topResults = uniqueResults.slice(0, 5);
 
         let resultContent = document.getElementById('resultContent');
         let htmlContent = `<h3 style="margin-top:0; color:#4ade80;">✨ Top 5 Bài Viết Phù Hợp Nhất:</h3>`;
