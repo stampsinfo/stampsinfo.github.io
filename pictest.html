@@ -3,100 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tra Cứu Tem Thông Minh (Nhận Diện Ảnh dHash)</title>
+    <title>Tra Cứu Tem Thông Minh (Hỗ Trợ Camera & dHash)</title>
     <!-- Nhúng sẵn file database.js vào trang -->
     <script src="database.js"></script>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background: #0f172a; color: #fff; margin: 0; }
-        .box { background: #1e293b; max-width: 800px; margin: 40px auto; padding: 30px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); text-align: center; }
+        .box { background: #1e293b; max-width: 850px; margin: 30px auto; padding: 30px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); text-align: center; }
         h2 { color: #38bdf8; margin-top: 0; }
         p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
         
-        .drop-zone { border: 2px dashed #475569; padding: 30px; border-radius: 8px; background: #334155; cursor: pointer; transition: 0.2s; margin-bottom: 20px; }
+        .action-group { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+        .btn { background: #3b82f6; border: none; padding: 12px 20px; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 14px; }
+        .btn:hover { background: #2563eb; }
+        .btn-camera { background: #10b981; } .btn-camera:hover { background: #059669; }
+        .btn-stop { background: #ef4444; } .btn-stop:hover { background: #dc2626; }
+
+        .drop-zone { border: 2px dashed #475569; padding: 25px; border-radius: 8px; background: #334155; cursor: pointer; transition: 0.2s; margin-bottom: 20px; }
         .drop-zone:hover { border-color: #38bdf8; background: #334155aa; }
         input[type="file"] { display: none; }
         
-        #previewImg { max-width: 200px; max-height: 200px; border-radius: 6px; margin-top: 15px; display: none; border: 2px solid #64748b; }
+        /* Khu vực hiển thị camera và ảnh xem trước */
+        .media-container { margin: 15px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        #previewImg { max-width: 220px; max-height: 220px; border-radius: 6px; display: none; border: 2px solid #64748b; }
         
+        #videoBox { display: none; position: relative; width: 100%; max-width: 400px; background: #000; border-radius: 8px; overflow: hidden; border: 2px solid #10b981; margin: 0 auto; }
+        video { width: 100%; height: auto; display: block; }
+
         #resultBox { margin-top: 25px; background: #020617; padding: 20px; border-radius: 8px; text-align: left; border: 1px solid #334155; display: none; }
-        #resultBox h3 { color: #4ade80; margin-top: 0; margin-bottom: 10px; }
-        #resultBox p { color: #cbd5e1; margin: 8px 0; }
-        #resultBox a { color: #38bdf8; text-decoration: none; font-weight: bold; }
-        #resultBox a:hover { text-decoration: underline; }
+        #resultBox h3 { color: #4ade80; margin-top: 0; margin-bottom: 15px; }
         
+        .result-item { border-bottom: 1px dashed #334155; padding: 12px 0; }
+        .result-item:last-child { border-bottom: none; }
+        .result-title { margin: 0 0 5px 0; font-size: 15px; }
+        .result-title a { color: #38bdf8; text-decoration: none; font-weight: bold; }
+        .result-title a:hover { text-decoration: underline; }
+        .result-meta { margin: 0; font-size: 13px; }
+
         .loading { color: #f59e0b; font-weight: bold; margin-top: 15px; display: none; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2>🔍 TRA CỨU TEM THÔNG MINH QUA ẢNH</h2>
-    <p>Tải ảnh con tem lên hoặc kéo thả vào đây để tìm bài viết tương ứng trong Database.</p>
+    <h2>🔍 TRA CỨU TEM THÔNG MINH</h2>
+    <p>Chọn file ảnh có sẵn, kéo thả hoặc sử dụng Camera trực tiếp để quét tìm bài viết.</p>
     
-    <div class="drop-zone" onclick="document.getElementById('fileInput').click()" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
-        <span style="font-size: 30px;">📁</span><br>
-        <b>Click để chọn ảnh</b> hoặc kéo thả ảnh vào đây
-        <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+    <div class="action-group">
+        <button class="btn" onclick="document.getElementById('fileInput').click()">📁 Chọn Ảnh Từ Máy</button>
+        <button id="btnToggleCam" class="btn btn-camera" onclick="toggleCamera()">📷 Mở Camera Chụp Ảnh</button>
     </div>
 
-    <div>
+    <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+
+    <!-- Khu vực hiển thị Video từ Camera -->
+    <div id="videoBox">
+        <video id="webcam" autoplay playsinline></video>
+        <div style="padding: 10px; background: #1e293b; text-align: center;">
+            <button class="btn btn-camera" onclick="captureSnapshot()">📸 Chụp Ảnh Ngay</button>
+            <button class="btn btn-stop" onclick="stopCamera()">✖ Đóng Camera</button>
+        </div>
+    </div>
+
+    <!-- Khu vực hiển thị ảnh xem trước -->
+    <div class="media-container">
         <img id="previewImg" alt="Ảnh xem trước">
     </div>
 
     <div id="loadingText" class="loading">⏳ Đang xử lý và phân tích mã băm ảnh...</div>
 
     <div id="resultBox">
-        <h3 id="resTitle">Kết quả tìm kiếm</h3>
-        <p><b>Bài viết:</b> <a id="resLink" href="#" target="_blank">Xem bài viết</a></p>
-        <p><b>Link ảnh gốc:</b> <span id="resImgUrl" style="word-break: break-all; color: #94a3b8; font-size: 12px;"></span></p>
-        <p><b>Độ chính xác (Sai số Hamming):</b> <span id="resScore" style="color: #f59e0b;"></span></p>
+        <div id="resultContent"></div>
     </div>
 </div>
 
 <script>
-    // --- 1. XỬ LÝ KHI NGƯỜI DÙNG CHỌN / KÉO THẢ ẢNH ---
+    let mediaStream = null;
+
+    // --- 1. XỬ LÝ CHỌN FILE HOẶC KÉO THẢ ---
     function handleFileSelect(event) {
         const file = event.target.files[0];
-        if (file) processImageFile(file);
-    }
-
-    function handleDrop(event) {
-        event.preventDefault();
-        const file = event.dataTransfer.files[0];
-        if (file) processImageFile(file);
+        if (file) {
+            stopCamera();
+            processImageFile(file);
+        }
     }
 
     function processImageFile(file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                // Hiển thị ảnh xem trước
-                const preview = document.getElementById('previewImg');
-                preview.src = e.target.result;
-                preview.style.display = 'inline-block';
-
-                // Ẩn kết quả cũ, hiện thông báo đang xử lý
-                document.getElementById('resultBox').style.display = 'none';
-                document.getElementById('loadingText').style.display = 'block';
-
-                // Chạy thuật toán băm ảnh ngay lập tức
-                setTimeout(() => {
-                    try {
-                        let inputHash = computeDHash256(img);
-                        searchDatabase(inputHash);
-                    } catch (err) {
-                        alert("Lỗi xử lý ảnh: " + err.message);
-                        document.getElementById('loadingText').style.display = 'none';
-                    }
-                }, 50);
-            };
-            img.src = e.target.result;
+            loadImageAndRun(e.target.result);
         };
         reader.readAsDataURL(file);
     }
 
-    // --- 2. THUẬT TOÁN dHash 256-bit (Chuẩn tỷ lệ 17x16 giống hệt trang quét) ---
+    // --- 2. XỬ LÝ CAMERA (MỞ / TẮT / CHỤP) ---
+    async function toggleCamera() {
+        const videoBox = document.getElementById('videoBox');
+        const webcam = document.getElementById('webcam');
+
+        if (mediaStream) {
+            stopCamera();
+            return;
+        }
+
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" }, // Ưu tiên camera sau trên điện thoại
+                audio: false 
+            });
+            webcam.srcObject = mediaStream;
+            videoBox.style.display = 'block';
+            document.getElementById('btnToggleCam').innerText = "🔴 Đang Mở Camera";
+            document.getElementById('btnToggleCam').className = "btn btn-stop";
+            
+            // Ẩn ảnh xem trước cũ khi bật camera
+            document.getElementById('previewImg').style.display = 'none';
+            document.getElementById('resultBox').style.display = 'none';
+        } catch (err) {
+            alert("Không thể truy cập Camera! Vui lòng kiểm tra quyền cấp phép của trình duyệt. Lỗi: " + err.message);
+        }
+    }
+
+    function stopCamera() {
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream = null;
+        }
+        document.getElementById('videoBox').style.display = 'none';
+        let btn = document.getElementById('btnToggleCam');
+        btn.innerText = "📷 Mở Camera Chụp Ảnh";
+        btn.className = "btn btn-camera";
+    }
+
+    function captureSnapshot() {
+        const webcam = document.getElementById('webcam');
+        if (!mediaStream) return;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = webcam.videoWidth || 640;
+        canvas.height = webcam.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(webcam, 0, 0, canvas.width, canvas.height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        stopCamera();
+        loadImageAndRun(dataUrl);
+    }
+
+    // --- 3. ĐỌC ẢNH VÀ CHẠY THUẬT TOÁN HASH ---
+    function loadImageAndRun(dataUrl) {
+        const preview = document.getElementById('previewImg');
+        preview.src = dataUrl;
+        preview.style.display = 'inline-block';
+
+        document.getElementById('resultBox').style.display = 'none';
+        document.getElementById('loadingText').style.display = 'block';
+
+        const img = new Image();
+        img.onload = function() {
+            setTimeout(() => {
+                try {
+                    let inputHash = computeDHash256(img);
+                    searchDatabase(inputHash);
+                } catch (err) {
+                    alert("Lỗi xử lý ảnh: " + err.message);
+                    document.getElementById('loadingText').style.display = 'none';
+                }
+            }, 50);
+        };
+        img.src = dataUrl;
+    }
+
+    // --- 4. THUẬT TOÁN dHash 256-bit (Chuẩn tỷ lệ 17x16) ---
     function computeDHash256(imgElement) {
         const canvas = document.createElement('canvas');
         canvas.width = 17; 
@@ -130,7 +208,7 @@
         return hash;
     }
 
-    // --- 3. HÀM TÍNH KHOẢNG CÁCH HAMMING ---
+    // --- 5. TÍNH KHOẢNG CÁCH HAMMING ---
     function hammingDistance(hash1, hash2) {
         let dist = 0;
         for (let i = 0; i < hash1.length; i++) {
@@ -139,44 +217,47 @@
         return dist;
     }
 
-function searchDatabase(inputHash) {
+    // --- 6. TÌM KIẾM VÀ HIỂN THỊ BẢNG XẾP HẠNG (ĐÃ LOẠI BỎ LINK ẢNH) ---
+    function searchDatabase(inputHash) {
         document.getElementById('loadingText').style.display = 'none';
 
         if (typeof blogDatabase === 'undefined' || !Array.isArray(blogDatabase) || blogDatabase.length === 0) {
-            alert("Không tìm thấy dữ liệu trong file database.js!");
+            alert("Không tìm thấy dữ liệu trong file database.js hoặc file chưa được nạp đúng cách!");
             return;
         }
 
         let results = [];
-
-        // Tính toán khoảng cách Hamming cho TOÀN BỘ database
         for (let item of blogDatabase) {
             let cost = hammingDistance(inputHash, item.h);
             results.push({ item: item, cost: cost });
         }
 
-        // Sắp xếp từ độ sai số thấp nhất đến cao nhất (càng thấp càng giống)
+        // Sắp xếp theo độ sai số từ thấp đến cao (càng thấp càng khớp chính xác)
         results.sort((a, b) => a.cost - b.cost);
 
-        // Lấy top 5 kết quả tốt nhất để phân tích
+        // Lấy Top 5 kết quả tối ưu nhất
         let topResults = results.slice(0, 5);
 
-        let resultBox = document.getElementById('resultBox');
-        let htmlContent = `<h3>🔍 Top 5 kết quả gần nhất:</h3>`;
+        let resultContent = document.getElementById('resultContent');
+        let htmlContent = `<h3 style="margin-top:0; color:#4ade80;">✨ Top 5 Bài Viết Phù Hợp Nhất:</h3>`;
         
         topResults.forEach((res, index) => {
-            let color = res.cost <= 45 ? "#4ade80" : (res.cost <= 75 ? "#f59e0b" : "#ef4444");
+            // Phân loại màu sắc theo mức độ sai số (nới lỏng ngưỡng lên tới 75 bits để bao quát tốt ảnh thực tế)
+            let color = res.cost <= 40 ? "#4ade80" : (res.cost <= 75 ? "#f59e0b" : "#ef4444");
+            let badgeText = res.cost <= 40 ? "Khớp rất tốt" : (res.cost <= 75 ? "Khớp tương đối" : "Sai số cao");
+
             htmlContent += `
-                <div style="border-bottom: 1px dashed #334155; padding: 10px 0;">
-                    <p style="margin: 0; color: #fff;"><b>#${index + 1}. Bài viết:</b> <a href="${res.item.u}" target="_blank" style="color: #38bdf8;">${res.item.t}</a></p>
-                    <p style="margin: 4px 0 0 0; font-size: 13px; color: ${color};">Sai số Hamming: <b>${res.cost} bits</b></p>
-                    <p style="margin: 2px 0 0 0; font-size: 11px; color: #94a3b8; word-break: break-all;">Ảnh: ${res.item.img}</p>
+                <div class="result-item">
+                    <p class="result-title"><b>#${index + 1}.</b> <a href="${res.item.u}" target="_blank">${res.item.t}</a></p>
+                    <p class="result-meta" style="color: ${color};">
+                        Sai số Hamming: <b>${res.cost} bits</b> &bull; <span>${badgeText}</span>
+                    </p>
                 </div>
             `;
         });
 
-        resultBox.innerHTML = htmlContent;
-        resultBox.style.display = 'block';
+        resultContent.innerHTML = htmlContent;
+        document.getElementById('resultBox').style.display = 'block';
     }
 </script>
 
