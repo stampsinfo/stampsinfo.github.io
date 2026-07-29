@@ -7,49 +7,75 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
         .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
-        h1 { color: #2c3e50; margin-top: 0; }
+        h1 { color: #2c3e50; margin-top: 0; font-size: 24px; }
         
         /* Khu vực upload ảnh */
-        .upload-area { border: 2px dashed #3498db; padding: 30px; border-radius: 8px; background: #ebf5fb; cursor: pointer; transition: 0.3s; position: relative; margin-bottom: 20px; }
+        .upload-area { border: 2px dashed #3498db; padding: 30px; border-radius: 8px; background: #ebf5fb; cursor: pointer; transition: 0.3s; position: relative; margin-bottom: 15px; }
         .upload-area:hover { background: #d6eaf8; border-color: #2980b9; }
         .upload-area p { margin: 0; font-size: 16px; color: #2980b9; font-weight: bold; }
         #fileInput { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
         
+        /* Nút phụ trợ */
+        .action-buttons { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
+        .btn-outline { background: #fff; border: 2px solid #3498db; color: #3498db; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 8px; }
+        .btn-outline:hover { background: #3498db; color: #fff; }
+
+        /* Giao diện Camera WebRTC */
+        #cameraContainer { display: none; margin-bottom: 20px; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
+        #videoStream { width: 100%; max-height: 400px; object-fit: cover; display: block; }
+        .camera-controls { padding: 15px; background: #222; display: flex; justify-content: center; gap: 15px; }
+        .btn-capture { background: #e74c3c; color: white; border: none; padding: 12px 30px; border-radius: 50px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .btn-capture:hover { background: #c0392b; }
+        .btn-cancel { background: #7f8c8d; color: white; border: none; padding: 12px 20px; border-radius: 50px; font-weight: bold; cursor: pointer; }
+
         /* Hiển thị ảnh tải lên */
         #preview { max-width: 250px; max-height: 250px; display: none; margin: 15px auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
         
         /* Nút tìm kiếm */
-        button { background: #e74c3c; color: #fff; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #c0392b; }
-        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        #searchBtn { background: #27ae60; color: #fff; border: none; padding: 14px 40px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s; width: 100%; max-width: 300px; box-shadow: 0 4px 6px rgba(39, 174, 96, 0.2); }
+        #searchBtn:hover { background: #219653; transform: translateY(-2px); }
+        #searchBtn:disabled { background: #bdc3c7; cursor: not-allowed; box-shadow: none; transform: none; }
         
         /* Kết quả */
         #status { margin-top: 15px; font-weight: bold; color: #7f8c8d; }
-        .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; margin-top: 30px; }
+        .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 30px; }
         .result-card { background: #fff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.3s; text-decoration: none; color: inherit; display: flex; flex-direction: column; }
         .result-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
-        .result-img { width: 100%; height: 180px; object-fit: contain; background: #fafafa; border-bottom: 1px solid #eee; padding: 5px; box-sizing: border-box; }
-        .result-info { padding: 15px; text-align: left; }
-        .result-title { font-size: 14px; font-weight: bold; margin: 0 0 10px 0; color: #2c3e50; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .result-sim { font-size: 13px; color: #27ae60; font-weight: bold; }
+        .result-img { width: 100%; height: 160px; object-fit: contain; background: #fafafa; border-bottom: 1px solid #eee; padding: 5px; box-sizing: border-box; }
+        .result-info { padding: 12px; text-align: left; }
+        .result-title { font-size: 13px; font-weight: bold; margin: 0 0 8px 0; color: #2c3e50; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .result-sim { font-size: 13px; color: #27ae60; font-weight: bold; margin: 0; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🔍 Tìm Kiếm Hình Ảnh</h1>
+    <h1>🔍 Nhận Diện & Tìm Kiếm Tem</h1>
     
-    <div class="upload-area">
-        <p>Nhấp vào đây, kéo thả ảnh hoặc dán (Ctrl+V) ảnh vào đây</p>
+    <div class="action-buttons">
+        <button class="btn-outline" onclick="openCamera()">📸 Mở Camera Chụp Trực Tiếp</button>
+    </div>
+
+    <!-- Khu vực hiển thị luồng Camera -->
+    <div id="cameraContainer">
+        <video id="videoStream" autoplay playsinline></video>
+        <div class="camera-controls">
+            <button class="btn-cancel" onclick="closeCamera()">❌ Hủy</button>
+            <button class="btn-capture" onclick="capturePhoto()">⭕ CHỤP ẢNH</button>
+        </div>
+    </div>
+    
+    <!-- Khu vực tải file -->
+    <div class="upload-area" id="uploadArea">
+        <p>📁 Nhấp tải ảnh lên hoặc Dán (Ctrl+V)</p>
         <input type="file" id="fileInput" accept="image/*">
     </div>
     
     <img id="preview" alt="Ảnh tải lên">
     <br>
-    <button id="searchBtn" onclick="processSearch()" disabled>Tìm Kiếm Ngay</button>
+    <button id="searchBtn" onclick="processSearch()" disabled>🔍 TÌM KIẾM NGAY</button>
     
     <div id="status">Vui lòng tải file database.js trước khi tìm kiếm...</div>
-    
     <div class="results-grid" id="results"></div>
 </div>
 
@@ -60,65 +86,110 @@
     let uploadedImage = null;
     const SIMILARITY_THRESHOLD = 75; // Độ trùng khớp tối thiểu (75%)
 
-    // Kiểm tra xem database.js đã được tải chưa
     window.onload = function() {
         if (typeof blogDatabase !== 'undefined') {
-            document.getElementById('status').innerText = `✅ Đã tải ${blogDatabase.length} dữ liệu. Sẵn sàng tìm kiếm!`;
+            document.getElementById('status').innerText = `✅ Đã kết nối Database (${blogDatabase.length} tem). Sẵn sàng!`;
         } else {
             document.getElementById('status').style.color = "red";
-            document.getElementById('status').innerText = "❌ Lỗi: Không tìm thấy file database.js. Vui lòng đặt nó cùng thư mục với file index.html";
+            document.getElementById('status').innerText = "❌ Lỗi: Không tìm thấy file database.js.";
         }
     };
 
-    // --- XỬ LÝ ẢNH ĐẦU VÀO ---
-    const fileInput = document.getElementById('fileInput');
-    const preview = document.getElementById('preview');
-    const searchBtn = document.getElementById('searchBtn');
+    // --- 1. CHỨC NĂNG CAMERA TRỰC TIẾP (WebRTC) ---
+    const videoStream = document.getElementById('videoStream');
+    const cameraContainer = document.getElementById('cameraContainer');
+    const uploadArea = document.getElementById('uploadArea');
+    let currentStream = null;
 
-    fileInput.addEventListener('change', handleImage);
+    async function openCamera() {
+        try {
+            // Yêu cầu camera (Ưu tiên camera sau trên điện thoại: facingMode: 'environment')
+            const constraints = { video: { facingMode: 'environment' } };
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            videoStream.srcObject = currentStream;
+            cameraContainer.style.display = 'block';
+            uploadArea.style.display = 'none'; // Ẩn ô upload đi cho gọn
+            document.getElementById('preview').style.display = 'none'; // Ẩn ảnh cũ
+            document.getElementById('searchBtn').disabled = true;
+            document.getElementById('results').innerHTML = ''; // Xóa kết quả cũ
+        } catch (err) {
+            alert("❌ Không thể truy cập Camera. Vui lòng kiểm tra quyền cho phép Camera trên trình duyệt của bạn.");
+        }
+    }
+
+    function closeCamera() {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop()); // Tắt camera để tiết kiệm pin
+        }
+        cameraContainer.style.display = 'none';
+        uploadArea.style.display = 'block';
+    }
+
+    function capturePhoto() {
+        // Tạo một canvas ẩn để vẽ lại khung hình từ Video
+        const canvas = document.createElement('canvas');
+        canvas.width = videoStream.videoWidth;
+        canvas.height = videoStream.videoHeight;
+        canvas.getContext('2d').drawImage(videoStream, 0, 0, canvas.width, canvas.height);
+        
+        // Xuất ảnh ra định dạng base64 (DataURL)
+        const dataURL = canvas.toDataURL('image/jpeg', 0.9);
+        
+        // Tắt camera
+        closeCamera();
+        
+        // Gắn ảnh vào khung Preview và chuẩn bị tìm kiếm
+        document.getElementById('preview').src = dataURL;
+        document.getElementById('preview').style.display = 'block';
+        
+        uploadedImage = new Image();
+        uploadedImage.onload = function() {
+            document.getElementById('searchBtn').disabled = false;
+            document.getElementById('status').innerText = "✅ Đã chụp ảnh xong. Bấm 'Tìm Kiếm Ngay'!";
+        };
+        uploadedImage.src = dataURL;
+    }
+
+    // --- 2. CHỨC NĂNG TẢI FILE / DÁN ẢNH ---
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        if (e.target.files && e.target.files[0]) processImageFile(e.target.files[0]);
+    });
     
-    // Hỗ trợ dán ảnh (Ctrl + V)
     document.addEventListener("paste", function(e) {
         let items = (e.clipboardData || e.originalEvent.clipboardData).items;
         for (let item of items) {
             if (item.type.indexOf("image") === 0) {
-                let file = item.getAsFile();
-                loadImageFile(file);
+                processImageFile(item.getAsFile());
             }
         }
     });
 
-    function handleImage(e) {
-        if (e.target.files && e.target.files[0]) loadImageFile(e.target.files[0]);
-    }
-
-    function loadImageFile(file) {
+    function processImageFile(file) {
         const reader = new FileReader();
         reader.onload = function(event) {
-            preview.src = event.target.result;
-            preview.style.display = 'block';
+            document.getElementById('preview').src = event.target.result;
+            document.getElementById('preview').style.display = 'block';
             
             uploadedImage = new Image();
-            uploadedImage.src = event.target.result;
             uploadedImage.onload = function() {
-                searchBtn.disabled = false; // Bật nút tìm kiếm
-                document.getElementById('status').innerText = "Ảnh đã sẵn sàng. Bấm 'Tìm Kiếm Ngay'!";
+                document.getElementById('searchBtn').disabled = false;
+                document.getElementById('status').innerText = "✅ Ảnh đã sẵn sàng. Bấm 'Tìm Kiếm Ngay'!";
             }
+            uploadedImage.src = event.target.result;
         }
         reader.readAsDataURL(file);
     }
 
-    // --- THUẬT TOÁN HASH (GIỐNG HỆT CÔNG CỤ TẠO DATABASE) ---
+    // --- 3. THUẬT TOÁN HASH (Chuẩn tỷ lệ khung hình) ---
     function computeDHash256(imgElement) {
         const canvas = document.createElement('canvas');
         canvas.width = 17; canvas.height = 16;
         const ctx = canvas.getContext('2d');
         
-        // Tô nền trắng
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, 17, 16);
 
-        // Bù viền, giữ nguyên tỷ lệ
         const scale = Math.min(17 / imgElement.width, 16 / imgElement.height);
         const w = imgElement.width * scale;
         const h = imgElement.height * scale;
@@ -143,7 +214,6 @@
         return hash;
     }
 
-    // Tính khoảng cách Hamming
     function hammingDistance(hash1, hash2) {
         let distance = 0;
         for (let i = 0; i < 256; i++) {
@@ -152,62 +222,52 @@
         return distance;
     }
 
-    // --- XỬ LÝ TÌM KIẾM ---
+    // --- 4. TÌM KIẾM VÀ HIỂN THỊ KẾT QUẢ ---
     function processSearch() {
         if (!uploadedImage || typeof blogDatabase === 'undefined') return;
 
-        document.getElementById('status').innerText = "⏳ Đang quét dữ liệu...";
-        searchBtn.disabled = true;
+        document.getElementById('status').innerText = "⏳ Đang quét cơ sở dữ liệu. Vui lòng đợi...";
+        document.getElementById('searchBtn').disabled = true;
 
         setTimeout(() => {
             const targetHash = computeDHash256(uploadedImage);
             let matches = [];
 
-            // Duyệt qua toàn bộ database
             for (let item of blogDatabase) {
                 let dist = hammingDistance(targetHash, item.h);
                 let similarity = ((256 - dist) / 256) * 100;
                 
                 if (similarity >= SIMILARITY_THRESHOLD) {
-                    matches.push({
-                        title: item.t,
-                        url: item.u,
-                        img: item.img,
-                        sim: similarity
-                    });
+                    matches.push({ title: item.t, url: item.u, img: item.img, sim: similarity });
                 }
             }
 
-            // Sắp xếp giảm dần theo độ chính xác
-            matches.sort((a, b) => b.sim - a.sim);
+            matches.sort((a, b) => b.sim - a.sim); // Giống nhất lên đầu
             renderResults(matches);
             
-            searchBtn.disabled = false;
-        }, 100); // Timeout nhỏ để UI kịp cập nhật chữ "Đang quét..."
+            document.getElementById('searchBtn').disabled = false;
+        }, 50);
     }
 
-    // --- HIỂN THỊ KẾT QUẢ ---
     function renderResults(matches) {
         const resultsDiv = document.getElementById('results');
         resultsDiv.innerHTML = "";
 
         if (matches.length === 0) {
-            document.getElementById('status').innerText = "❌ Không tìm thấy kết quả nào phù hợp.";
+            document.getElementById('status').innerText = "❌ Không tìm thấy con tem nào giống ảnh của bạn.";
             return;
         }
 
-        document.getElementById('status').innerText = `✅ Tìm thấy ${matches.length} kết quả phù hợp!`;
+        document.getElementById('status').innerText = `🎉 Tìm thấy ${matches.length} kết quả khớp!`;
 
         matches.forEach(item => {
-            // Cắt bớt tiêu đề nếu quá dài
             let shortTitle = item.title.replace(" | Stamp IO VN", ""); 
-
             resultsDiv.innerHTML += `
                 <a href="${item.url}" target="_blank" class="result-card">
                     <img src="${item.img}" class="result-img" alt="Tem">
                     <div class="result-info">
                         <p class="result-title">${shortTitle}</p>
-                        <p class="result-sim">Độ giống: ${item.sim.toFixed(2)}%</p>
+                        <p class="result-sim">Khớp: ${item.sim.toFixed(1)}%</p>
                     </div>
                 </a>
             `;
