@@ -27,7 +27,7 @@
                     <span id="model-badge" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
                     <span id="model-status" class="text-sm font-medium text-gray-700">Đang khởi tạo mô hình AI (Chờ khoảng 30s-1 phút cho lần đầu)...</span>
                 </div>
-                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-semibold">Cache: 0 ảnh</span>
+                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-semibold">Cache: 0 bài</span>
             </div>
             <div id="progress-bar-container" class="w-full bg-gray-200 rounded-full h-2 mt-3 hidden overflow-hidden">
                 <div id="progress-bar" class="bg-blue-600 h-2 transition-all duration-300" style="width: 0%"></div>
@@ -41,10 +41,16 @@
                 Đồng bộ dữ liệu bài viết Blogger
             </h2>
             <div class="flex flex-col sm:flex-row gap-3">
-                <input type="url" id="blog-url" placeholder="https://tenblog.blogspot.com" class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="url" id="blog-url" value="https://www.stamp.io.vn/" placeholder="https://tenblog.blogspot.com" class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                
                 <button id="btn-sync" disabled class="bg-gray-400 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-not-allowed shrink-0 flex items-center justify-center gap-2">
                     <svg class="w-4 h-4 animate-spin hidden" id="sync-spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                     Đồng bộ & Tạo Cache
+                </button>
+
+                <button id="btn-clear-cache" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shrink-0 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    Xóa Cache
                 </button>
             </div>
             <!-- Log tiến trình -->
@@ -129,6 +135,7 @@
             cacheCount: document.getElementById('cache-count'),
             btnSync: document.getElementById('btn-sync'),
             syncSpinner: document.getElementById('sync-spinner'),
+            btnClearCache: document.getElementById('btn-clear-cache'),
             blogUrl: document.getElementById('blog-url'),
             syncLogBox: document.getElementById('sync-log-box'),
             syncLog: document.getElementById('sync-log'),
@@ -166,6 +173,10 @@
                 ui.btnSync.disabled = false;
                 ui.btnSync.classList.replace('bg-gray-400', 'bg-blue-600');
                 ui.btnSync.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
+
+                // Tự động gọi đồng bộ ngay khi trang load và AI model tải xong
+                syncBlogger();
+                
             } catch (err) {
                 ui.modelBadge.className = "w-3 h-3 rounded-full bg-red-500";
                 ui.modelStatus.textContent = "Lỗi tải AI Model: " + err.message;
@@ -205,6 +216,15 @@
             });
         }
 
+        function dbClearAllPosts() {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('posts', 'readwrite');
+                const req = tx.objectStore('posts').clear();
+                req.onsuccess = () => resolve();
+                req.onerror = (e) => reject(e.target.error);
+            });
+        }
+
         async function updateCacheBadge() {
             const posts = await dbGetAllPosts();
             let totalImg = 0;
@@ -215,10 +235,7 @@
         // --- 3. BỘ TẢI ẢNH CHỐNG LỖI 5 LỚP (5-TIER FALLBACK IMAGE FETCHER) ---
         function normalizeBloggerUrl(url) {
             if (!url) return '';
-            // 1. Nâng cấp HTTP thành HTTPS
             let clean = url.replace(/^http:/i, 'https:');
-            
-            // 2. Chuẩn hóa kích thước ảnh Blogger về s800 để lấy chuẩn màu & tương thích tốt
             clean = clean.replace(/\/(s\d+(-[c|p|k|r|w]+)?|w\d+-h\d+(-[a-z]+)?)\//i, '/s800/');
             return clean;
         }
@@ -250,33 +267,28 @@
         async function fetchImageBlobSafe(originalUrl) {
             const targetUrl = normalizeBloggerUrl(originalUrl);
 
-            // Layer 1: Direct Fetch CORS
             try {
                 const res = await fetch(targetUrl, { mode: 'cors' });
                 if (res.ok) return await res.blob();
             } catch (e) {}
 
-            // Layer 2: Canvas CrossOrigin
             try {
                 const blob = await loadImageViaCanvas(targetUrl);
                 if (blob) return blob;
             } catch (e) {}
 
-            // Layer 3: Dedicated Image CDN Proxy (wsrv.nl - cực mạnh về xử lý CORS ảnh)
             try {
                 const proxyWsrv = `https://images.weserv.nl/?url=${encodeURIComponent(targetUrl)}&output=jpg&q=80`;
                 const res = await fetch(proxyWsrv);
                 if (res.ok) return await res.blob();
             } catch (e) {}
 
-            // Layer 4: Corsproxy.io Fallback
             try {
                 const proxyCorsIo = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
                 const res = await fetch(proxyCorsIo);
                 if (res.ok) return await res.blob();
             } catch (e) {}
 
-            // Layer 5: AllOrigins Fallback
             try {
                 const proxyAllOrigins = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
                 const res = await fetch(proxyAllOrigins);
@@ -407,6 +419,30 @@
             ui.progressBar.style.width = `${pct}%`;
         }
 
+        // Xử lý Xóa Cache
+        async function handleClearCache() {
+            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ bộ nhớ đệm AI? Hệ thống sẽ phải trích xuất lại ảnh từ đầu ở lần đồng bộ tới.")) return;
+            
+            try {
+                ui.btnClearCache.disabled = true;
+                ui.btnClearCache.innerHTML = "Đang xóa...";
+                
+                await dbClearAllPosts();
+                await updateCacheBadge();
+                
+                ui.syncLogBox.classList.remove('hidden');
+                appendLog("🗑️ Đã xóa toàn bộ bộ nhớ đệm (Cache) thành công.");
+                ui.resultsList.innerHTML = "";
+                ui.matchCountBadge.textContent = "0 kết quả";
+                
+            } catch (err) {
+                alert("Lỗi khi xóa Cache: " + err.message);
+            } finally {
+                ui.btnClearCache.disabled = false;
+                ui.btnClearCache.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg> Xóa Cache`;
+            }
+        }
+
         // --- 5. SEARCH & VECTOR MATCHING ---
         async function processAndSearch(fileOrBlob) {
             if (!processor || !model) return alert("Mô hình AI chưa sẵn sàng!");
@@ -419,7 +455,6 @@
             ui.queryPreview.src = previewUrl;
 
             try {
-                // Resize nhẹ nếu ảnh lớn để tối ưu RAM
                 const resizedBlob = await resizeImageIfNeeded(fileOrBlob);
                 const queryBlobUrl = URL.createObjectURL(resizedBlob);
                 const rawImage = await RawImage.fromURL(queryBlobUrl);
@@ -441,7 +476,7 @@
         async function runVectorSearch(queryVector) {
             const posts = await dbGetAllPosts();
             if (posts.length === 0) {
-                ui.searchStatus.textContent = "Cơ sở dữ liệu trống. Vui lòng bấm Đồng bộ bài viết trước!";
+                ui.searchStatus.textContent = "Cơ sở dữ liệu trống. Vui lòng đợi Đồng bộ bài viết xong!";
                 return;
             }
 
@@ -518,6 +553,8 @@
 
         // --- 6. EVENT HANDLERS ---
         function setupEventListeners() {
+            ui.btnClearCache.addEventListener('click', handleClearCache);
+
             ui.thresholdSlider.addEventListener('input', (e) => {
                 ui.thresholdValue.textContent = Math.round(e.target.value * 100) + '%';
             });
