@@ -2,14 +2,12 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Công Cụ Cập Nhật Database Blogger (Thông Minh)</title>
+    <title>Công Cụ Cập Nhật Database Blogger (Auto GitHub)</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; background: #f4f6f9; color: #333; }
         .box { background: #fff; max-width: 650px; margin: 0 auto; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
         h2 { color: #2c3e50; margin-top: 0; }
         p { color: #666; font-size: 14px; margin-bottom: 20px; }
-        .upload-area { border: 2px dashed #007bff; padding: 15px; border-radius: 8px; background: #f8fbff; margin-bottom: 20px; text-align: left; }
-        .upload-area input { font-size: 14px; }
         button { background: #28a745; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: background 0.2s; width: 100%; }
         button:hover { background: #218838; }
         button:disabled { background: #cccccc; cursor: not-allowed; }
@@ -19,16 +17,10 @@
 <body>
 
 <div class="box">
-    <h2>🛠️ Công Cụ Cập Nhật database.js</h2>
-    <p>Chỉ quét những bài viết/hình ảnh mới, tự động giữ lại dữ liệu cũ giúp tiết kiệm thời gian.</p>
+    <h2>🛠️ Cập Nhật database.js (Tự động)</h2>
+    <p>Hệ thống sẽ tự động tìm file <code>database.js</code> trên GitHub của bạn, nạp dữ liệu cũ và chỉ quét thêm những ảnh mới.</p>
     
-    <div class="upload-area">
-        <b>Bước 1 (Tùy chọn):</b> Chọn file <code>database.js</code> cũ của bạn.<br>
-        <span style="font-size: 12px; color: #666;">(Nếu bỏ qua bước này, hệ thống sẽ quét lại từ đầu)</span><br><br>
-        <input type="file" id="oldDbFile" accept=".js">
-    </div>
-
-    <button id="startBtn" onclick="startProcessing()">🚀 Bước 2: Bắt Đầu Quét & Cập Nhật</button>
+    <button id="startBtn" onclick="startProcessing()">🚀 Bắt Đầu Quét & Cập Nhật</button>
     
     <div id="log">Sẵn sàng...</div>
 </div>
@@ -43,28 +35,6 @@
         logDiv.innerHTML += `<span style="color: ${color}">${msg}</span><br>`;
         logDiv.scrollTop = logDiv.scrollHeight;
     }
-
-    // --- XỬ LÝ ĐỌC FILE DATABASE CŨ ---
-    document.getElementById('oldDbFile').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const url = URL.createObjectURL(file);
-        const script = document.createElement('script');
-        script.src = url;
-        script.onload = () => {
-            if (window.blogDatabase) {
-                oldDatabase = window.blogDatabase;
-                // Lưu danh sách các link ảnh đã có sẵn để lọc
-                existingImgUrls = new Set(oldDatabase.map(item => item.img));
-                log(`✅ Đã nạp thành công Database cũ: Có sẵn <b>${oldDatabase.length}</b> hình ảnh.`, "#ffdd59");
-            } else {
-                log("❌ Không tìm thấy biến 'blogDatabase' trong file này!", "#ff6b6b");
-            }
-        };
-        script.onerror = () => log("❌ Lỗi khi đọc file js cũ!", "#ff6b6b");
-        document.head.appendChild(script);
-    });
 
     // --- CÁC HÀM CỐT LÕI (JSONP, HASH, PROXY) ---
     function fetchFeedJSONP(url) {
@@ -137,7 +107,33 @@
     // --- HÀM CHẠY CHÍNH ---
     async function startProcessing() {
         document.getElementById('startBtn').disabled = true;
-        document.getElementById('oldDbFile').disabled = true;
+        
+        // BƯỚC 1: TỰ ĐỘNG TÌM VÀ NẠP FILE DATABASE.JS TRÊN GITHUB
+        log("🔄 Đang tìm file <code>database.js</code> cũ trên hệ thống...");
+        
+        await new Promise((resolve) => {
+            const script = document.createElement('script');
+            // Gắn timestamp để luôn lấy file mới nhất, tránh cache của GitHub Pages
+            script.src = 'database.js?t=' + new Date().getTime(); 
+            
+            script.onload = () => {
+                if (typeof blogDatabase !== 'undefined') {
+                    oldDatabase = blogDatabase;
+                    existingImgUrls = new Set(oldDatabase.map(item => item.img));
+                    log(`✅ Tự động nạp thành công Database cũ: Có sẵn <b>${oldDatabase.length}</b> hình ảnh.`, "#ffdd59");
+                }
+                resolve();
+            };
+            
+            script.onerror = () => {
+                log("⚠️ Không tìm thấy Database cũ (hoặc đây là lần đầu chạy). Sẽ quét từ đầu.", "#eccc68");
+                resolve();
+            };
+            
+            document.head.appendChild(script);
+        });
+
+        // BƯỚC 2: QUÉT BÀI VIẾT MỚI
         log("<br>🔄 Đang quét danh sách bài viết từ Blogger...");
         
         let start = 1; let max = 150; let entries = [];
@@ -162,8 +158,8 @@
 
         log(`📥 Tìm thấy tổng cộng ${entries.length} bài viết. Bắt đầu đối chiếu dữ liệu...`);
 
-        let newRecords = []; // Chứa dữ liệu mới vừa quét
-        let skipCount = 0;   // Đếm số ảnh đã có trong db cũ
+        let newRecords = []; 
+        let skipCount = 0;   
 
         for (let entry of entries) {
             let title = entry.title ? entry.title.$t : "Không tiêu đề";
@@ -188,10 +184,10 @@
             for (let imgUrl of imgs) {
                 let cleanUrl = imgUrl.replace(/^http:/, 'https:');
                 
-                // KIỂM TRA XEM ẢNH ĐÃ CÓ TRONG DB CŨ CHƯA
+                // KIỂM TRA: Nếu ảnh đã có trong GitHub -> Bỏ qua
                 if (existingImgUrls.has(cleanUrl)) {
                     skipCount++;
-                    continue; // Bỏ qua không tốn thời gian tính Hash nữa
+                    continue; 
                 }
                 
                 // NẾU LÀ ẢNH MỚI TINH -> TÍNH HASH
@@ -199,7 +195,7 @@
                 
                 if (hash) {
                     newRecords.push({ t: title, u: postUrl, img: cleanUrl, h: hash });
-                    existingImgUrls.add(cleanUrl); // Thêm vào set để tránh trùng lặp nếu 1 ảnh dùng ở 2 bài
+                    existingImgUrls.add(cleanUrl); 
                     log(`✨ [Thêm Mới] ${title.substring(0, 30)}...`);
                 }
             }
@@ -210,24 +206,34 @@
 
         log(`<br>🎉 <b>HOÀN THÀNH TỔNG HỢP!</b>`, "#2ed573");
         log(`- Giữ nguyên: ${oldDatabase.length} ảnh cũ.`);
-        log(`- Bỏ qua: ${skipCount} ảnh do đã có sẵn.`);
-        log(`- Cập nhật thêm: ${newRecords.length} ảnh mới.`);
+        log(`- Lướt qua: ${skipCount} ảnh do đã có sẵn.`);
+        if (newRecords.length > 0) {
+            log(`- Cập nhật thêm: <b>${newRecords.length}</b> ảnh mới.`);
+        } else {
+            log(`- <b>Không có ảnh nào mới để thêm!</b>`);
+        }
+        
         log(`👉 Tổng số lượng trong database mới: <b>${finalDatabase.length} ảnh</b>.`);
         
+        // Mẹo: Dùng "var" thay cho "const" để tránh lỗi biến khi trình duyệt load lại file lần 2
         const jsonStr = JSON.stringify(finalDatabase);
         const jsonEscaped = jsonStr.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\${/g, '\\${');
-        const jsContent = `const blogDatabase = JSON.parse(\`${jsonEscaped}\`);\n`;
+        const jsContent = `var blogDatabase = JSON.parse(\`${jsonEscaped}\`);\n`;
 
+        // Tải xuống file mới
         const blob = new Blob([jsContent], { type: 'text/javascript' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = 'database.js';
         a.click();
 
-        log("<br>💾 File <b>database.js</b> đã được tự động tải về máy. Hãy upload đè lên file cũ trên GitHub!", "#2ed573");
+        if (newRecords.length > 0) {
+            log("<br>💾 File <b>database.js</b> đã tải về máy. Hãy upload đè lên file cũ trên GitHub!", "#2ed573");
+        } else {
+            log("<br>💡 Web của bạn đã ở trạng thái mới nhất, không cần phải upload file mới.", "#ffdd59");
+        }
         
         document.getElementById('startBtn').disabled = false;
-        document.getElementById('oldDbFile').disabled = false;
     }
 </script>
 
