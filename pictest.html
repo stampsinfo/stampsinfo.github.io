@@ -337,75 +337,9 @@
             ui.syncLogBox.scrollTop = ui.syncLogBox.scrollHeight;
         }
 
-        // --- 4. ĐỒNG BỘ BLOGGER RSS ---
-        async function syncBlogger() {
-            let urlStr = ui.blogUrl.value.trim();
-            if (!urlStr) return alert("Vui lòng nhập đường dẫn Blogger!");
+        
 
-            if(!urlStr.startsWith('http')) urlStr = 'https://' + urlStr;
-            if(urlStr.endsWith('/')) urlStr = urlStr.slice(0, -1);
 
-            ui.btnSync.disabled = true;
-            ui.syncSpinner.classList.remove('hidden');
-            ui.progressBarContainer.classList.remove('hidden');
-            ui.syncLogBox.classList.remove('hidden');
-            ui.syncLog.innerHTML = "";
-
-            appendLog("Đang kết nối RSS Blogger...");
-
-            try {
-                const rssUrl = `${urlStr}/feeds/posts/default?alt=json&max-results=500`;
-let res;
-
-try {
-    // Thử kết nối trực tiếp
-    res = await fetch(rssUrl);
-    if (!res.ok) throw new Error("Direct fetch failed");
-} catch (directErr) {
-    appendLog("⚠️ Bị chặn kết nối chéo (CORS), đang kích hoạt trạm trung chuyển (Proxy)...");
-    try {
-        // Lớp dự phòng 1: Dùng AllOrigins
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`;
-        res = await fetch(proxyUrl);
-    } catch (proxyErr) {
-        // Lớp dự phòng 2: Dùng CorsProxy
-        const proxyUrl2 = `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`;
-        res = await fetch(proxyUrl2);
-    }
-}
-
-if(!res || !res.ok) throw new Error("Không thể đọc dữ liệu blog, mạng không ổn định hoặc link sai!");
-
-                
-                const data = await res.json();
-                const entries = data.feed.entry || [];
-                
-                appendLog(`Đã tải thành công ${entries.length} bài viết từ Blogger RSS.`);
-
-                const parser = new DOMParser();
-                const postsToProcess = [];
-
-                entries.forEach(entry => {
-                    const postId = entry.id.$t;
-                    const title = entry.title.$t;
-                    const link = entry.link.find(l => l.rel === 'alternate')?.href || urlStr;
-                    const html = entry.content ? entry.content.$t : (entry.summary ? entry.summary.$t : "");
-                    
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const imgElements = Array.from(doc.querySelectorAll('img')).map(img => img.src).filter(Boolean);
-                    
-                    if (imgElements.length > 0) {
-                        postsToProcess.push({ postId, title, link, images: imgElements, embeddings: [] });
-                    }
-                });
-
-                const existingPosts = await dbGetAllPosts();
-                const existingMap = new Map(existingPosts.map(p => [p.postId, p]));
-
-                let totalImgs = postsToProcess.reduce((sum, p) => sum + p.images.length, 0);
-                let currentImgIndex = 0;
-
-                appendLog(`Tổng cộng ${totalImgs} hình ảnh cần kiểm tra/trích xuất vector...`);}
         // --- CƠ CHẾ JSONP BYPASS CORS 100% DÀNH RIÊNG CHO BLOGGER ---
         function fetchBloggerFeedJSONP(blogUrl) {
             return new Promise((resolve, reject) => {
