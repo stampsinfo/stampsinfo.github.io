@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tra Cứu Tem Thông Minh (Hỗ Trợ Camera & dHash)</title>
+    <title>Tra Cứu Tem Thông Minh (Hỗ Trợ Tem Ngang & Dọc)</title>
     <!-- Nhúng sẵn file database.js vào trang -->
     <script src="database.js"></script>
     <style>
@@ -24,12 +24,10 @@
         .drop-zone:hover { border-color: #38bdf8; background: #334155aa; }
         input[type="file"] { display: none; }
         
-        /* Khu vực hiển thị camera và các nút điều khiển bên trong */
         #videoBox { display: none; background: #0f172a; border-radius: 12px; border: 2px solid #10b981; margin: 20px auto; padding: 15px; max-width: 450px; text-align: center; }
         .video-container { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 15px; }
         video { width: 100%; height: auto; display: block; max-height: 350px; object-fit: cover; }
 
-        /* Bảng điều khiển camera riêng biệt, giãn cách thoáng, không bị dính */
         .camera-controls { display: flex; gap: 15px; justify-content: center; align-items: center; flex-wrap: wrap; }
 
         .media-container { margin: 15px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
@@ -49,8 +47,8 @@
 <body>
 
 <div class="box">
-    <h2>🔍 TRA CỨU TEM THÔNG MINH</h2>
-    <p>Chọn file ảnh có sẵn hoặc mở Camera trực tiếp để quét tìm bài viết.</p>
+    <h2>🔍 TRA CỨU TEM THÔNG MINH (HỖ TRỢ TEM NGANG/DỌC)</h2>
+    <p>Chọn file ảnh hoặc mở Camera để quét tìm bài viết (Tự động thích ứng tem ngang và dọc).</p>
     
     <div class="action-group">
         <button class="btn btn-choose" onclick="document.getElementById('fileInput').click()">📁 Chọn Ảnh Từ Máy</button>
@@ -59,7 +57,6 @@
 
     <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
 
-    <!-- KHU VỰC CAMERA TỐI ƯU GIAO DIỆN DI ĐỘNG -->
     <div id="videoBox">
         <div class="video-container">
             <video id="webcam" autoplay playsinline></video>
@@ -70,12 +67,11 @@
         </div>
     </div>
 
-    <!-- Khu vực hiển thị ảnh xem trước -->
     <div class="media-container">
         <img id="previewImg" alt="Ảnh xem trước">
     </div>
 
-    <div id="loadingText" class="loading">⏳ Đang xử lý và phân tích mã băm ảnh...</div>
+    <div id="loadingText" class="loading">⏳ Đang xử lý và phân tích mã băm ảnh thích ứng...</div>
 
     <div id="resultBox">
         <div id="resultContent"></div>
@@ -117,8 +113,6 @@
             });
             webcam.srcObject = mediaStream;
             videoBox.style.display = 'block';
-            
-            // Cuộn màn hình tự động xuống khung camera để người dùng di động dễ nhìn thấy ngay
             videoBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
             let btn = document.getElementById('btnToggleCam');
@@ -170,7 +164,7 @@
         img.onload = function() {
             setTimeout(() => {
                 try {
-                    let inputHash = computeDHash256(img);
+                    let inputHash = computeAdaptiveDHash(img);
                     searchDatabase(inputHash);
                 } catch (err) {
                     alert("Lỗi xử lý ảnh: " + err.message);
@@ -181,24 +175,34 @@
         img.src = dataUrl;
     }
 
-    function computeDHash256(imgElement) {
+    // --- THUẬT TOÁN dHash Thích Ứng (Tự động nhận diện Ngang / Dọc) ---
+    function computeAdaptiveDHash(imgElement) {
         const canvas = document.createElement('canvas');
-        canvas.width = 17; 
-        canvas.height = 16;
-        const ctx = canvas.getContext('2d');
         
+        // Kiểm tra tỷ lệ khung hình thực tế của ảnh đầu vào
+        const isLandscape = imgElement.width > imgElement.height;
+        
+        // Nếu là tem ngang: Dùng khung 16x17. Nếu là tem dọc: Dùng khung 17x16.
+        const targetW = isLandscape ? 17 : 17;
+        const targetH = isLandscape ? 16 : 16;
+        
+        // Cấu hình khung lưới băm phù hợp chiều hướng
+        canvas.width = isLandscape ? 16 : 17;
+        canvas.height = isLandscape ? 17 : 16;
+        
+        const ctx = canvas.getContext('2d');
         ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, 17, 16);
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const scale = Math.min(17 / imgElement.width, 16 / imgElement.height);
+        const scale = Math.min(canvas.width / imgElement.width, canvas.height / imgElement.height);
         const w = imgElement.width * scale;
         const h = imgElement.height * scale;
-        const x = (17 - w) / 2;
-        const y = (16 - h) / 2;
+        const x = (canvas.width - w) / 2;
+        const y = (canvas.height - h) / 2;
         
         ctx.drawImage(imgElement, x, y, w, h);
         
-        const imgData = ctx.getImageData(0, 0, 17, 16).data;
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         let grayscale = [];
         for (let i = 0; i < imgData.length; i += 4) {
             let r = imgData[i], g = imgData[i+1], b = imgData[i+2], a = imgData[i+3] / 255;
@@ -206,15 +210,19 @@
         }
 
         let hash = "";
-        for (let y = 0; y < 16; y++) {
-            for (let x = 0; x < 16; x++) {
-                hash += (grayscale[y * 17 + x] > grayscale[y * 17 + x + 1]) ? "1" : "0";
+        let rows = canvas.height;
+        let cols = canvas.width;
+        
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols - 1; x++) {
+                hash += (grayscale[y * cols + x] > grayscale[y * cols + x + 1]) ? "1" : "0";
             }
         }
         return hash;
     }
 
     function hammingDistance(hash1, hash2) {
+        if (!hash1 || !hash2 || hash1.length !== hash2.length) return 999;
         let dist = 0;
         for (let i = 0; i < hash1.length; i++) {
             if (hash1[i] !== hash2[i]) dist++;
@@ -243,8 +251,8 @@
         let htmlContent = `<h3 style="margin-top:0; color:#4ade80;">✨ Top 5 Bài Viết Phù Hợp Nhất:</h3>`;
         
         topResults.forEach((res, index) => {
-            let color = res.cost <= 40 ? "#4ade80" : (res.cost <= 75 ? "#f59e0b" : "#ef4444");
-            let badgeText = res.cost <= 40 ? "Khớp rất tốt" : (res.cost <= 75 ? "Khớp tương đối" : "Sai số cao");
+            let color = res.cost <= 45 ? "#4ade80" : (res.cost <= 80 ? "#f59e0b" : "#ef4444");
+            let badgeText = res.cost <= 45 ? "Khớp rất tốt" : (res.cost <= 80 ? "Khớp tương đối" : "Sai số cao");
 
             htmlContent += `
                 <div class="result-item">
