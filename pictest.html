@@ -3,59 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tìm Kiếm Tem Bưu Chính</title>
-    <!-- Tải trực tiếp database.js (BẮT BUỘC PHẢI ĐỂ FILE database.js CÙNG THƯ MỤC) -->
-    <script src="database.js"></script>
+    <title>Tìm Kiếm Tem Bằng Hình Ảnh</title>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef2f5; color: #333; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; }
-        h1 { color: #2c3e50; }
-        .upload-box { border: 2px dashed #3498db; padding: 30px; border-radius: 10px; background: #f7fbff; margin: 20px 0; cursor: pointer; transition: 0.3s; }
-        .upload-box:hover { background: #eaf4fc; }
-        input[type="file"] { display: none; }
-        .btn-upload { background: #3498db; color: white; padding: 10px 25px; border-radius: 5px; cursor: pointer; font-weight: bold; display: inline-block; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
+        h1 { color: #2c3e50; margin-top: 0; }
         
-        #preview { max-width: 250px; max-height: 250px; margin-top: 15px; display: none; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        /* Khu vực upload ảnh */
+        .upload-area { border: 2px dashed #3498db; padding: 30px; border-radius: 8px; background: #ebf5fb; cursor: pointer; transition: 0.3s; position: relative; margin-bottom: 20px; }
+        .upload-area:hover { background: #d6eaf8; border-color: #2980b9; }
+        .upload-area p { margin: 0; font-size: 16px; color: #2980b9; font-weight: bold; }
+        #fileInput { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
         
-        /* CSS cho danh sách kết quả */
-        #results { margin-top: 30px; text-align: left; }
-        .result-item { display: flex; gap: 20px; align-items: center; background: #fdfdfd; border: 1px solid #eee; padding: 15px; border-radius: 10px; margin-bottom: 15px; transition: 0.2s; }
-        .result-item:hover { box-shadow: 0 4px 10px rgba(0,0,0,0.1); transform: translateY(-2px); }
-        .result-img { width: 100px; height: 100px; object-fit: cover; border-radius: 6px; }
-        .result-info { flex: 1; }
-        .result-info h3 { margin: 0 0 8px 0; font-size: 18px; color: #2c3e50; }
-        .result-info a { color: #e74c3c; text-decoration: none; font-weight: bold; }
-        .badge { background: #2ecc71; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .badge.warning { background: #f39c12; }
+        /* Hiển thị ảnh tải lên */
+        #preview { max-width: 250px; max-height: 250px; display: none; margin: 15px auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        
+        /* Nút tìm kiếm */
+        button { background: #e74c3c; color: #fff; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #c0392b; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        
+        /* Kết quả */
+        #status { margin-top: 15px; font-weight: bold; color: #7f8c8d; }
+        .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; margin-top: 30px; }
+        .result-card { background: #fff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.3s; text-decoration: none; color: inherit; display: flex; flex-direction: column; }
+        .result-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
+        .result-img { width: 100%; height: 180px; object-fit: contain; background: #fafafa; border-bottom: 1px solid #eee; padding: 5px; box-sizing: border-box; }
+        .result-info { padding: 15px; text-align: left; }
+        .result-title { font-size: 14px; font-weight: bold; margin: 0 0 10px 0; color: #2c3e50; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .result-sim { font-size: 13px; color: #27ae60; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🔍 Nhận Diện Tem Bưu Chính</h1>
-    <p>Tải lên một bức ảnh chụp tem của bạn để hệ thống quét và tìm kiếm thông tin.</p>
-    <p><i>Lưu ý: Hãy cắt (crop) ảnh sát viền con tem nhất có thể để nhận diện chính xác.</i></p>
-
-    <label class="upload-box" for="imageInput">
-        <div class="btn-upload">Tải Ảnh Lên (hoặc Chụp)</div>
-        <input type="file" id="imageInput" accept="image/*">
-        <br>
-        <img id="preview" alt="Ảnh tải lên">
-    </label>
-
-    <div id="results"></div>
+    <h1>🔍 Tìm Kiếm Hình Ảnh</h1>
+    
+    <div class="upload-area">
+        <p>Nhấp vào đây, kéo thả ảnh hoặc dán (Ctrl+V) ảnh vào đây</p>
+        <input type="file" id="fileInput" accept="image/*">
+    </div>
+    
+    <img id="preview" alt="Ảnh tải lên">
+    <br>
+    <button id="searchBtn" onclick="processSearch()" disabled>Tìm Kiếm Ngay</button>
+    
+    <div id="status">Vui lòng tải file database.js trước khi tìm kiếm...</div>
+    
+    <div class="results-grid" id="results"></div>
 </div>
 
+<!-- Nạp Database đã quét -->
+<script src="database.js"></script>
+
 <script>
-    // 1. Hàm tính Hash 256-bit (ĐỒNG BỘ VỚI TOOL TẠO DATABASE - CÓ GIỮ TỶ LỆ)
+    let uploadedImage = null;
+    const SIMILARITY_THRESHOLD = 75; // Độ trùng khớp tối thiểu (75%)
+
+    // Kiểm tra xem database.js đã được tải chưa
+    window.onload = function() {
+        if (typeof blogDatabase !== 'undefined') {
+            document.getElementById('status').innerText = `✅ Đã tải ${blogDatabase.length} dữ liệu. Sẵn sàng tìm kiếm!`;
+        } else {
+            document.getElementById('status').style.color = "red";
+            document.getElementById('status').innerText = "❌ Lỗi: Không tìm thấy file database.js. Vui lòng đặt nó cùng thư mục với file index.html";
+        }
+    };
+
+    // --- XỬ LÝ ẢNH ĐẦU VÀO ---
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const searchBtn = document.getElementById('searchBtn');
+
+    fileInput.addEventListener('change', handleImage);
+    
+    // Hỗ trợ dán ảnh (Ctrl + V)
+    document.addEventListener("paste", function(e) {
+        let items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let item of items) {
+            if (item.type.indexOf("image") === 0) {
+                let file = item.getAsFile();
+                loadImageFile(file);
+            }
+        }
+    });
+
+    function handleImage(e) {
+        if (e.target.files && e.target.files[0]) loadImageFile(e.target.files[0]);
+    }
+
+    function loadImageFile(file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            preview.src = event.target.result;
+            preview.style.display = 'block';
+            
+            uploadedImage = new Image();
+            uploadedImage.src = event.target.result;
+            uploadedImage.onload = function() {
+                searchBtn.disabled = false; // Bật nút tìm kiếm
+                document.getElementById('status').innerText = "Ảnh đã sẵn sàng. Bấm 'Tìm Kiếm Ngay'!";
+            }
+        }
+        reader.readAsDataURL(file);
+    }
+
+    // --- THUẬT TOÁN HASH (GIỐNG HỆT CÔNG CỤ TẠO DATABASE) ---
     function computeDHash256(imgElement) {
         const canvas = document.createElement('canvas');
         canvas.width = 17; canvas.height = 16;
         const ctx = canvas.getContext('2d');
         
+        // Tô nền trắng
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, 17, 16);
 
+        // Bù viền, giữ nguyên tỷ lệ
         const scale = Math.min(17 / imgElement.width, 16 / imgElement.height);
         const w = imgElement.width * scale;
         const h = imgElement.height * scale;
@@ -80,102 +143,75 @@
         return hash;
     }
 
-    // 2. Hàm đếm số bit khác biệt (Hamming Distance)
-    function getHammingDistance(hash1, hash2) {
-        if (!hash1 || !hash2 || hash1.length !== hash2.length) return 256;
+    // Tính khoảng cách Hamming
+    function hammingDistance(hash1, hash2) {
         let distance = 0;
-        for (let i = 0; i < hash1.length; i++) {
+        for (let i = 0; i < 256; i++) {
             if (hash1[i] !== hash2[i]) distance++;
         }
         return distance;
     }
 
-    // 3. Hàm Xử lý khi người dùng chọn ảnh
-    document.getElementById('imageInput').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
+    // --- XỬ LÝ TÌM KIẾM ---
+    function processSearch() {
+        if (!uploadedImage || typeof blogDatabase === 'undefined') return;
 
-        const resultsDiv = document.getElementById('results');
-        resultsDiv.innerHTML = "<h3>⏳ Đang xử lý và quét dữ liệu...</h3>";
+        document.getElementById('status').innerText = "⏳ Đang quét dữ liệu...";
+        searchBtn.disabled = true;
 
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const img = new Image();
-            img.onload = function() {
-                // Hiển thị ảnh xem trước
-                const preview = document.getElementById('preview');
-                preview.src = event.target.result;
-                preview.style.display = "inline-block";
+        setTimeout(() => {
+            const targetHash = computeDHash256(uploadedImage);
+            let matches = [];
 
-                // Tính Hash ảnh người dùng
-                const userHash = computeDHash256(img);
+            // Duyệt qua toàn bộ database
+            for (let item of blogDatabase) {
+                let dist = hammingDistance(targetHash, item.h);
+                let similarity = ((256 - dist) / 256) * 100;
                 
-                // Gọi hàm tìm kiếm
-                searchStamps(userHash);
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
-
-    // 4. Hàm Quét Database và Hiển thị
-    function searchStamps(userHash) {
-        const resultsDiv = document.getElementById('results');
-        
-        if (typeof blogDatabase === 'undefined') {
-            resultsDiv.innerHTML = "<h3 style='color:red;'>Lỗi: Chưa kết nối được với Dữ liệu (database.js).</h3>";
-            return;
-        }
-
-        let matchedResults = [];
-        const MAX_DISTANCE = 40; // Ngưỡng chấp nhận sai số tối đa (40 bit)
-
-        // Quét toàn bộ dữ liệu
-        for (let i = 0; i < blogDatabase.length; i++) {
-            let item = blogDatabase[i];
-            let diff = getHammingDistance(userHash, item.h);
-
-            if (diff <= MAX_DISTANCE) {
-                let matchPercent = ((256 - diff) / 256) * 100;
-                matchedResults.push({
-                    ...item,
-                    diffBits: diff,
-                    matchScore: matchPercent.toFixed(1)
-                });
+                if (similarity >= SIMILARITY_THRESHOLD) {
+                    matches.push({
+                        title: item.t,
+                        url: item.u,
+                        img: item.img,
+                        sim: similarity
+                    });
+                }
             }
-        }
 
-        // Xếp hạng từ giống nhất đến ít giống nhất
-        matchedResults.sort((a, b) => a.diffBits - b.diffBits);
+            // Sắp xếp giảm dần theo độ chính xác
+            matches.sort((a, b) => b.sim - a.sim);
+            renderResults(matches);
+            
+            searchBtn.disabled = false;
+        }, 100); // Timeout nhỏ để UI kịp cập nhật chữ "Đang quét..."
+    }
 
-        // Hiển thị ra màn hình
-        if (matchedResults.length === 0) {
-            resultsDiv.innerHTML = "<h3>😔 Không tìm thấy con tem nào phù hợp trong dữ liệu.</h3><p>Hãy thử cắt ảnh sát viền tem hơn và thử lại.</p>";
+    // --- HIỂN THỊ KẾT QUẢ ---
+    function renderResults(matches) {
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = "";
+
+        if (matches.length === 0) {
+            document.getElementById('status').innerText = "❌ Không tìm thấy kết quả nào phù hợp.";
             return;
         }
 
-        let html = `<h3>🎉 Tìm thấy ${matchedResults.length} kết quả phù hợp:</h3>`;
-        
-        matchedResults.forEach(item => {
-            // Đánh giá mức độ khớp
-            let badgeClass = item.diffBits <= 25 ? "badge" : "badge warning";
-            let badgeText = item.diffBits <= 25 ? "Khớp Cao" : "Có Thể Khớp";
+        document.getElementById('status').innerText = `✅ Tìm thấy ${matches.length} kết quả phù hợp!`;
 
-            html += `
-            <div class="result-item">
-                <img src="${item.img}" class="result-img" alt="Tem">
-                <div class="result-info">
-                    <h3>${item.t}</h3>
-                    <p>
-                        <span class="${badgeClass}">${badgeText}</span> 
-                        Độ chính xác: <b>${item.matchScore}%</b> (Sai số: ${item.diffBits} bit)
-                    </p>
-                    <a href="${item.u}" target="_blank">Xem chi tiết bài viết ➔</a>
-                </div>
-            </div>`;
+        matches.forEach(item => {
+            // Cắt bớt tiêu đề nếu quá dài
+            let shortTitle = item.title.replace(" | Stamp IO VN", ""); 
+
+            resultsDiv.innerHTML += `
+                <a href="${item.url}" target="_blank" class="result-card">
+                    <img src="${item.img}" class="result-img" alt="Tem">
+                    <div class="result-info">
+                        <p class="result-title">${shortTitle}</p>
+                        <p class="result-sim">Độ giống: ${item.sim.toFixed(2)}%</p>
+                    </div>
+                </a>
+            `;
         });
-
-        resultsDiv.innerHTML = html;
     }
 </script>
 
