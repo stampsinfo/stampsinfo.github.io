@@ -374,6 +374,79 @@ if(!res || !res.ok) throw new Error("Không thể đọc dữ liệu blog, mạn
                 let currentImgIndex = 0;
 
                 appendLog(`Tổng cộng ${totalImgs} hình ảnh cần kiểm tra/trích xuất vector...`);
+        // --- CƠ CHẾ JSONP BYPASS CORS 100% DÀNH RIÊNG CHO BLOGGER ---
+        function fetchBloggerFeedJSONP(blogUrl) {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'bloggerCallback_' + Date.now();
+                
+                // Hàm nhận dữ liệu từ Blogger trả về
+                window[callbackName] = function(data) {
+                    delete window[callbackName]; // Dọn dẹp sau khi nhận xong
+                    document.head.removeChild(script);
+                    resolve(data);
+                };
+
+                const script = document.createElement('script');
+                // Lệnh json-in-script giúp vượt rào CORS mà không cần Proxy
+                script.src = `${blogUrl}/feeds/posts/default?alt=json-in-script&max-results=500&callback=${callbackName}`;
+                
+                script.onerror = () => {
+                    delete window[callbackName];
+                    document.head.removeChild(script);
+                    reject(new Error("Không thể tải dữ liệu. Hãy kiểm tra lại link blog!"));
+                };
+                
+                document.head.appendChild(script);
+            });
+        }
+
+        // --- 4. ĐỒNG BỘ BLOGGER RSS (ĐÃ NÂNG CẤP) ---
+        async function syncBlogger() {
+            let urlStr = ui.blogUrl.value.trim();
+            if (!urlStr) return alert("Vui lòng nhập đường dẫn Blogger!");
+
+            if(!urlStr.startsWith('http')) urlStr = 'https://' + urlStr;
+            if(urlStr.endsWith('/')) urlStr = urlStr.slice(0, -1);
+
+            ui.btnSync.disabled = true;
+            ui.syncSpinner.classList.remove('hidden');
+            ui.progressBarContainer.classList.remove('hidden');
+            ui.syncLogBox.classList.remove('hidden');
+            ui.syncLog.innerHTML = "";
+
+            appendLog("Đang kết nối Blogger bằng kênh an toàn (JSONP Anti-CORS)...");
+
+            try {
+                // Gọi hàm JSONP thay vì fetch thông thường
+                const data = await fetchBloggerFeedJSONP(urlStr);
+                const entries = data.feed.entry || [];
+                
+                appendLog(`Đã tải thành công ${entries.length} bài viết từ Blogger.`);
+
+                const parser = new DOMParser();
+                const postsToProcess = [];
+
+                entries.forEach(entry => {
+                    const postId = entry.id.$t;
+                    const title = entry.title.$t;
+                    const link = entry.link.find(l => l.rel === 'alternate')?.href || urlStr;
+                    const html = entry.content ? entry.content.$t : (entry.summary ? entry.summary.$t : "");
+                    
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const imgElements = Array.from(doc.querySelectorAll('img')).map(img => img.src).filter(Boolean);
+                    
+                    if (imgElements.length > 0) {
+                        postsToProcess.push({ postId, title, link, images: imgElements, embeddings: [] });
+                    }
+                });
+
+                const existingPosts = await dbGetAllPosts();
+                const existingMap = new Map(existingPosts.map(p => [p.postId, p]));
+
+                let totalImgs = postsToProcess.reduce((sum, p) => sum + p.images.length, 0);
+                let currentImgIndex = 0;
+
+                appendLog(`Tổng cộng ${totalImgs} hình ảnh cần kiểm tra/trích xuất vector...`);
 
                 for (let i = 0; i < postsToProcess.length; i++) {
                     const post = postsToProcess[i];
@@ -432,6 +505,7 @@ if(!res || !res.ok) throw new Error("Không thể đọc dữ liệu blog, mạn
                 setTimeout(() => ui.progressBarContainer.classList.add('hidden'), 3000);
             }
         }
+
 
         function updateProgress(cur, total) {
             const pct = total > 0 ? Math.round((cur / total) * 100) : 0;
