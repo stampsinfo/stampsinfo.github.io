@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công Cụ Cập Nhật Tăng Dần Database Tem (Incremental Update)</title>
+    <title>Cập Nhật Tăng Dần Database Tem (Tự Động Tải Từ Repo)</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background: #0f172a; color: #fff; }
         .box { background: #1e293b; max-width: 850px; margin: 0 auto; padding: 30px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); text-align: center; }
         h2 { color: #38bdf8; margin-top: 0; }
         p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
         
-        .upload-section { background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 2px dashed #475569; text-align: left; }
-        .upload-section label { font-weight: bold; color: #f59e0b; display: block; margin-bottom: 8px; }
+        .upload-section { background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #475569; text-align: left; }
+        .upload-section label { font-weight: bold; color: #cbd5e1; display: block; margin-bottom: 8px; font-size: 13px; }
         
         .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
         button { border: none; padding: 12px 20px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; color: white; }
@@ -26,20 +26,23 @@
 <body>
 
 <div class="box">
-    <h2>⚡ CẬP NHẬT TĂNG DẦN DATABASE TEM</h2>
-    <p>Chỉ quét các bài viết/tem mới phát sinh, bỏ qua các tem cũ đã có trong file database cũ.</p>
+    <h2>⚡ CẬP NHẬT TĂNG DẦN DATABASE (TỰ ĐỘNG TỪ REPO)</h2>
+    <p>Hệ thống sẽ tự động lấy file <code>database.js</code> đang có sẵn trên cùng thư mục GitHub để so sánh và bổ sung tem mới.</p>
     
-    <div class="upload-section">
-        <label>📂 Bước 1: Tải lên file <code>database.js</code> cũ hiện tại của bạn:</label>
-        <input type="file" id="oldDbFile" accept=".js" onchange="loadOldDatabase(event)">
-    </div>
-
-    <div id="statusBox">Vui lòng tải lên file database.js cũ để bắt đầu...</div>
+    <div id="statusBox">⏳ Đang tự động tải database.js từ repo...</div>
 
     <div class="btn-group">
-        <button id="btnStartUpdate" class="btn-start" onclick="startIncrementalScan()" disabled>🚀 Bắt Đầu Kiểm Tra & Cập Nhật Mới</button>
+        <button id="btnStartUpdate" class="btn-start" onclick="startIncrementalScan()" disabled>🚀 Bắt Đầu Quét & Cập Nhật Mới</button>
         <button id="btnDownload" class="btn-download" onclick="downloadUpdatedDB()" disabled>💾 Tải database.js Đã Cập Nhật</button>
     </div>
+
+    <!-- Phần dự phòng nếu chạy test dưới máy tính bị lỗi CORS -->
+    <details class="upload-section">
+        <summary style="cursor: pointer; color: #38bdf8; font-weight: bold; font-size: 13px;">⚙️ Tùy chọn nâng cao: Tải file thủ công (Nếu chạy dưới máy tính cá nhân)</summary>
+        <br>
+        <label>📂 Chọn file <code>database.js</code> thủ công từ máy:</label>
+        <input type="file" id="oldDbFile" accept=".js" onchange="loadManualDatabase(event)">
+    </details>
     
     <div id="log">Hệ thống sẵn sàng...</div>
 </div>
@@ -58,33 +61,45 @@
     }
 
     function setStatus(msg) {
-        document.getElementById('statusBoxinnerHTML' in document.getElementById('statusBox') ? 'innerHTML' : 'innerText') = msg;
+        document.getElementById('statusBox').innerHTML = msg;
     }
 
-    // --- 1. ĐỌC FILE DATABASE CŨ ---
-    function loadOldDatabase(event) {
+    // --- 1. TỰ ĐỘNG TẢI DATABASE TỪ REPO KHI MỞ TRANG ---
+    window.onload = async function() {
+        try {
+            log("[Hệ thống] Đang cố gắng tải database.js từ cùng thư mục trên Repo...", "#38bdf8");
+            let response = await fetch('./database.js?t=' + new Date().getTime());
+            if (!response.ok) throw new Error("Không tìm thấy file database.js cùng thư mục.");
+            
+            let content = await response.text();
+            parseAndLoadDatabase(content);
+            log("✅ Tự động tải database.js từ Repo thành công!", "#4ade80");
+        } catch (err) {
+            setStatus("⚠️ Không thể tự động tải file từ Repo (Có thể do chạy trực tiếp từ máy tính). Vui lòng dùng mục tùy chọn bên dưới để chọn file thủ công.");
+            log("⚠️ Không thể tự động tải file: " + err.message, "#f59e0b");
+        }
+    };
+
+    function parseAndLoadDatabase(content) {
+        let match = content.match(/\[[\s\S]*\]/);
+        if (match) {
+            existingDatabase = JSON.parse(match[0]);
+            existingImageUrls = new Set(existingDatabase.map(item => item.img));
+            
+            setStatus(`✅ Đã nạp thành công từ Repo: <b>${existingDatabase.length}</b> tem. Sẵn sàng cập nhật!`);
+            document.getElementById('btnStartUpdate').disabled = false;
+            log(`[Hệ thống] Đã nạp thành công database cũ gồm ${existingDatabase.length} tem.`, "#38bdf8");
+        } else {
+            alert("Cấu trúc file database.js không hợp lệ!");
+        }
+    }
+
+    function loadManualDatabase(event) {
         const file = event.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = function(e) {
-            try {
-                let content = e.target.result;
-                // Trích xuất mảng JSON từ định dạng "var blogDatabase = [...];"
-                let match = content.match(/\[[\s\S]*\]/);
-                if (match) {
-                    existingDatabase = JSON.parse(match[0]);
-                    existingImageUrls = new Set(existingDatabase.map(item => item.img));
-                    
-                    setStatus(`✅ Đã nạp database cũ: <b>${existingDatabase.length}</b> tem. Sẵn sàng quét bài mới!`);
-                    document.getElementById('btnStartUpdate').disabled = false;
-                    log(`[Hệ thống] Đã đọc thành công database cũ gồm ${existingDatabase.length} tem.`, "#38bdf8");
-                } else {
-                    alert("Cấu trúc file database.js không hợp lệ!");
-                }
-            } catch (err) {
-                alert("Lỗi khi đọc file: " + err.message);
-            }
+            parseAndLoadDatabase(e.target.result);
         };
         reader.readAsText(file);
     }
@@ -164,13 +179,12 @@
     // --- 3. TIẾN TRÌNH QUÉT VÀ CẬP NHẬT TĂNG DẦN ---
     async function startIncrementalScan() {
         if (existingDatabase.length === 0) {
-            alert("Vui lòng tải lên file database cũ trước!");
+            alert("Chưa có dữ liệu database cũ được tải!");
             return;
         }
 
         isRunning = true;
         document.getElementById('btnStartUpdate').disabled = true;
-        document.getElementById('oldDbFile').disabled = true;
 
         log("<br>🔄 <b>Đang quét danh sách bài viết từ Blogger để tìm điểm mới...</b>", "#38bdf8");
 
@@ -197,7 +211,7 @@
         log(`📦 Đã đọc thấy tổng cộng ${allEntries.length} bài viết trên blog. Đang lọc các bài mới...`, "#38bdf8");
 
         let newlyAddedCount = 0;
-        updatedDatabase = [...existingDatabase]; // Bắt đầu bằng database cũ
+        updatedDatabase = [...existingDatabase];
 
         for (let i = 0; i < allEntries.length; i++) {
             let entry = allEntries[i];
@@ -216,16 +230,12 @@
             }
             imgs = [...new Set(imgs)];
 
-            // Lọc ra các ảnh thực sự chưa có trong database cũ
             let newImgsForThisPost = imgs.filter(imgUrl => {
                 let cleanUrl = imgUrl.replace(/^http:/, 'https:');
                 return !existingImageUrls.has(cleanUrl);
             });
 
-            // Nếu tất cả ảnh trong bài này đã có rồi, có thể bỏ qua bài viết này luôn để tăng tốc
-            if (newImgsForThisPost.length === 0) {
-                continue; 
-            }
+            if (newImgsForThisPost.length === 0) continue; 
 
             log(`✨ Phát hiện bài viết mới/có ảnh mới: <b>${title}</b> (${newImgsForThisPost.length} ảnh mới)`, "#f59e0b");
 
@@ -237,7 +247,7 @@
                 if (hash) {
                     let newItem = { t: title, u: postUrl, img: cleanUrl, h: hash };
                     updatedDatabase.push(newItem);
-                    existingImageUrls.add(cleanUrl); // Đánh dấu đã có để không bị trùng lặp
+                    existingImageUrls.add(cleanUrl);
                     newlyAddedCount++;
                     log(`➕ Thêm tem mới [#${newlyAddedCount}]: ${cleanUrl.substring(0, 50)}...`);
                 }
@@ -249,7 +259,6 @@
         log(`<br>🎉 <b>QUÉT CẬP NHẬT HOÀN TẤT!</b> Đã bổ sung thành công <b>${newlyAddedCount}</b> tem mới.`, "#4ade80");
         document.getElementById('btnDownload').disabled = false;
         document.getElementById('btnStartUpdate').disabled = false;
-        document.getElementById('oldDbFile').disabled = false;
     }
 
     // --- 4. TẢI FILE DATABASE.JS MỚI ---
