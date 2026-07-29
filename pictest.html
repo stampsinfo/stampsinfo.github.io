@@ -3,297 +3,594 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tra Cứu Tem Thông Minh (Chọn Tem Ngang / Dọc)</title>
-    <!-- Nhúng sẵn file database.js vào trang -->
-    <script src="database.js"></script>
+    <title>Tìm bài viết theo hình ảnh Blogger - AI Vision Search</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background: #0f172a; color: #fff; margin: 0; }
-        .box { background: #1e293b; max-width: 850px; margin: 30px auto; padding: 30px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); text-align: center; }
-        h2 { color: #38bdf8; margin-top: 0; }
-        p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
-        
-        .action-group { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
-        .btn { border: none; padding: 12px 20px; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 14px; }
-        .btn:hover { opacity: 0.9; }
-        .btn-choose { background: #3b82f6; }
-        .btn-camera-vert { background: #10b981; } 
-        .btn-camera-horiz { background: #8b5cf6; } 
-        .btn-capture { background: #06b6d4; font-size: 15px; padding: 12px 24px; }
-        .btn-stop { background: #ef4444; } 
-
-        .drop-zone { border: 2px dashed #475569; padding: 25px; border-radius: 8px; background: #334155; cursor: pointer; transition: 0.2s; margin-bottom: 20px; }
-        .drop-zone:hover { border-color: #38bdf8; background: #334155aa; }
-        input[type="file"] { display: none; }
-        
-        #videoBox { display: none; background: #0f172a; border-radius: 12px; border: 2px solid #38bdf8; margin: 20px auto; padding: 15px; max-width: 450px; text-align: center; }
-        
-        /* Thay đổi khung hình xem trước camera tương ứng Ngang / Dọc */
-        .video-container { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 15px; display: flex; justify-content: center; align-items: center; }
-        video { width: 100%; height: auto; display: block; object-fit: cover; }
-        
-        /* Tỷ lệ khung hình hiển thị camera */
-        .video-vertical { max-height: 400px; }
-        .video-horizontal { max-height: 250px; }
-
-        .camera-controls { display: flex; gap: 15px; justify-content: center; align-items: center; flex-wrap: wrap; }
-        #camModeTitle { color: #f59e0b; font-weight: bold; margin-bottom: 10px; font-size: 15px; }
-
-        .media-container { margin: 15px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        #previewImg { max-width: 200px; max-height: 200px; border-radius: 6px; display: none; border: 2px solid #64748b; }
-
-        #resultBox { margin-top: 25px; background: #020617; padding: 20px; border-radius: 8px; text-align: left; border: 1px solid #334155; display: none; }
-        .result-item { border-bottom: 1px dashed #334155; padding: 12px 0; }
-        .result-item:last-child { border-bottom: none; }
-        .result-title { margin: 0 0 5px 0; font-size: 15px; }
-        .result-title a { color: #38bdf8; text-decoration: none; font-weight: bold; }
-        .result-title a:hover { text-decoration: underline; }
-        .result-meta { margin: 0; font-size: 13px; }
-
-        .loading { color: #f59e0b; font-weight: bold; margin-top: 15px; display: none; }
+        .drag-over { border-color: #2563eb; background-color: #eff6ff; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     </style>
 </head>
-<body>
+<body class="bg-gray-100 font-sans text-gray-800 min-h-screen">
 
-<div class="box">
-    <h2>🔍 TRA CỨU TEM THÔNG MINH</h2>
-    <p>Chọn ảnh có sẵn từ máy hoặc chọn chế độ chụp Camera phù hợp với loại tem.</p>
-    
-    <div class="action-group">
-        <button class="btn btn-choose" onclick="document.getElementById('fileInput').click()">📁 Chọn Ảnh Từ Máy</button>
-        <button class="btn btn-camera-vert" onclick="startCamera('vertical')">🔲 Chụp Tem Dọc</button>
-        <button class="btn btn-camera-horiz" onclick="startCamera('horizontal')">🖼️ Chụp Tem Ngang</button>
-    </div>
+    <div class="max-w-5xl mx-auto p-4 sm:p-6">
+        <!-- Header -->
+        <header class="mb-6 text-center">
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tìm bài viết Blogger theo hình ảnh</h1>
+            <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Chạy 100% trên trình duyệt &bull; Chống lỗi CORS</p>
+        </header>
 
-    <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
-
-    <!-- KHU VỰC CAMERA TÙY CHỌN -->
-    <div id="videoBox">
-        <div id="camModeTitle">Đang mở chế độ: Tem Dọc</div>
-        <div class="video-container" id="videoContainerDiv">
-            <video id="webcam" autoplay playsinline></video>
-        </div>
-        <div class="camera-controls">
-            <button class="btn btn-capture" onclick="captureSnapshot()">📸 Chụp Ngay</button>
-            <button class="btn btn-stop" onclick="stopCamera()">✖ Đóng Camera</button>
-        </div>
-    </div>
-
-    <div class="media-container">
-        <img id="previewImg" alt="Ảnh xem trước">
-    </div>
-
-    <div id="loadingText" class="loading">⏳ Đang xử lý mã băm và tìm kiếm...</div>
-
-    <div id="resultBox">
-        <div id="resultContent"></div>
-    </div>
-</div>
-
-<script>
-    let mediaStream = null;
-    let currentMode = 'vertical'; // Mặc định dọc
-
-    function handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (file) {
-            stopCamera();
-            processImageFile(file);
-        }
-    }
-
-    function processImageFile(file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            loadImageAndRun(e.target.result, 'auto');
-        };
-        reader.readAsDataURL(file);
-    }
-
-    async function startCamera(mode) {
-        currentMode = mode;
-        const videoBox = document.getElementById('videoBox');
-        const webcam = document.getElementById('webcam');
-        const containerDiv = document.getElementById('videoContainerDiv');
-        const modeTitle = document.getElementById('camModeTitle');
-
-        if (mediaStream) {
-            stopCamera();
-        }
-
-        if (mode === 'vertical') {
-            modeTitle.innerText = "📌 Đang mở: Chế độ Chụp Tem Dọc";
-            containerDiv.className = "video-container video-vertical";
-        } else {
-            modeTitle.innerText = "📌 Đang mở: Chế độ Chụp Tem Ngang";
-            containerDiv.className = "video-container video-horizontal";
-        }
-
-        try {
-            mediaStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" }, 
-                audio: false 
-            });
-            webcam.srcObject = mediaStream;
-            videoBox.style.display = 'block';
-            videoBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-            document.getElementById('previewImg').style.display = 'none';
-            document.getElementById('resultBox').style.display = 'none';
-        } catch (err) {
-            alert("Không thể truy cập Camera! Vui lòng cấp quyền camera cho trình duyệt. Lỗi: " + err.message);
-        }
-    }
-
-    function stopCamera() {
-        if (mediaStream) {
-            mediaStream.getTracks().forEach(track => track.stop());
-            mediaStream = null;
-        }
-        document.getElementById('videoBox').style.display = 'none';
-    }
-
-    function captureSnapshot() {
-        const webcam = document.getElementById('webcam');
-        if (!mediaStream) return;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = webcam.videoWidth || 640;
-        canvas.height = webcam.videoHeight || 480;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(webcam, 0, 0, canvas.width, canvas.height);
-
-        const dataUrl = canvas.toDataURL('image/jpeg');
-        let modeToRun = currentMode;
-        stopCamera();
-        loadImageAndRun(dataUrl, modeToRun);
-    }
-
-    function loadImageAndRun(dataUrl, mode) {
-        const preview = document.getElementById('previewImg');
-        preview.src = dataUrl;
-        preview.style.display = 'inline-block';
-
-        document.getElementById('resultBox').style.display = 'none';
-        document.getElementById('loadingText').style.display = 'block';
-
-        const img = new Image();
-        img.onload = function() {
-            setTimeout(() => {
-                try {
-                    let inputHash = computeFixedDHash(img, mode);
-                    searchDatabase(inputHash);
-                } catch (err) {
-                    alert("Lỗi xử lý ảnh: " + err.message);
-                    document.getElementById('loadingText').style.display = 'none';
-                }
-            }, 50);
-        };
-        img.src = dataUrl;
-    }
-
-    // --- HÀM BĂM dHash THEO LỰA CHỌN CỐ ĐỊNH (NGANG / DỌC) ---
-    function computeFixedDHash(imgElement, mode) {
-        let isLandscape = false;
-        if (mode === 'horizontal') isLandscape = true;
-        else if (mode === 'vertical') isLandscape = false;
-        else {
-            // Trường hợp tải ảnh có sẵn từ máy -> tự nhận diện theo tỷ lệ ảnh
-            isLandscape = imgElement.width > imgElement.height;
-        }
-
-        const canvas = document.createElement('canvas');
-        // Tem dọc: Lưới 17x16 | Tem ngang: Lưới 16x17
-        canvas.width = isLandscape ? 17 : 17;
-        canvas.height = isLandscape ? 16 : 16;
-        
-        const cols = isLandscape ? 17 : 17;
-        const rows = isLandscape ? 16 : 16;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const scale = Math.min(canvas.width / imgElement.width, canvas.height / imgElement.height);
-        const w = imgElement.width * scale;
-        const h = imgElement.height * scale;
-        const x = (canvas.width - w) / 2;
-        const y = (canvas.height - h) / 2;
-        
-        ctx.drawImage(imgElement, x, y, w, h);
-        
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-        let grayscale = [];
-        for (let i = 0; i < imgData.length; i += 4) {
-            let r = imgData[i], g = imgData[i+1], b = imgData[i+2], a = imgData[i+3] / 255;
-            grayscale.push((r * 0.299 + g * 0.587 + b * 0.114) * a + 255 * (1 - a));
-        }
-
-        let hash = "";
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols - 1; x++) {
-                hash += (grayscale[y * cols + x] > grayscale[y * cols + x + 1]) ? "1" : "0";
-            }
-        }
-        return hash;
-    }
-
-    function hammingDistance(hash1, hash2) {
-        if (!hash1 || !hash2 || hash1.length !== hash2.length) return 999;
-        let dist = 0;
-        for (let i = 0; i < hash1.length; i++) {
-            if (hash1[i] !== hash2[i]) dist++;
-        }
-        return dist;
-    }
-
-    // --- TÌM KIẾM VÀ GOM NHÓM TÊN BÀI VIẾT DUY NHẤT ---
-    function searchDatabase(inputHash) {
-        document.getElementById('loadingText').style.display = 'none';
-
-        if (typeof blogDatabase === 'undefined' || !Array.isArray(blogDatabase) || blogDatabase.length === 0) {
-            alert("Không tìm thấy dữ liệu trong file database.js!");
-            return;
-        }
-
-        let resultsMap = new Map(); // Dùng Map để gom nhóm theo đường dẫn bài viết (u)
-
-        for (let item of blogDatabase) {
-            let cost = hammingDistance(inputHash, item.h);
-            
-            // Nếu bài viết này chưa có trong danh sách, hoặc có điểm số tốt hơn (cost nhỏ hơn), cập nhật lại
-            if (!resultsMap.has(item.u) || resultsMap.get(item.u).cost > cost) {
-                resultsMap.set(item.u, { item: item, cost: cost });
-            }
-        }
-
-        // Chuyển Map thành mảng và sắp xếp theo độ sai số tăng dần (khớp nhất lên đầu)
-        let uniqueResults = Array.from(resultsMap.values());
-        uniqueResults.sort((a, b) => a.cost - b.cost);
-
-        // Lấy Top 5 bài viết độc lập tốt nhất
-        let topResults = uniqueResults.slice(0, 5);
-
-        let resultContent = document.getElementById('resultContent');
-        let htmlContent = `<h3 style="margin-top:0; color:#4ade80;">✨ Top 5 Bài Viết Phù Hợp Nhất:</h3>`;
-        
-        topResults.forEach((res, index) => {
-            let color = res.cost <= 45 ? "#4ade80" : (res.cost <= 80 ? "#f59e0b" : "#ef4444");
-            let badgeText = res.cost <= 45 ? "Khớp rất tốt" : (res.cost <= 80 ? "Khớp tương đối" : "Sai số cao");
-
-            htmlContent += `
-                <div class="result-item">
-                    <p class="result-title"><b>#${index + 1}.</b> <a href="${res.item.u}" target="_blank">${res.item.t}</a></p>
-                    <p class="result-meta" style="color: ${color};">
-                        Sai số Hamming: <b>${res.cost} bits</b> &bull; <span>${badgeText}</span>
-                    </p>
+        <!-- Trạng thái Hệ thống & Model AI -->
+        <div id="status-panel" class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span id="model-badge" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
+                    <span id="model-status" class="text-sm font-medium text-gray-700">Đang khởi tạo mô hình AI (Chờ khoảng 30s-1 phút cho lần đầu)...</span>
                 </div>
-            `;
-        });
+                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-semibold">Cache: 0 ảnh</span>
+            </div>
+            <div id="progress-bar-container" class="w-full bg-gray-200 rounded-full h-2 mt-3 hidden overflow-hidden">
+                <div id="progress-bar" class="bg-blue-600 h-2 transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
 
-        resultContent.innerHTML = htmlContent;
-        document.getElementById('resultBox').style.display = 'block';
-    }
-</script>
+        <!-- BƯỚC 1: Cấu hình & Đồng bộ Blogger -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
+            <h2 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <span class="bg-blue-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs">1</span>
+                Đồng bộ dữ liệu bài viết Blogger
+            </h2>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <input type="url" id="blog-url" placeholder="https://tenblog.blogspot.com" class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="btn-sync" disabled class="bg-gray-400 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-not-allowed shrink-0 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4 animate-spin hidden" id="sync-spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Đồng bộ & Tạo Cache
+                </button>
+            </div>
+            <!-- Log tiến trình -->
+            <div id="sync-log-box" class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-600 font-mono h-20 overflow-y-auto custom-scrollbar hidden">
+                <div id="sync-log">Sẵn sàng đồng bộ.</div>
+            </div>
+        </div>
 
+        <!-- BƯỚC 2: Tìm kiếm hình ảnh -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
+            <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span class="bg-blue-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs">2</span>
+                Tải ảnh hoặc chụp ảnh để tìm kiếm
+            </h2>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <!-- Dropzone / Upload -->
+                <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-blue-500 hover:bg-blue-50/50 min-h-[140px]">
+                    <svg class="w-9 h-9 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    <span class="text-sm font-medium text-gray-700">Kéo thả ảnh vào đây</span>
+                    <span class="text-xs text-gray-400 mt-1">hoặc nhấp để chọn từ máy tính</span>
+                    <input type="file" id="file-input" class="hidden" accept="image/jpeg, image/png, image/webp, image/avif">
+                </div>
+
+                <!-- Camera Control -->
+                <div class="flex flex-col gap-2">
+                    <button id="btn-camera" class="w-full h-full min-h-[140px] bg-indigo-50 border-2 border-dashed border-indigo-200 text-indigo-700 rounded-xl font-medium hover:bg-indigo-100 transition-all flex flex-col items-center justify-center gap-2">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span>Mở Camera chụp trực tiếp</span>
+                    </button>
+                    
+                    <div id="camera-container" class="hidden relative w-full h-40 bg-black rounded-xl overflow-hidden shadow-inner">
+                        <video id="video-stream" class="w-full h-full object-cover" autoplay playsinline></video>
+                        <button id="btn-capture" class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-white text-gray-900 px-5 py-1.5 rounded-full text-xs font-bold shadow-lg hover:bg-gray-100 transition-all">Chụp ngay</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slider ngưỡng điểm tương đồng -->
+            <div class="flex items-center gap-4 border-t pt-4 mt-2">
+                <label class="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">Độ tương đồng tối thiểu:</label>
+                <input type="range" id="threshold-slider" min="0.55" max="0.95" step="0.01" value="0.75" class="flex-1 accent-blue-600">
+                <span id="threshold-value" class="text-sm font-bold text-blue-600 w-12 text-right">75%</span>
+            </div>
+        </div>
+
+        <!-- BƯỚC 3: Kết quả hiển thị -->
+        <div id="results-section" class="hidden bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+            <h3 class="text-md font-bold text-gray-900 mb-3 pb-2 border-b">Ảnh tìm kiếm</h3>
+            <div class="flex items-center gap-4 mb-6">
+                <img id="query-preview" class="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border shadow-sm" src="" alt="Preview">
+                <div>
+                    <div id="search-status" class="text-sm font-semibold text-blue-600">Đang phân tích hình ảnh...</div>
+                    <p class="text-xs text-gray-500 mt-1">Đang trích xuất đặc trưng AI và so sánh với cơ sở dữ liệu Vector.</p>
+                </div>
+            </div>
+
+            <h3 class="text-md font-bold text-gray-900 mb-3 pb-2 border-b flex items-center justify-between">
+                <span>Bài viết tương đồng nhất</span>
+                <span id="match-count-badge" class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-semibold">0 kết quả</span>
+            </h3>
+            <div id="results-list" class="space-y-3">
+                <!-- Data Render -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Transformer & Engine Core -->
+    <script type="module">
+        import { AutoProcessor, CLIPVisionModelWithProjection, RawImage, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
+
+        env.allowLocalModels = false;
+
+        const MODEL_ID = 'Xenova/clip-vit-base-patch32';
+        let processor = null;
+        let model = null;
+        let db = null;
+
+        const ui = {
+            modelBadge: document.getElementById('model-badge'),
+            modelStatus: document.getElementById('model-status'),
+            cacheCount: document.getElementById('cache-count'),
+            btnSync: document.getElementById('btn-sync'),
+            syncSpinner: document.getElementById('sync-spinner'),
+            blogUrl: document.getElementById('blog-url'),
+            syncLogBox: document.getElementById('sync-log-box'),
+            syncLog: document.getElementById('sync-log'),
+            progressBarContainer: document.getElementById('progress-bar-container'),
+            progressBar: document.getElementById('progress-bar'),
+            
+            dropZone: document.getElementById('drop-zone'),
+            fileInput: document.getElementById('file-input'),
+            btnCamera: document.getElementById('btn-camera'),
+            cameraContainer: document.getElementById('camera-container'),
+            videoStream: document.getElementById('video-stream'),
+            btnCapture: document.getElementById('btn-capture'),
+            
+            thresholdSlider: document.getElementById('threshold-slider'),
+            thresholdValue: document.getElementById('threshold-value'),
+            
+            resultsSection: document.getElementById('results-section'),
+            queryPreview: document.getElementById('query-preview'),
+            searchStatus: document.getElementById('search-status'),
+            resultsList: document.getElementById('results-list'),
+            matchCountBadge: document.getElementById('match-count-badge')
+        };
+
+        // --- 1. KHỞI TẠO HỆ THỐNG ---
+        async function init() {
+            await initDB();
+            await updateCacheBadge();
+
+            try {
+                processor = await AutoProcessor.from_pretrained(MODEL_ID);
+                model = await CLIPVisionModelWithProjection.from_pretrained(MODEL_ID);
+
+                ui.modelBadge.className = "w-3 h-3 rounded-full bg-green-500";
+                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
+                ui.btnSync.disabled = false;
+                ui.btnSync.classList.replace('bg-gray-400', 'bg-blue-600');
+                ui.btnSync.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
+            } catch (err) {
+                ui.modelBadge.className = "w-3 h-3 rounded-full bg-red-500";
+                ui.modelStatus.textContent = "Lỗi tải AI Model: " + err.message;
+            }
+
+            setupEventListeners();
+        }
+
+        // --- 2. INDEXEDDB DATABASE ---
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('BloggerImageSearchV2', 1);
+                req.onupgradeneeded = (e) => {
+                    const database = e.target.result;
+                    if (!database.objectStoreNames.contains('posts')) {
+                        database.createObjectStore('posts', { keyPath: 'postId' });
+                    }
+                };
+                req.onsuccess = (e) => { db = e.target.result; resolve(); };
+                req.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        function dbSavePost(post) {
+            return new Promise((resolve) => {
+                const tx = db.transaction('posts', 'readwrite');
+                tx.objectStore('posts').put(post);
+                tx.oncomplete = resolve;
+            });
+        }
+
+        function dbGetAllPosts() {
+            return new Promise((resolve) => {
+                const tx = db.transaction('posts', 'readonly');
+                const req = tx.objectStore('posts').getAll();
+                req.onsuccess = () => resolve(req.result || []);
+            });
+        }
+
+        async function updateCacheBadge() {
+            const posts = await dbGetAllPosts();
+            let totalImg = 0;
+            posts.forEach(p => totalImg += (p.embeddings || []).length);
+            ui.cacheCount.textContent = `Cache: ${posts.length} bài (${totalImg} ảnh)`;
+        }
+
+        // --- 3. BỘ TẢI ẢNH CHỐNG LỖI 5 LỚP (5-TIER FALLBACK IMAGE FETCHER) ---
+        function normalizeBloggerUrl(url) {
+            if (!url) return '';
+            // 1. Nâng cấp HTTP thành HTTPS
+            let clean = url.replace(/^http:/i, 'https:');
+            
+            // 2. Chuẩn hóa kích thước ảnh Blogger về s800 để lấy chuẩn màu & tương thích tốt
+            clean = clean.replace(/\/(s\d+(-[c|p|k|r|w]+)?|w\d+-h\d+(-[a-z]+)?)\//i, '/s800/');
+            return clean;
+        }
+
+        function loadImageViaCanvas(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.naturalWidth || img.width;
+                        canvas.height = img.naturalHeight || img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        canvas.toBlob((blob) => {
+                            if (blob) resolve(blob);
+                            else reject(new Error('Canvas conversion null'));
+                        }, 'image/jpeg', 0.9);
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                img.onerror = () => reject(new Error('HTMLImageElement load error'));
+                img.src = url;
+            });
+        }
+
+        async function fetchImageBlobSafe(originalUrl) {
+            const targetUrl = normalizeBloggerUrl(originalUrl);
+
+            // Layer 1: Direct Fetch CORS
+            try {
+                const res = await fetch(targetUrl, { mode: 'cors' });
+                if (res.ok) return await res.blob();
+            } catch (e) {}
+
+            // Layer 2: Canvas CrossOrigin
+            try {
+                const blob = await loadImageViaCanvas(targetUrl);
+                if (blob) return blob;
+            } catch (e) {}
+
+            // Layer 3: Dedicated Image CDN Proxy (wsrv.nl - cực mạnh về xử lý CORS ảnh)
+            try {
+                const proxyWsrv = `https://images.weserv.nl/?url=${encodeURIComponent(targetUrl)}&output=jpg&q=80`;
+                const res = await fetch(proxyWsrv);
+                if (res.ok) return await res.blob();
+            } catch (e) {}
+
+            // Layer 4: Corsproxy.io Fallback
+            try {
+                const proxyCorsIo = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+                const res = await fetch(proxyCorsIo);
+                if (res.ok) return await res.blob();
+            } catch (e) {}
+
+            // Layer 5: AllOrigins Fallback
+            try {
+                const proxyAllOrigins = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+                const res = await fetch(proxyAllOrigins);
+                if (res.ok) return await res.blob();
+            } catch (e) {}
+
+            throw new Error(`Không thể tải ảnh sau khi thử qua 5 lớp kết nối: ${originalUrl}`);
+        }
+
+        function appendLog(msg) {
+            const div = document.createElement('div');
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            ui.syncLog.appendChild(div);
+            ui.syncLogBox.scrollTop = ui.syncLogBox.scrollHeight;
+        }
+
+        // --- 4. ĐỒNG BỘ BLOGGER RSS ---
+        async function syncBlogger() {
+            let urlStr = ui.blogUrl.value.trim();
+            if (!urlStr) return alert("Vui lòng nhập đường dẫn Blogger!");
+
+            if(!urlStr.startsWith('http')) urlStr = 'https://' + urlStr;
+            if(urlStr.endsWith('/')) urlStr = urlStr.slice(0, -1);
+
+            ui.btnSync.disabled = true;
+            ui.syncSpinner.classList.remove('hidden');
+            ui.progressBarContainer.classList.remove('hidden');
+            ui.syncLogBox.classList.remove('hidden');
+            ui.syncLog.innerHTML = "";
+
+            appendLog("Đang kết nối RSS Blogger...");
+
+            try {
+                const rssUrl = `${urlStr}/feeds/posts/default?alt=json&max-results=500`;
+                const res = await fetch(rssUrl);
+                if(!res.ok) throw new Error("Không thể đọc RSS Feed. Kiểm tra lại link blog!");
+                
+                const data = await res.json();
+                const entries = data.feed.entry || [];
+                
+                appendLog(`Đã tải thành công ${entries.length} bài viết từ Blogger RSS.`);
+
+                const parser = new DOMParser();
+                const postsToProcess = [];
+
+                entries.forEach(entry => {
+                    const postId = entry.id.$t;
+                    const title = entry.title.$t;
+                    const link = entry.link.find(l => l.rel === 'alternate')?.href || urlStr;
+                    const html = entry.content ? entry.content.$t : (entry.summary ? entry.summary.$t : "");
+                    
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const imgElements = Array.from(doc.querySelectorAll('img')).map(img => img.src).filter(Boolean);
+                    
+                    if (imgElements.length > 0) {
+                        postsToProcess.push({ postId, title, link, images: imgElements, embeddings: [] });
+                    }
+                });
+
+                const existingPosts = await dbGetAllPosts();
+                const existingMap = new Map(existingPosts.map(p => [p.postId, p]));
+
+                let totalImgs = postsToProcess.reduce((sum, p) => sum + p.images.length, 0);
+                let currentImgIndex = 0;
+
+                appendLog(`Tổng cộng ${totalImgs} hình ảnh cần kiểm tra/trích xuất vector...`);
+
+                for (let i = 0; i < postsToProcess.length; i++) {
+                    const post = postsToProcess[i];
+                    const cachedPost = existingMap.get(post.postId);
+                    const updatedEmbeddings = [];
+
+                    for (const rawImgUrl of post.images) {
+                        const cleanUrl = normalizeBloggerUrl(rawImgUrl);
+                        
+                        // Kiểm tra cache
+                        const cached = cachedPost?.embeddings?.find(e => e.url === cleanUrl || e.rawUrl === rawImgUrl);
+                        if (cached) {
+                            updatedEmbeddings.push(cached);
+                            currentImgIndex++;
+                            updateProgress(currentImgIndex, totalImgs);
+                            continue;
+                        }
+
+                        // Sinh vector cho ảnh mới
+                        try {
+                            appendLog(`Đang xử lý: ${post.title.substring(0, 30)}...`);
+                            const blob = await fetchImageBlobSafe(rawImgUrl);
+                            const blobUrl = URL.createObjectURL(blob);
+                            const rawImage = await RawImage.fromURL(blobUrl);
+
+                            const inputs = await processor(rawImage);
+                            const { image_embeds } = await model(inputs);
+
+                            updatedEmbeddings.push({
+                                url: cleanUrl,
+                                rawUrl: rawImgUrl,
+                                vector: Array.from(image_embeds.data)
+                            });
+
+                            URL.revokeObjectURL(blobUrl);
+                        } catch (err) {
+                            appendLog(`⚠️ Bỏ qua ảnh lỗi: ${err.message}`);
+                        }
+
+                        currentImgIndex++;
+                        updateProgress(currentImgIndex, totalImgs);
+                    }
+
+                    post.embeddings = updatedEmbeddings;
+                    await dbSavePost(post);
+                }
+
+                appendLog("✅ Hoàn tất đồng bộ dữ liệu vào Cache!");
+                await updateCacheBadge();
+
+            } catch (err) {
+                appendLog(`❌ Lỗi đồng bộ: ${err.message}`);
+            } finally {
+                ui.btnSync.disabled = false;
+                ui.syncSpinner.classList.add('hidden');
+                setTimeout(() => ui.progressBarContainer.classList.add('hidden'), 3000);
+            }
+        }
+
+        function updateProgress(cur, total) {
+            const pct = total > 0 ? Math.round((cur / total) * 100) : 0;
+            ui.progressBar.style.width = `${pct}%`;
+        }
+
+        // --- 5. SEARCH & VECTOR MATCHING ---
+        async function processAndSearch(fileOrBlob) {
+            if (!processor || !model) return alert("Mô hình AI chưa sẵn sàng!");
+
+            ui.resultsSection.classList.remove('hidden');
+            ui.searchStatus.textContent = "Đang xử lý hình ảnh...";
+            ui.resultsList.innerHTML = "";
+
+            const previewUrl = URL.createObjectURL(fileOrBlob);
+            ui.queryPreview.src = previewUrl;
+
+            try {
+                // Resize nhẹ nếu ảnh lớn để tối ưu RAM
+                const resizedBlob = await resizeImageIfNeeded(fileOrBlob);
+                const queryBlobUrl = URL.createObjectURL(resizedBlob);
+                const rawImage = await RawImage.fromURL(queryBlobUrl);
+
+                ui.searchStatus.textContent = "Đang sinh Embedding Vector AI...";
+                const inputs = await processor(rawImage);
+                const { image_embeds } = await model(inputs);
+
+                URL.revokeObjectURL(queryBlobUrl);
+
+                ui.searchStatus.textContent = "Đang so sánh điểm Vector Cosine Similarity...";
+                await runVectorSearch(image_embeds.data);
+
+            } catch (err) {
+                ui.searchStatus.textContent = "❌ Lỗi: " + err.message;
+            }
+        }
+
+        async function runVectorSearch(queryVector) {
+            const posts = await dbGetAllPosts();
+            if (posts.length === 0) {
+                ui.searchStatus.textContent = "Cơ sở dữ liệu trống. Vui lòng bấm Đồng bộ bài viết trước!";
+                return;
+            }
+
+            const minThreshold = parseFloat(ui.thresholdSlider.value);
+            const matches = [];
+
+            for (const post of posts) {
+                let maxScore = -1;
+                let bestImg = "";
+
+                for (const imgItem of post.embeddings) {
+                    const score = cosineSimilarity(queryVector, imgItem.vector);
+                    if (score > maxScore) {
+                        maxScore = score;
+                        bestImg = imgItem.url;
+                    }
+                }
+
+                if (maxScore >= minThreshold) {
+                    matches.push({
+                        title: post.title,
+                        link: post.link,
+                        score: maxScore,
+                        thumb: bestImg
+                    });
+                }
+            }
+
+            matches.sort((a, b) => b.score - a.score);
+            renderResults(matches);
+        }
+
+        function cosineSimilarity(vecA, vecB) {
+            let dot = 0, normA = 0, normB = 0;
+            for (let i = 0; i < vecA.length; i++) {
+                dot += vecA[i] * vecB[i];
+                normA += vecA[i] * vecA[i];
+                normB += vecB[i] * vecB[i];
+            }
+            if (normA === 0 || normB === 0) return 0;
+            return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+        }
+
+        function renderResults(matches) {
+            ui.searchStatus.textContent = "Hoàn tất tìm kiếm!";
+            ui.matchCountBadge.textContent = `${matches.length} kết quả`;
+            ui.resultsList.innerHTML = "";
+
+            if (matches.length === 0) {
+                ui.resultsList.innerHTML = `<div class="p-4 text-center text-sm text-gray-500 italic">Không tìm thấy bài viết nào đạt ngưỡng tương đồng. Hãy thử hạ thấp thanh gạt độ tương đồng.</div>`;
+                return;
+            }
+
+            matches.forEach(item => {
+                const pct = Math.round(item.score * 100);
+                const el = document.createElement('div');
+                el.className = "flex items-center gap-4 p-3.5 bg-gray-50 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50/30 transition-all";
+                el.innerHTML = `
+                    <img src="${item.thumb}" class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-md border shrink-0 bg-gray-200" onerror="this.src='https://via.placeholder.com/150?text=Image+Error'">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-sm font-bold text-gray-900 truncate" title="${item.title}">${item.title}</h4>
+                        <div class="flex items-center gap-2 mt-1.5">
+                            <span class="text-xs text-gray-500">Độ giống:</span>
+                            <span class="text-xs font-extrabold px-2 py-0.5 rounded ${pct >= 85 ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}">${pct}%</span>
+                        </div>
+                    </div>
+                    <a href="${item.link}" target="_blank" class="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all">
+                        Xem bài
+                    </a>
+                `;
+                ui.resultsList.appendChild(el);
+            });
+        }
+
+        // --- 6. EVENT HANDLERS ---
+        function setupEventListeners() {
+            ui.thresholdSlider.addEventListener('input', (e) => {
+                ui.thresholdValue.textContent = Math.round(e.target.value * 100) + '%';
+            });
+
+            ui.btnSync.addEventListener('click', syncBlogger);
+
+            ui.dropZone.addEventListener('click', () => ui.fileInput.click());
+            ui.fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) processAndSearch(e.target.files[0]);
+            });
+
+            ui.dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                ui.dropZone.classList.add('drag-over');
+            });
+            ui.dropZone.addEventListener('dragleave', () => ui.dropZone.classList.remove('drag-over'));
+            ui.dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                ui.dropZone.classList.remove('drag-over');
+                if (e.dataTransfer.files.length > 0) processAndSearch(e.dataTransfer.files[0]);
+            });
+
+            let stream = null;
+            ui.btnCamera.addEventListener('click', async () => {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    ui.videoStream.srcObject = stream;
+                    ui.btnCamera.classList.add('hidden');
+                    ui.cameraContainer.classList.remove('hidden');
+                } catch (err) {
+                    alert("Không thể mở Camera: " + err.message);
+                }
+            });
+
+            ui.btnCapture.addEventListener('click', () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = ui.videoStream.videoWidth;
+                canvas.height = ui.videoStream.videoHeight;
+                canvas.getContext('2d').drawImage(ui.videoStream, 0, 0);
+
+                canvas.toBlob((blob) => {
+                    if (stream) stream.getTracks().forEach(t => t.stop());
+                    ui.cameraContainer.classList.add('hidden');
+                    ui.btnCamera.classList.remove('hidden');
+                    processAndSearch(blob);
+                }, 'image/jpeg', 0.9);
+            });
+        }
+
+        function resizeImageIfNeeded(file) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const MAX = 1024;
+                    let w = img.width, h = img.height;
+                    if (w > MAX || h > MAX) {
+                        const ratio = Math.min(MAX / w, MAX / h);
+                        w = Math.round(w * ratio);
+                        h = Math.round(h * ratio);
+                    } else {
+                        return resolve(file);
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(resolve, 'image/jpeg', 0.9);
+                };
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
 </body>
 </html>
