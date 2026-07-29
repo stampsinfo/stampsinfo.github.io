@@ -17,7 +17,7 @@
         <!-- Header -->
         <header class="mb-6 text-center">
             <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tìm bài viết Blogger theo hình ảnh</h1>
-            <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Chạy 100% trên trình duyệt &bull; Chống lỗi CORS</p>
+            <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Thu thập 100% bài viết &bull; Đồng bộ đa thiết bị qua JSON</p>
         </header>
 
         <!-- Trạng thái Hệ thống & Model AI -->
@@ -38,23 +38,35 @@
         <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
             <h2 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
                 <span class="bg-blue-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs">1</span>
-                Đồng bộ dữ liệu bài viết Blogger
+                Đồng bộ dữ liệu & Quản lý Cache AI
             </h2>
-            <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex flex-col sm:flex-row gap-3 mb-3">
                 <input type="url" id="blog-url" value="https://www.stamp.io.vn/" placeholder="https://tenblog.blogspot.com" class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 
                 <button id="btn-sync" disabled class="bg-gray-400 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-not-allowed shrink-0 flex items-center justify-center gap-2">
                     <svg class="w-4 h-4 animate-spin hidden" id="sync-spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Đồng bộ & Tạo Cache
+                    Đồng bộ Blogger
                 </button>
 
                 <button id="btn-clear-cache" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shrink-0 flex items-center justify-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     Xóa Cache
                 </button>
             </div>
+
+            <!-- Các nút Xuất / Nhập Cache JSON để dùng đa thiết bị -->
+            <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100 items-center">
+                <span class="text-xs text-gray-500 font-medium">Chia sẻ cache giữa các máy:</span>
+                <button id="btn-export" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5">
+                    📥 Xuất Cache (.json)
+                </button>
+                <label class="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5">
+                    📤 Nhập Cache (.json)
+                    <input type="file" id="import-file-input" class="hidden" accept=".json">
+                </label>
+            </div>
+
             <!-- Log tiến trình -->
-            <div id="sync-log-box" class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-600 font-mono h-20 overflow-y-auto custom-scrollbar hidden">
+            <div id="sync-log-box" class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-600 font-mono h-24 overflow-y-auto custom-scrollbar hidden">
                 <div id="sync-log">Sẵn sàng đồng bộ.</div>
             </div>
         </div>
@@ -71,7 +83,7 @@
                 <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-blue-500 hover:bg-blue-50/50 min-h-[140px]">
                     <svg class="w-9 h-9 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                     <span class="text-sm font-medium text-gray-700">Kéo thả ảnh vào đây</span>
-                    <span class="text-xs text-gray-400 mt-1">hoặc nhấp để chọn từ máy tính</span>
+                    <span class="text-xs text-gray-400 mt-1">hoặc nhấp để chọn từ thiết bị</span>
                     <input type="file" id="file-input" class="hidden" accept="image/jpeg, image/png, image/webp, image/avif">
                 </div>
 
@@ -136,6 +148,8 @@
             btnSync: document.getElementById('btn-sync'),
             syncSpinner: document.getElementById('sync-spinner'),
             btnClearCache: document.getElementById('btn-clear-cache'),
+            btnExport: document.getElementById('btn-export'),
+            importFileInput: document.getElementById('import-file-input'),
             blogUrl: document.getElementById('blog-url'),
             syncLogBox: document.getElementById('sync-log-box'),
             syncLog: document.getElementById('sync-log'),
@@ -159,18 +173,20 @@
             matchCountBadge: document.getElementById('match-count-badge')
         };
 
-        // --- 1. KHỞI TẠO HỆ THỐNG ---
+        // --- 1. KHỞI TẠO HỆ THỐNG & HIỂN THỊ % TẢI AI ---
         async function init() {
             try {
                 await initDB();
                 await updateCacheBadge();
 
-                ui.modelStatus.textContent = "Đang tải mô hình AI Vision (lần đầu có thể mất 30s)...";
+                ui.modelStatus.textContent = "Đang bắt đầu tải mô hình AI Vision...";
 
                 const onProgress = (data) => {
                     if (data.status === 'progress' && data.progress) {
                         const pct = Math.round(data.progress);
-                        ui.modelStatus.textContent = `Đang tải AI (${data.file || ''}): ${pct}%`;
+                        ui.modelStatus.textContent = `Đang tải AI (${data.file || 'model'}): ${pct}%`;
+                    } else if (data.status === 'init') {
+                        ui.modelStatus.textContent = `Chuẩn bị tải: ${data.file || ''}`;
                     }
                 };
 
@@ -183,8 +199,11 @@
                 ui.btnSync.classList.replace('bg-gray-400', 'bg-blue-600');
                 ui.btnSync.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
 
-                // Tự động chạy đồng bộ ngay khi AI sẵn sàng
-                syncBlogger();
+                // Tự động kiểm tra nếu chưa có cache thì đồng bộ ngay
+                const existing = await dbGetAllPosts();
+                if (existing.length === 0) {
+                    syncBlogger();
+                }
                 
             } catch (err) {
                 ui.modelBadge.className = "w-3 h-3 rounded-full bg-red-500";
@@ -301,22 +320,22 @@
             ui.syncLogBox.scrollTop = ui.syncLogBox.scrollHeight;
         }
 
-        // --- 4. JSONP BYPASS CORS & ĐỒNG BỘ BLOGGER ---
-        function fetchBloggerFeedJSONP(blogUrl) {
+        // --- 4. THU THẬP 100% BÀI VIẾT BẰNG PHÂN TRANG TỰ ĐỘNG ---
+        function fetchBloggerPageJSONP(blogUrl, startIndex) {
             return new Promise((resolve, reject) => {
-                const callbackName = 'bloggerCallback_' + Date.now();
+                const callbackName = 'bloggerCallback_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
                 window[callbackName] = function(data) {
                     delete window[callbackName];
-                    document.head.removeChild(script);
+                    if (script.parentNode) document.head.removeChild(script);
                     resolve(data);
                 };
 
                 const script = document.createElement('script');
-                script.src = `${blogUrl}/feeds/posts/default?alt=json-in-script&max-results=500&callback=${callbackName}`;
+                script.src = `${blogUrl}/feeds/posts/default?alt=json-in-script&max-results=150&start-index=${startIndex}&callback=${callbackName}`;
                 script.onerror = () => {
                     delete window[callbackName];
-                    document.head.removeChild(script);
-                    reject(new Error("Không thể tải RSS từ Blogger."));
+                    if (script.parentNode) document.head.removeChild(script);
+                    reject(new Error("Không thể kết nối RSS Blogger."));
                 };
                 document.head.appendChild(script);
             });
@@ -335,18 +354,31 @@
             ui.syncLogBox.classList.remove('hidden');
             ui.syncLog.innerHTML = "";
 
-            appendLog("Đang kết nối Blogger bằng JSONP Anti-CORS...");
+            appendLog("Đang bắt đầu quét toàn bộ bài viết từ Blogger (Vét cạn phân trang)...");
 
             try {
-                const data = await fetchBloggerFeedJSONP(urlStr);
-                const entries = data.feed.entry || [];
-                
-                appendLog(`Đã tải thành công ${entries.length} bài viết.`);
+                let allEntries = [];
+                let startIndex = 1;
+                let pageSize = 150;
+
+                while (true) {
+                    appendLog(`Đang tải danh sách bài viết từ bài số ${startIndex}...`);
+                    const data = await fetchBloggerPageJSONP(urlStr, startIndex);
+                    const entries = data.feed.entry || [];
+                    
+                    if (entries.length === 0) break;
+                    
+                    allEntries = allEntries.concat(entries);
+                    if (entries.length < pageSize) break;
+                    startIndex += pageSize;
+                }
+
+                appendLog(`✅ Tổng cộng đã quét được ${allEntries.length} bài viết.`);
 
                 const parser = new DOMParser();
                 const postsToProcess = [];
 
-                entries.forEach(entry => {
+                allEntries.forEach(entry => {
                     const postId = entry.id.$t;
                     const title = entry.title.$t;
                     const link = entry.link.find(l => l.rel === 'alternate')?.href || urlStr;
@@ -366,7 +398,7 @@
                 let totalImgs = postsToProcess.reduce((sum, p) => sum + p.images.length, 0);
                 let currentImgIndex = 0;
 
-                appendLog(`Tổng cộng ${totalImgs} hình ảnh cần kiểm tra vector...`);
+                appendLog(`Tổng cộng có ${totalImgs} hình ảnh cần xử lý vector AI...`);
 
                 for (let i = 0; i < postsToProcess.length; i++) {
                     const post = postsToProcess[i];
@@ -411,7 +443,7 @@
                     await dbSavePost(post);
                 }
 
-                appendLog("✅ Hoàn tất đồng bộ dữ liệu vào Cache!");
+                appendLog("🎉 Hoàn tất đồng bộ toàn bộ dữ liệu vào Cache!");
                 await updateCacheBadge();
 
             } catch (err) {
@@ -443,6 +475,42 @@
             } finally {
                 ui.btnClearCache.disabled = false;
             }
+        }
+
+        // --- XUẤT & NHẬP CACHE JSON ---
+        async function exportCacheToJson() {
+            const posts = await dbGetAllPosts();
+            if (posts.length === 0) return alert("Cache đang trống, không có gì để xuất!");
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(posts));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `blogger_ai_cache_${Date.now()}.json`);
+            dlAnchorElem.click();
+        }
+
+        async function importCacheFromJson(file) {
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const posts = JSON.parse(e.target.result);
+                    if (!Array.isArray(posts)) throw new Error("File JSON không hợp lệ!");
+
+                    ui.syncLogBox.classList.remove('hidden');
+                    appendLog(`Đang nạp ${posts.length} bài viết từ file Cache vào thiết bị...`);
+
+                    for (const post of posts) {
+                        await dbSavePost(post);
+                    }
+
+                    await updateCacheBadge();
+                    appendLog("✅ Nhập Cache thành công! Bạn có thể tìm kiếm ngay lập tức.");
+                    alert("Đã khôi phục thành công toàn bộ dữ liệu AI Cache!");
+                } catch (err) {
+                    alert("Lỗi đọc file Cache: " + err.message);
+                }
+            };
+            reader.readAsText(file);
         }
 
         // --- 5. SEARCH & VECTOR MATCHING ---
@@ -556,6 +624,10 @@
         // --- 6. EVENT HANDLERS ---
         function setupEventListeners() {
             ui.btnClearCache.addEventListener('click', handleClearCache);
+            ui.btnExport.addEventListener('click', exportCacheToJson);
+            ui.importFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) importCacheFromJson(e.target.files[0]);
+            });
 
             ui.thresholdSlider.addEventListener('input', (e) => {
                 ui.thresholdValue.textContent = Math.round(e.target.value * 100) + '%';
