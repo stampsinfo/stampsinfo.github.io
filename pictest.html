@@ -579,7 +579,7 @@
             }
         }
 
-        async function runVectorSearch(queryVector) {async function runVectorSearch(queryVector) {
+        async function runVectorSearch(queryVector) {
             const posts = await dbGetAllPosts();
             if (posts.length === 0) {
                 ui.searchStatus.textContent = "Cơ sở dữ liệu trống. Vui lòng đồng bộ bài viết!";
