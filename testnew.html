@@ -209,7 +209,7 @@
                 model = await CLIPVisionModelWithProjection.from_pretrained(MODEL_ID, { progress_callback: onProgress });
 
                 ui.modelBadge.className = "w-3 h-3 rounded-full bg-green-500";
-                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
+                ui.modelStatus.textContent = "AI Model đã sẵn sàng!";
                 ui.btnSyncBlogger.disabled = false;
                 ui.btnSyncBlogger.classList.replace('bg-gray-400', 'bg-blue-600');
                 ui.btnSyncBlogger.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
@@ -324,7 +324,7 @@
                     appendLog(msg);
                     alert(msg);
                 } else {
-                    appendLog("✨ Dữ liệu Cache trên máy đã trùng khớp 100% với Repo.");
+                    appendLog("✨ Dữ liệu trên máy đã trùng khớp 100%.");
                 }
 
             } catch (err) {
