@@ -279,11 +279,11 @@
         // --- 3. TỰ ĐỘNG SO SÁNH & ĐỒNG BỘ CACHE TỪ REPO ---
         async function syncFromRepoCache() {
             try {
-                appendLog("🔄 Đang tự động kiểm tra cache mới từ Repo...");
+                appendLog("🔄 Đang tự động kiểm tra dữ liệu mới từ hệ thống...");
 
                 const res = await fetch('./cache.json?t=' + Date.now());
                 if (!res.ok) {
-                    appendLog("⚠️ Không tìm thấy file cache.json trên Repo.");
+                    appendLog("⚠️ Không tìm thấy file dữ liệu trên Repo.");
                     return;
                 }
 
@@ -319,7 +319,7 @@
                 await updateCacheBadge();
 
                 if (newAdded > 0 || updatedCount > 0) {
-                    const msg = `🎉 Tự động đồng bộ Repo thành công: Thêm ${newAdded} bài mới, cập nhật ${updatedCount} bài!`;
+                    const msg = `🎉 Tự động đồng bộ dữ liệu thành công: Thêm ${newAdded} bài mới, cập nhật ${updatedCount} bài!`;
                     ui.syncLogBox.classList.remove('hidden');
                     appendLog(msg);
                     alert(msg);
@@ -328,7 +328,7 @@
                 }
 
             } catch (err) {
-                appendLog(`❌ Lỗi đồng bộ từ Repo: ${err.message}`);
+                appendLog(`❌ Lỗi đồng bộ từ máy chủ: ${err.message}`);
             }
         }
 
@@ -416,7 +416,7 @@
             ui.progressBarContainer.classList.remove('hidden');
             ui.syncLogBox.classList.remove('hidden');
 
-            appendLog("🔄 Đang bắt đầu quét bài viết từ Blogger...");
+            appendLog("🔄 Đang bắt đầu quét bài viết từ trang chủ...");
 
             try {
                 let allEntries = [];
@@ -435,7 +435,7 @@
                     startIndex += pageSize;
                 }
 
-                appendLog(`✅ Tìm thấy ${allEntries.length} bài viết trên Blogger.`);
+                appendLog(`✅ Tìm thấy ${allEntries.length} bài viết trên trang chủ.`);
 
                 const parser = new DOMParser();
                 const postsToProcess = [];
@@ -507,10 +507,10 @@
                     await dbSavePost(post);
                 }
 
-                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
+                ui.modelStatus.textContent = "AI Model đã sẵn sàng!";
                 
                 if (newImagesProcessed > 0) {
-                    appendLog(`🎉 Đã xử lý thêm ${newImagesProcessed} ảnh mới vào Cache thành công!`);
+                    appendLog(`🎉 Đã xử lý thêm ${newImagesProcessed} ảnh mới thành công`);
                     alert(`Đã hoàn tất đồng bộ! Thêm mới ${newImagesProcessed} ảnh.`);
                 } else {
                     appendLog("✨ Không có bài viết/hình ảnh mới nào.");
@@ -522,7 +522,7 @@
             } catch (err) {
                 appendLog(`❌ Lỗi quét Blogger: ${err.message}`);
                 alert("Lỗi quét Blogger: " + err.message);
-                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
+                ui.modelStatus.textContent = "AI Model đã sẵn sàng";
             } finally {
                 ui.btnSyncBlogger.disabled = false;
                 ui.syncSpinner.classList.add('hidden');
@@ -536,13 +536,13 @@
         }
 
         async function handleClearCache() {
-            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ cache?")) return;
+            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ dữ liệu?")) return;
             try {
                 ui.btnClearCache.disabled = true;
                 await dbClearAllPosts();
                 await updateCacheBadge();
                 ui.syncLogBox.classList.remove('hidden');
-                appendLog("🗑️ Đã xóa toàn bộ cache thành công.");
+                appendLog("🗑️ Đã xóa toàn bộ dữ liệu thành công.");
                 ui.resultsList.innerHTML = "";
                 ui.matchCountBadge.textContent = "0 bài viết";
             } catch (err) {
@@ -554,7 +554,7 @@
 
         async function exportCacheToJson() {
             const posts = await dbGetAllPosts();
-            if (posts.length === 0) return alert("Cache đang trống, không có gì để xuất!");
+            if (posts.length === 0) return alert("Dữ liệu đang trống, không có gì để xuất!");
             
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(posts));
             const dlAnchorElem = document.createElement('a');
@@ -571,17 +571,17 @@
                     if (!Array.isArray(posts)) throw new Error("File JSON không hợp lệ!");
 
                     ui.syncLogBox.classList.remove('hidden');
-                    appendLog(`Đang nạp ${posts.length} bài viết từ file Cache...`);
+                    appendLog(`Đang nạp ${posts.length} bài viết từ file dữ liệu...`);
 
                     for (const post of posts) {
                         await dbSavePost(post);
                     }
 
                     await updateCacheBadge();
-                    appendLog("✅ Nhập Cache thành công! Bạn có thể tìm kiếm ngay.");
-                    alert("Đã khôi phục thành công toàn bộ dữ liệu AI Cache!");
+                    appendLog("✅ Nhập dữ liệu thành công! Bạn có thể tìm kiếm ngay.");
+                    alert("Đã khôi phục thành công toàn bộ dữ liệu AI!");
                 } catch (err) {
-                    alert("Lỗi đọc file Cache: " + err.message);
+                    alert("Lỗi đọc file dữ liệu: " + err.message);
                 }
             };
             reader.readAsText(file);
@@ -620,7 +620,7 @@
         async function runVectorSearch(queryVector) {
             const posts = await dbGetAllPosts();
             if (posts.length === 0) {
-                ui.searchStatus.textContent = "Cơ sở dữ liệu trống. Vui lòng bấm quét Blogger!";
+                ui.searchStatus.textContent = "Cơ sở dữ liệu trống. Vui lòng bấm quét dữ liệu!";
                 return;
             }
 
