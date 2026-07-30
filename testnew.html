@@ -266,7 +266,7 @@
             const posts = await dbGetAllPosts();
             let totalImg = 0;
             posts.forEach(p => totalImg += (p.embeddings || []).length);
-            ui.cacheCount.textContent = `Cache: ${posts.length} bài (${totalImg} ảnh)`;
+            ui.cacheCount.textContent = `Data: ${posts.length} bài (${totalImg} ảnh)`;
         }
 
         function appendLog(msg) {
