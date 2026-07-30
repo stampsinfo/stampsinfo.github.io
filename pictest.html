@@ -41,15 +41,15 @@
                 Đồng bộ dữ liệu & Quản lý Cache AI
             </h2>
             <div class="flex flex-col sm:flex-row gap-3 mb-3">
-                <input type="url" id="blog-url" value="https://www.stamp.io.vn/" placeholder="https://tenblog.blogspot.com" class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="url" id="blog-url" value="https://www.stamp.io.vn/" placeholder="https://tenblog.blogspot.com" class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" hidden>
                 
                 <button id="btn-sync" disabled class="bg-gray-400 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-not-allowed shrink-0 flex items-center justify-center gap-2">
                     <svg class="w-4 h-4 animate-spin hidden" id="sync-spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Đồng bộ Blogger
+                    Đồng bộ dữ liệu mới
                 </button>
 
                 <button id="btn-clear-cache" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shrink-0 flex items-center justify-center gap-2">
-                    Xóa Cache
+                    Xóa dữ liệu
                 </button>
             </div>
 
@@ -57,10 +57,10 @@
             <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100 items-center">
                 <span class="text-xs text-gray-500 font-medium">Chia sẻ cache giữa các máy:</span>
                 <button id="btn-export" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5">
-                    📥 Xuất Cache (.json)
+                    📥 Xuất dữ liệu (.json)
                 </button>
                 <label class="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5">
-                    📤 Nhập Cache (.json)
+                    📤 Nhập dữ liệu (.json)
                     <input type="file" id="import-file-input" class="hidden" accept=".json">
                 </label>
             </div>
