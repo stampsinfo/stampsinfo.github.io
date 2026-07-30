@@ -17,7 +17,7 @@
         <!-- Header -->
         <header class="mb-6 text-center">
             <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tìm bài viết Blogger theo hình ảnh</h1>
-            <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Thu thập 100% bài viết &bull; Đồng bộ tự động qua Repo & JSON</p>
+            <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Thu thập 100% bài &bull; Nhận diện thông minh</p>
         </header>
 
         <!-- Trạng thái Hệ thống & Model AI -->
@@ -53,7 +53,7 @@
                 </button>
             </div>
 
-            <!-- Các nút Xuất / Nhập Cache JSON để dùng đa thiết bị -->
+            <!-- Các nút Xuất / Nhập Cache JSON -->
             <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100 items-center">
                 <span class="text-xs text-gray-500 font-medium">Chia sẻ cache giữa các máy:</span>
                 <button id="btn-export" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5">
@@ -78,26 +78,23 @@
                 Tải ảnh hoặc chụp ảnh để tìm kiếm
             </h2>
             
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div id="action-container" class="grid grid-cols-1 gap-4 mb-4">
                 <!-- Dropzone / Upload -->
                 <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-blue-500 hover:bg-blue-50/50 min-h-[140px]">
                     <svg class="w-9 h-9 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                     <span class="text-sm font-medium text-gray-700">Kéo thả ảnh vào đây</span>
-                    <span class="text-xs text-gray-400 mt-1">hoặc nhấp để chọn từ thiết bị</span>
+                    <span class="text-xs text-gray-400 mt-1">hoặc nhấp để tải lên từ thư viện</span>
                     <input type="file" id="file-input" class="hidden" accept="image/jpeg, image/png, image/webp, image/avif">
                 </div>
 
-                <!-- Camera Control -->
-                <div class="flex flex-col gap-2">
+                <!-- Camera Control (Chỉ hiển thị trên Mobile/Tablet) -->
+                <div id="camera-section" class="hidden h-full">
                     <button id="btn-camera" class="w-full h-full min-h-[140px] bg-indigo-50 border-2 border-dashed border-indigo-200 text-indigo-700 rounded-xl font-medium hover:bg-indigo-100 transition-all flex flex-col items-center justify-center gap-2">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        <span>Mở Camera chụp trực tiếp</span>
+                        <span>Mở Máy Ảnh Chụp Ngay</span>
                     </button>
-                    
-                    <div id="camera-container" class="hidden relative w-full h-40 bg-black rounded-xl overflow-hidden shadow-inner">
-                        <video id="video-stream" class="w-full h-full object-cover" autoplay playsinline></video>
-                        <button id="btn-capture" class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-white text-gray-900 px-5 py-1.5 rounded-full text-xs font-bold shadow-lg hover:bg-gray-100 transition-all">Chụp ngay</button>
-                    </div>
+                    <!-- Thuộc tính capture="environment" sẽ mở thẳng camera sau của điện thoại -->
+                    <input type="file" id="camera-input" class="hidden" accept="image/*" capture="environment">
                 </div>
             </div>
 
@@ -156,12 +153,13 @@
             progressBarContainer: document.getElementById('progress-bar-container'),
             progressBar: document.getElementById('progress-bar'),
             
+            actionContainer: document.getElementById('action-container'),
             dropZone: document.getElementById('drop-zone'),
             fileInput: document.getElementById('file-input'),
+            
+            cameraSection: document.getElementById('camera-section'),
             btnCamera: document.getElementById('btn-camera'),
-            cameraContainer: document.getElementById('camera-container'),
-            videoStream: document.getElementById('video-stream'),
-            btnCapture: document.getElementById('btn-capture'),
+            cameraInput: document.getElementById('camera-input'),
             
             thresholdSlider: document.getElementById('threshold-slider'),
             thresholdValue: document.getElementById('threshold-value'),
@@ -173,8 +171,22 @@
             matchCountBadge: document.getElementById('match-count-badge')
         };
 
+        // --- Kiểm tra thiết bị Di động (Mobile/Tablet/iPad) ---
+        function checkMobileDevice() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+            if (isMobile) {
+                ui.cameraSection.classList.remove('hidden');
+                ui.actionContainer.classList.add('sm:grid-cols-2'); // Chia đôi màn hình upload & camera trên tablet
+            } else {
+                ui.cameraSection.classList.add('hidden');
+                ui.actionContainer.classList.remove('sm:grid-cols-2'); // Desktop: Vùng tải ảnh chiếm toàn màn hình
+            }
+        }
+
         // --- 1. KHỞI TẠO HỆ THỐNG & TỰ ĐỘNG NẠP CACHE TỪ REPO ---
         async function init() {
+            checkMobileDevice(); // Cấu hình giao diện tùy theo thiết bị
+            
             try {
                 await initDB();
                 
@@ -218,12 +230,6 @@
                 ui.btnSync.disabled = false;
                 ui.btnSync.classList.replace('bg-gray-400', 'bg-blue-600');
                 ui.btnSync.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
-
-                // Tự động quét nhẹ nếu hoàn toàn chưa có cache nào cả
-                const checkAfterInit = await dbGetAllPosts();
-                if (checkAfterInit.length === 0) {
-                    syncBlogger();
-                }
                 
             } catch (err) {
                 ui.modelBadge.className = "w-3 h-3 rounded-full bg-red-500";
@@ -435,7 +441,6 @@
                         const cleanUrl = normalizeBloggerUrl(rawImgUrl);
                         const cached = cachedPost?.embeddings?.find(e => e.url === cleanUrl || e.rawUrl === rawImgUrl);
                         
-                        // HIỂN THỊ TIẾN ĐỘ CHI TIẾT TỪNG BÀI VÀ SỐ LƯỢNG ẢNH
                         ui.modelStatus.textContent = `Bài ${i + 1}/${postsToProcess.length}: "${post.title.substring(0, 30)}..." (Ảnh ${j + 1}/${totalPostImgs})`;
 
                         if (cached) {
@@ -666,6 +671,7 @@
 
             ui.btnSync.addEventListener('click', syncBlogger);
 
+            // Xử lý sự kiện kéo thả và chọn ảnh qua thư viện
             ui.dropZone.addEventListener('click', () => ui.fileInput.click());
             ui.fileInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) processAndSearch(e.target.files[0]);
@@ -682,31 +688,13 @@
                 if (e.dataTransfer.files.length > 0) processAndSearch(e.dataTransfer.files[0]);
             });
 
-            let stream = null;
-            ui.btnCamera.addEventListener('click', async () => {
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                    ui.videoStream.srcObject = stream;
-                    ui.btnCamera.classList.add('hidden');
-                    ui.cameraContainer.classList.remove('hidden');
-                } catch (err) {
-                    alert("Không thể mở Camera: " + err.message);
-                }
-            });
-
-            ui.btnCapture.addEventListener('click', () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = ui.videoStream.videoWidth;
-                canvas.height = ui.videoStream.videoHeight;
-                canvas.getContext('2d').drawImage(ui.videoStream, 0, 0);
-
-                canvas.toBlob((blob) => {
-                    if (stream) stream.getTracks().forEach(t => t.stop());
-                    ui.cameraContainer.classList.add('hidden');
-                    ui.btnCamera.classList.remove('hidden');
-                    processAndSearch(blob);
-                }, 'image/jpeg', 0.9);
-            });
+            // Xử lý sự kiện nút chụp ảnh (Sử dụng Ứng dụng Camera hệ thống)
+            if (ui.btnCamera && ui.cameraInput) {
+                ui.btnCamera.addEventListener('click', () => ui.cameraInput.click());
+                ui.cameraInput.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) processAndSearch(e.target.files[0]);
+                });
+            }
         }
 
         function resizeImageIfNeeded(file) {
