@@ -579,7 +579,7 @@
             }
         }
 
-        async function runVectorSearch(queryVector) {
+        async function runVectorSearch(queryVector) {async function runVectorSearch(queryVector) {
             const posts = await dbGetAllPosts();
             if (posts.length === 0) {
                 ui.searchStatus.textContent = "Cơ sở dữ liệu trống. Vui lòng đồng bộ bài viết!";
@@ -611,8 +611,14 @@
                 }
             }
 
+            // 1. Sắp xếp danh sách kết quả theo điểm số từ cao xuống thấp
             matches.sort((a, b) => b.score - a.score);
-            renderResults(matches);
+            
+            // 2. GIỚI HẠN: Chỉ cắt lấy tối đa 10 kết quả đầu tiên (cao điểm nhất)
+            const top10Matches = matches.slice(0, 10);
+
+            // 3. Hiển thị ra giao diện
+            renderResults(top10Matches);
         }
 
         function cosineSimilarity(vecA, vecB) {
