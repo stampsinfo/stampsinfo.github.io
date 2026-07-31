@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tìm tem thư theo hình ảnh - AI Vision Search</title>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Tìm bài viết Blogger theo hình ảnh - AI Vision Search</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         .drag-over { border-color: #2563eb; background-color: #eff6ff; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
@@ -21,7 +19,7 @@
     <div class="max-w-5xl mx-auto p-4 sm:p-6">
         <!-- Header -->
         <header class="mb-6 text-center">
-            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tìm tem thư theo hình ảnh</h1>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tìm bài viết Blogger theo hình ảnh</h1>
             <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Tự động đồng bộ Cache</p>
         </header>
 
@@ -32,7 +30,7 @@
                     <span id="model-badge" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
                     <span id="model-status" class="text-sm font-medium text-gray-700">Đang khởi tạo hệ thống...</span>
                 </div>
-                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-semibold">Data: 0 bài (0 ảnh)</span>
+                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-semibold">Cache: 0 bài (0 ảnh)</span>
             </div>
             <div id="progress-bar-container" class="w-full bg-gray-200 rounded-full h-2 mt-3 hidden overflow-hidden">
                 <div id="progress-bar" class="bg-blue-600 h-2 transition-all duration-300" style="width: 0%"></div>
@@ -49,7 +47,7 @@
             <summary class="font-bold text-gray-800 p-4 cursor-pointer flex items-center justify-between hover:bg-gray-50 transition-colors rounded-xl">
                 <div class="flex items-center gap-2">
                     <span class="bg-gray-700 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs group-open:bg-blue-600 transition-colors">⚙️</span>
-                    <span class="text-sm sm:text-base">Quản lý dữ liệu</span>
+                    <span class="text-sm sm:text-base">Công cụ nâng cao: Quản lý Cache & Quét Blogger thủ công</span>
                 </div>
                 <!-- Icon mũi tên xoay khi mở -->
                 <svg class="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -59,28 +57,28 @@
             
             <div class="p-5 border-t border-gray-100">
                 <div class="flex flex-col sm:flex-row gap-3 mb-4">
-                    <input type="url" id="blog-url" value="https://www.stamp.io.vn/" placeholder="https://tenblog.blogspot.com" class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" hidden>
+                    <input type="url" id="blog-url" value="https://www.stamp.io.vn/" placeholder="https://tenblog.blogspot.com" class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
 
                     <!-- Nút Đồng bộ thủ công từ Blogger -->
                     <button id="btn-sync-blogger" disabled class="bg-gray-400 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-not-allowed shrink-0 flex items-center justify-center gap-2">
                         <svg class="w-4 h-4 animate-spin hidden" id="sync-spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        🌐 Quét dữ liệu trang chủ
+                        🌐 Quét Blogger
                     </button>
 
                     <!-- Nút Xóa Cache -->
                     <button id="btn-clear-cache" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shrink-0 flex items-center justify-center gap-2">
-                        Xóa dữ liệu AI
+                        Xóa Cache
                     </button>
                 </div>
 
                 <!-- Các nút Xuất / Nhập Cache JSON -->
                 <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100 items-center">
-                    <span class="text-xs text-gray-500 font-medium">Sao lưu/Khôi phục nhanh:</span></br>
-                    <button id="btn-export" onclick="exportCacheToZip()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5">
-                        📥 Xuất dữ liệu (.json)
+                    <span class="text-xs text-gray-500 font-medium">Sao lưu/Khôi phục nhanh:</span>
+                    <button id="btn-export" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5">
+                        📥 Xuất Cache (.json)
                     </button>
                     <label class="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5">
-                        📤 Nhập dữ liệu (.json)
+                        📤 Nhập Cache (.json)
                         <input type="file" id="import-file-input" class="hidden" accept=".json">
                     </label>
                 </div>
@@ -222,7 +220,7 @@
                 model = await CLIPVisionModelWithProjection.from_pretrained(MODEL_ID, { progress_callback: onProgress });
 
                 ui.modelBadge.className = "w-3 h-3 rounded-full bg-green-500";
-                ui.modelStatus.textContent = "AI Model đã sẵn sàng!";
+                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
                 ui.btnSyncBlogger.disabled = false;
                 ui.btnSyncBlogger.classList.replace('bg-gray-400', 'bg-blue-600');
                 ui.btnSyncBlogger.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
@@ -279,7 +277,7 @@
             const posts = await dbGetAllPosts();
             let totalImg = 0;
             posts.forEach(p => totalImg += (p.embeddings || []).length);
-            ui.cacheCount.textContent = `Data: ${posts.length} bài (${totalImg} ảnh)`;
+            ui.cacheCount.textContent = `Cache: ${posts.length} bài (${totalImg} ảnh)`;
         }
 
         function appendLog(msg) {
@@ -290,99 +288,59 @@
         }
 
         // --- 3. TỰ ĐỘNG SO SÁNH & ĐỒNG BỘ CACHE TỪ REPO ---
-        // --- HÀM TỰ ĐỘNG ĐỒNG BỘ DỮ LIỆU TỪ GITHUB REPO ---
-async function syncFromRepoCache() {
-    try {
-        // (Tùy chọn) Hiện hộp thoại log của bạn
-        if (ui && ui.syncLogBox) ui.syncLogBox.classList.remove('hidden');
-        appendLog("🔄 Đang kiểm tra dữ liệu Cache từ hệ thống...");
+        async function syncFromRepoCache() {
+            try {
+                ui.syncLogBox.classList.remove('hidden'); // Hiển thị khung log ngay
+                appendLog("🔄 Đang tự động kiểm tra cache mới từ Repo...");
 
-        // 1. Fetch file cache.zip (thay ./cache.zip bằng link raw github nếu cần, và giữ ?t=Date.now() để chống cache trình duyệt)
-        const repoUrl = './cache.zip?t=' + Date.now(); 
-        const res = await fetch(repoUrl);
-        
-        if (!res.ok) {
-            appendLog("⚠️ Không tìm thấy file cache.zip trên Repo (hoặc chưa upload).");
-            return;
-        }
-
-        // 2. Tải file dưới dạng Blob (dữ liệu nhị phân)
-        const blob = await res.blob();
-        appendLog(`📦 Đã tải xong file nén (${(blob.size / 1024 / 1024).toFixed(2)} MB). Đang giải nén...`);
-
-        // 3. Sử dụng JSZip để đọc file zip
-        const jszip = new JSZip();
-        const zip = await jszip.loadAsync(blob);
-        
-        // 4. Lấy file "cache.json" nằm bên trong file nén
-        const jsonFile = zip.file("cache.json");
-        if (!jsonFile) {
-            throw new Error("Không tìm thấy file 'cache.json' bên trong file ZIP!");
-        }
-        
-        // 5. Giải nén thành chuỗi văn bản và parse sang JSON
-        const jsonString = await jsonFile.async("string");
-        const repoPosts = JSON.parse(jsonString);
-
-        if (!Array.isArray(repoPosts) || repoPosts.length === 0) {
-            appendLog("⚠️ File cache.zip trên hệ thống trống.");
-            return;
-        }
-
-        appendLog("🔄 Đang đồng bộ và so sánh dữ liệu với máy của bạn...");
-
-        // 6. Logic so sánh và lưu vào IndexedDB
-        const localPosts = await dbGetAllPosts();
-        const localMap = new Map(localPosts.map(p => [p.postId, p]));
-
-        let newAdded = 0;
-        let updatedCount = 0;
-
-        for (const repoPost of repoPosts) {
-            const localPost = localMap.get(repoPost.postId);
-
-            // Nếu máy người dùng chưa có bài này -> Thêm mới
-            if (!localPost) {
-                await dbSavePost(repoPost);
-                newAdded++;
-            } 
-            // Nếu đã có, so sánh số lượng vector embeddings (nếu trên mạng có nhiều hơn thì cập nhật)
-            else {
-                const repoEmbedsCount = (repoPost.embeddings || []).length;
-                const localEmbedsCount = (localPost.embeddings || []).length;
-
-                if (repoEmbedsCount > localEmbedsCount) {
-                    await dbSavePost(repoPost);
-                    updatedCount++;
+                const res = await fetch('./cache.json?t=' + Date.now());
+                if (!res.ok) {
+                    appendLog("⚠️ Không tìm thấy file cache.json trên Repo.");
+                    return;
                 }
+
+                const repoPosts = await res.json();
+                if (!Array.isArray(repoPosts) || repoPosts.length === 0) {
+                    appendLog("⚠️ File cache.json trên Repo trống.");
+                    return;
+                }
+
+                const localPosts = await dbGetAllPosts();
+                const localMap = new Map(localPosts.map(p => [p.postId, p]));
+
+                let newAdded = 0;
+                let updatedCount = 0;
+
+                for (const repoPost of repoPosts) {
+                    const localPost = localMap.get(repoPost.postId);
+
+                    if (!localPost) {
+                        await dbSavePost(repoPost);
+                        newAdded++;
+                    } else {
+                        const repoEmbedsCount = (repoPost.embeddings || []).length;
+                        const localEmbedsCount = (localPost.embeddings || []).length;
+
+                        if (repoEmbedsCount > localEmbedsCount) {
+                            await dbSavePost(repoPost);
+                            updatedCount++;
+                        }
+                    }
+                }
+
+                await updateCacheBadge();
+
+                if (newAdded > 0 || updatedCount > 0) {
+                    const msg = `🎉 Tự động đồng bộ Repo thành công: Thêm ${newAdded} bài mới, cập nhật ${updatedCount} bài!`;
+                    appendLog(msg);
+                } else {
+                    appendLog("✨ Dữ liệu Cache trên máy đã trùng khớp 100% với Repo.");
+                }
+
+            } catch (err) {
+                appendLog(`❌ Lỗi đồng bộ từ Repo: ${err.message}`);
             }
         }
-
-        // Cập nhật lại giao diện (nếu có hàm này)
-        if (typeof updateCacheBadge === "function") {
-            await updateCacheBadge();
-        }
-
-        // 7. Thông báo kết quả
-        if (newAdded > 0 || updatedCount > 0) {
-            appendLog(`🎉 Đồng bộ thành công: Tải thêm ${newAdded} bài, cập nhật ${updatedCount} bài!`);
-        } else {
-            appendLog("✨ Dữ liệu AI của bạn đã là phiên bản mới nhất.");
-        }
-
-    } catch (err) {
-        console.error(err);
-        appendLog(`❌ Lỗi đồng bộ: ${err.message}`);
-    }
-}
-
-// (Tùy chọn) Hàm in log ra màn hình, nếu bạn chưa có thì dùng console.log tạm
-function appendLog(message) {
-    console.log(message);
-    // Nếu có thẻ div hiển thị log trên UI thì cập nhật:
-    // const logDiv = document.getElementById("sync-log");
-    // if(logDiv) logDiv.innerHTML += `<div>${message}</div>`;
-}
 
         // --- 4. BỘ TẢI ẢNH CHỐNG LỖI (CORS) & QUÉT BLOGGER THỦ CÔNG ---
         function normalizeBloggerUrl(url) {
@@ -450,7 +408,7 @@ function appendLog(message) {
                 script.onerror = () => {
                     delete window[callbackName];
                     if (script.parentNode) document.head.removeChild(script);
-                    reject(new Error("Lỗi kết nối trang chủ."));
+                    reject(new Error("Lỗi kết nối RSS Blogger."));
                 };
                 document.head.appendChild(script);
             });
@@ -458,7 +416,7 @@ function appendLog(message) {
 
         async function syncBlogger() {
             let urlStr = ui.blogUrl.value.trim();
-            if (!urlStr) return alert("Vui lòng nhập đường dẫn!");
+            if (!urlStr) return alert("Vui lòng nhập đường dẫn Blogger!");
 
             if(!urlStr.startsWith('http')) urlStr = 'https://' + urlStr;
             if(urlStr.endsWith('/')) urlStr = urlStr.slice(0, -1);
@@ -468,7 +426,7 @@ function appendLog(message) {
             ui.progressBarContainer.classList.remove('hidden');
             ui.syncLogBox.classList.remove('hidden');
 
-            appendLog("🔄 Đang bắt đầu quét bài viết từ máy chủ...");
+            appendLog("🔄 Đang bắt đầu quét bài viết từ Blogger...");
 
             try {
                 let allEntries = [];
@@ -487,7 +445,7 @@ function appendLog(message) {
                     startIndex += pageSize;
                 }
 
-                appendLog(`✅ Tìm thấy ${allEntries.length} bài viết trên trang chủ.`);
+                appendLog(`✅ Tìm thấy ${allEntries.length} bài viết trên Blogger.`);
 
                 const parser = new DOMParser();
                 const postsToProcess = [];
@@ -559,10 +517,10 @@ function appendLog(message) {
                     await dbSavePost(post);
                 }
 
-                ui.modelStatus.textContent = "AI Model đã sẵn sàng!";
+                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
                 
                 if (newImagesProcessed > 0) {
-                    appendLog(`🎉 Đã xử lý thêm ${newImagesProcessed} ảnh mới vào dữ liệu thành công!`);
+                    appendLog(`🎉 Đã xử lý thêm ${newImagesProcessed} ảnh mới vào Cache thành công!`);
                     alert(`Đã hoàn tất đồng bộ! Thêm mới ${newImagesProcessed} ảnh.`);
                 } else {
                     appendLog("✨ Không có bài viết/hình ảnh mới nào.");
@@ -572,9 +530,9 @@ function appendLog(message) {
                 await updateCacheBadge();
 
             } catch (err) {
-                appendLog(`❌ Lỗi quét trang chủ: ${err.message}`);
-                alert("Lỗi quét trang chủ: " + err.message);
-                ui.modelStatus.textContent = "AI Model đã sẵn sàng!";
+                appendLog(`❌ Lỗi quét Blogger: ${err.message}`);
+                alert("Lỗi quét Blogger: " + err.message);
+                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
             } finally {
                 ui.btnSyncBlogger.disabled = false;
                 ui.syncSpinner.classList.add('hidden');
@@ -588,13 +546,13 @@ function appendLog(message) {
         }
 
         async function handleClearCache() {
-            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ dữ liệu AI?")) return;
+            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ cache?")) return;
             try {
                 ui.btnClearCache.disabled = true;
                 await dbClearAllPosts();
                 await updateCacheBadge();
                 ui.syncLogBox.classList.remove('hidden');
-                appendLog("🗑️ Đã xóa toàn bộ dữ liệu thành công.");
+                appendLog("🗑️ Đã xóa toàn bộ cache thành công.");
                 ui.resultsList.innerHTML = "";
                 ui.matchCountBadge.textContent = "0 bài viết";
             } catch (err) {
@@ -604,71 +562,34 @@ function appendLog(message) {
             }
         }
 
-        // --- HÀM TẠO VÀ TẢI XUỐNG FILE CACHE.ZIP ---
-async function exportCacheToZip() {
-    try {
-        // 1. Lấy toàn bộ dữ liệu từ IndexedDB (đảm bảo bạn đang dùng đúng tên hàm của bạn)
-        const allPosts = await dbGetAllPosts();
-        
-        if (!allPosts || allPosts.length === 0) {
-            alert("⚠️ Không có dữ liệu trong Cache để xuất!");
-            return;
+        async function exportCacheToJson() {
+            const posts = await dbGetAllPosts();
+            if (posts.length === 0) return alert("Cache đang trống, không có gì để xuất!");
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(posts));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `cache.json`);
+            dlAnchorElem.click();
         }
-
-        alert("⏳ Đang nén dữ liệu, vui lòng đợi vài giây...");
-
-        // 2. Chuyển đổi dữ liệu thành chuỗi JSON
-        const jsonString = JSON.stringify(allPosts);
-
-        // 3. Khởi tạo JSZip và đưa nội dung JSON vào file có tên "cache.json" bên trong mảng nén
-        const zip = new JSZip();
-        zip.file("cache.json", jsonString);
-
-        // 4. Bắt đầu nén (Sử dụng DEFLATE level 9 để nén nhỏ nhất có thể, rất tốt cho file text)
-        const content = await zip.generateAsync({ 
-            type: "blob",
-            compression: "DEFLATE",
-            compressionOptions: {
-                level: 9 
-            }
-        });
-
-        // 5. Tự động kích hoạt tải xuống file cache.zip
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(content);
-        link.download = "cache.zip";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Giải phóng bộ nhớ
-        URL.revokeObjectURL(link.href);
-
-        alert(`✅ Đã xuất thành công file cache.zip! Dung lượng nén khoảng: ${(content.size / 1024 / 1024).toFixed(2)} MB. \nHãy upload file này lên GitHub.`);
-
-    } catch (error) {
-        console.error("❌ Lỗi khi xuất file ZIP:", error);
-        alert("Đã xảy ra lỗi khi xuất file ZIP. Xem Console để biết chi tiết.");
-    }
-}
 
         async function importCacheFromJson(file) {
             const reader = new FileReader();
             reader.onload = async function(e) {
                 try {
                     const posts = JSON.parse(e.target.result);
-                    if (!Array.isArray(posts)) throw new Error("File dữ liệu không hợp lệ!");
+                    if (!Array.isArray(posts)) throw new Error("File JSON không hợp lệ!");
 
                     ui.syncLogBox.classList.remove('hidden');
-                    appendLog(`Đang nạp ${posts.length} bài viết từ file dữ liệu...`);
+                    appendLog(`Đang nạp ${posts.length} bài viết từ file Cache...`);
 
                     for (const post of posts) {
                         await dbSavePost(post);
                     }
 
                     await updateCacheBadge();
-                    appendLog("✅ Nhập dữ liệu thành công! Bạn có thể tìm kiếm ngay.");
-                    alert("Đã khôi phục thành công toàn bộ dữ liệu AI!");
+                    appendLog("✅ Nhập Cache thành công! Bạn có thể tìm kiếm ngay.");
+                    alert("Đã khôi phục thành công toàn bộ dữ liệu AI Cache!");
                 } catch (err) {
                     alert("Lỗi đọc file Cache: " + err.message);
                 }
@@ -678,7 +599,7 @@ async function exportCacheToZip() {
 
         // --- 5. SEARCH & VECTOR MATCHING ---
         async function processAndSearch(fileOrBlob) {
-            if (!processor || !model) return alert("AI chưa sẵn sàng!");
+            if (!processor || !model) return alert("Mô hình AI chưa sẵn sàng!");
 
             ui.resultsSection.classList.remove('hidden');
             ui.searchStatus.textContent = "Đang xử lý hình ảnh...";
@@ -709,7 +630,7 @@ async function exportCacheToZip() {
         async function runVectorSearch(queryVector) {
             const posts = await dbGetAllPosts();
             if (posts.length === 0) {
-                ui.searchStatus.textContent = "Cơ sở dữ liệu trống. Vui lòng bấm quét dữ liệu trang chủ!";
+                ui.searchStatus.textContent = "Cơ sở dữ liệu trống. Vui lòng bấm quét Blogger!";
                 return;
             }
 
