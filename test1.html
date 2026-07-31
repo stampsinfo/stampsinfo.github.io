@@ -8,8 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- JSZip CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <!-- Transformers.js CDN (Xenova) -->
-    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2"></script>
+    <!-- Transformers.js CDN (Bản Global, sửa lỗi không cần dùng export/module) -->
+    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js"></script>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 min-h-screen">
 
@@ -20,7 +20,7 @@
             <p class="text-sm text-gray-600 mt-1">Sử dụng AI CLIP Vector & IndexedDB Cache</p>
         </header>
 
-        <!-- 🌟 1. THÔNG BÁO CHO THIẾT BỊ MỚI (Mặc định ẩn, hiện khi chưa có cache) -->
+        <!-- 🌟 THÔNG BÁO CHO THIẾT BỊ MỚI (Mặc định ẩn) -->
         <div id="first-time-notice" class="hidden bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl shadow-sm mb-4 flex items-start gap-3">
             <span class="text-blue-500 text-xl leading-none mt-0.5">💡</span>
             <div class="text-xs sm:text-sm text-blue-900 leading-relaxed">
@@ -73,7 +73,11 @@
         </div>
     </div>
 
+    <!-- MÃ SCRIPT JAVASCRIPT THUẦN (KHÔNG CHỨA EXPORT, KHÔNG CẦN MODULE) -->
     <script>
+        // Cấu hình môi trường cho thư viện AI chạy mượt trên Web
+        transformers.env.allowLocalModels = false;
+
         // --- 1. KHỞI TẠO INDEXEDDB ---
         const DB_NAME = 'BloggerCacheDB';
         const DB_VERSION = 1;
@@ -109,8 +113,8 @@
             return new Promise((resolve, reject) => {
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 const store = tx.objectStore(STORE_NAME);
-                for (const post of posts) {
-                    store.put(post);
+                for (let i = 0; i < posts.length; i++) {
+                    store.put(posts[i]);
                 }
                 tx.oncomplete = () => resolve();
                 tx.onerror = () => reject(tx.error);
@@ -158,7 +162,6 @@
             try {
                 const cacheSize = await checkCacheAndShowNotice();
 
-                // Tải Transformers.js CLIP Model
                 ui.statusText.textContent = "Đang nạp mô hình AI CLIP Vision...";
                 const { AutoProcessor, CLIPVisionModelWithProjection } = transformers;
                 
@@ -169,7 +172,7 @@
 
                 ui.statusText.textContent = "AI sẵn sàng! Đang kiểm tra Cache...";
                 
-                // Nếu chưa có cache -> Tự động kích hoạt đồng bộ ZIP từ Repo (Hoặc Release)
+                // Nếu chưa có cache -> Tự động kích hoạt đồng bộ ZIP từ Repo (Hoặc file cục bộ)
                 if (cacheSize === 0) {
                     await syncCacheFromRepo();
                 } else {
@@ -192,7 +195,7 @@
         async function syncCacheFromRepo() {
             try {
                 log("Đang tải file cache.zip...");
-                // Đổi đường dẫn thành link cache.zip thực tế của bạn
+                // Đường dẫn tương đối trỏ thẳng vào file cache.zip đã Push lên GitHub Pages
                 const res = await fetch('./cache.zip?t=' + Date.now()); 
                 if (!res.ok) throw new Error("Không thể tải file cache.zip từ Repo");
 
@@ -216,17 +219,17 @@
 
             } catch (err) {
                 log("⚠️ Đồng bộ thất bại: " + err.message);
-                ui.statusText.textContent = "Chưa có dữ liệu Cache. Bạn có thể tải ảnh nhưng chưa thể so sánh.";
+                ui.statusText.textContent = "Lỗi nạp bộ nhớ đệm Cache. Hãy kiểm tra lại file cache.zip";
             }
         }
 
-        // --- 5. TÌM KIẾM VECTOR & XỬ LÝ GOM NHÓM (TOP 10) ---
-        function handleFileSelect(event) {
+        // --- 5. XỬ LÝ ẢNH & TÌM KIẾM ---
+        window.handleFileSelect = function(event) {
             const file = event.target.files[0];
             if (file) {
                 processAndSearch(file);
             }
-        }
+        };
 
         async function processAndSearch(file) {
             if (!processor || !model) return alert("Hệ thống AI chưa nạp xong, vui lòng chờ!");
@@ -242,7 +245,7 @@
             ui.searchStatusBadge.textContent = "Đang xử lý";
 
             try {
-                // 1. Trích xuất Embeddings từ ảnh
+                // Trích xuất Embeddings từ ảnh
                 const { RawImage } = transformers;
                 const rawImg = await RawImage.fromURL(ui.queryPreview.src);
                 const inputs = await processor(rawImg);
@@ -251,7 +254,7 @@
 
                 ui.searchProgressText.textContent = "Đang so sánh điểm Vector với Cache...";
 
-                // 2. Chạy thuật toán tìm kiếm Vector
+                // Chạy thuật toán tìm kiếm Vector
                 await runVectorSearch(queryVector);
 
             } catch (err) {
@@ -260,7 +263,7 @@
             }
         }
 
-        // 🌟 THUẬT TOÁN COSINE SIMILARITY & GOM NHÓM POST (TOP 10)
+        // 🌟 THUẬT TOÁN TÍNH ĐIỂM & GOM NHÓM POST (TOP 10)
         function cosineSimilarity(vecA, vecB) {
             let dotProduct = 0, normA = 0, normB = 0;
             for (let i = 0; i < vecA.length; i++) {
@@ -279,29 +282,31 @@
                 return;
             }
 
-            // 🌟 Map để gom nhóm bài viết trùng khớp: Key = postId
+            // Map để gom nhóm bài viết trùng khớp
             const bestMatchesMap = new Map();
 
-            for (const post of posts) {
+            for (let i = 0; i < posts.length; i++) {
+                const post = posts[i];
                 if (!post.embeddings || post.embeddings.length === 0) continue;
 
                 let maxPostScore = -1;
                 let bestMatchedImg = post.thumbnail || '';
 
-                // Duyệt qua tất cả các vector ảnh trong cùng 1 bài viết
-                for (const emb of post.embeddings) {
+                // Quét từng ảnh trong bài viết
+                for (let j = 0; j < post.embeddings.length; j++) {
+                    const emb = post.embeddings[j];
                     if (!emb.vector) continue;
 
                     const score = cosineSimilarity(queryVector, emb.vector);
 
-                    // Lấy điểm cao nhất trong các ảnh của bài viết đó
+                    // Lưu lại ảnh có điểm cao nhất của bài viết
                     if (score > maxPostScore) {
                         maxPostScore = score;
                         bestMatchedImg = emb.imageUrl || post.thumbnail;
                     }
                 }
 
-                // Nếu có điểm khớp hợp lệ (Ngưỡng > 0.40)
+                // Lọc ngưỡng: Chỉ giữ bài viết nếu ảnh tốt nhất có độ khớp > 40%
                 if (maxPostScore > 0.40) {
                     bestMatchesMap.set(post.postId, {
                         post: post,
@@ -311,13 +316,13 @@
                 }
             }
 
-            // 🌟 Lọc lấy TOP 10 bài viết có độ chính xác cao nhất
+            // Chuyển sang mảng, sắp xếp giảm dần và lấy đúng Top 10
             const top10Results = Array.from(bestMatchesMap.values())
                 .sort((a, b) => b.score - a.score)
                 .slice(0, 10);
 
             // Cập nhật giao diện
-            ui.searchProgressText.textContent = `Hoàn tất! Tìm thấy ${top10Results.length} bài viết phù hợp.`;
+            ui.searchProgressText.textContent = `Hoàn tất! Hiển thị ${top10Results.length} kết quả khớp nhất.`;
             ui.searchStatusBadge.textContent = "Thành công";
 
             renderResults(top10Results);
@@ -325,7 +330,7 @@
 
         function renderResults(results) {
             if (results.length === 0) {
-                ui.resultsList.innerHTML = '<div class="col-span-2 text-center py-8 text-gray-500">Không tìm thấy bài viết nào khớp với hình ảnh này.</div>';
+                ui.resultsList.innerHTML = '<div class="col-span-2 text-center py-8 text-gray-500">Không tìm thấy bài viết nào tương đồng với hình ảnh này.</div>';
                 return;
             }
 
@@ -348,7 +353,7 @@
             }).join('');
         }
 
-        // Tự động khởi chạy ứng dụng khi tải xong trang
+        // Khởi động khi tải xong trang
         document.addEventListener('DOMContentLoaded', initSystem);
     </script>
 </body>
