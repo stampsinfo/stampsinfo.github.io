@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tìm tem thư theo hình ảnh - AI Vision Search</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Thư viện JSZip để nén và giải nén file ZIP ngay trên trình duyệt -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
@@ -26,7 +24,7 @@
             <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Tự động đồng bộ Cache ZIP</p>
         </header>
         
-        <!-- THÔNG BÁO THIẾT BỊ MỚI CHỜ CACHE & AI -->
+        <!-- THÔNG BÁO THIẾT BỊ MỚI -->
         <div id="new-device-warning" class="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded-r-lg shadow-sm hidden">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
@@ -36,9 +34,7 @@
                 </div>
                 <div class="ml-3">
                     <h3 class="text-sm font-bold text-amber-800">Hệ thống đang chuẩn bị...</h3>
-                    <p class="text-xs text-amber-700 mt-1">
-                        Hệ thống đang kiểm tra và thiết lập dữ liệu AI vui lòng chờ trong giây lát!
-                    </p>
+                    <p class="text-xs text-amber-700 mt-1">Hệ thống đang tải AI và thiết lập dữ liệu, vui lòng chờ trong giây lát!</p>
                 </div>
             </div>
         </div>
@@ -50,118 +46,66 @@
                     <span id="model-badge" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
                     <span id="model-status" class="text-sm font-medium text-gray-700">Đang khởi tạo hệ thống...</span>
                 </div>
-                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-semibold">Cache: 0 bài (0 ảnh)</span>
-            </div>
-            <div id="progress-bar-container" class="w-full bg-gray-200 rounded-full h-2 mt-3 hidden overflow-hidden">
-                <div id="progress-bar" class="bg-blue-600 h-2 transition-all duration-300" style="width: 0%"></div>
+                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-semibold">Cache: 0 ảnh</span>
             </div>
         </div>
 
-        <!-- Log tiến trình đồng bộ -->
-        <div id="sync-log-box" class="mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-600 font-mono h-28 overflow-y-auto custom-scrollbar hidden">
-            <div id="sync-log">Sẵn sàng xử lý.</div>
-        </div>
-
-        <!-- Dropdown: Cấu hình & Quản lý Cache -->
+        <!-- Dropdown: Quản lý Cache -->
         <details class="group bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
             <summary class="font-bold text-gray-800 p-4 cursor-pointer flex items-center justify-between hover:bg-gray-50 transition-colors rounded-xl">
                 <div class="flex items-center gap-2">
                     <span class="bg-gray-700 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs group-open:bg-blue-600 transition-colors">⚙️</span>
                     <span class="text-sm sm:text-base">Quản lý dữ liệu</span>
                 </div>
-                <svg class="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
+                <svg class="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </summary>
-            
-            <div class="p-5 border-t border-gray-100">
-                <div class="flex flex-col sm:flex-row gap-3 mb-4">
-                    <input type="url" id="blog-url" value="https://www.stamp.io.vn/" placeholder="https://tenblog.blogspot.com" class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" hidden>
-
-                    <!-- Nút Đồng bộ thủ công từ Blogger -->
-                    <button id="btn-sync-blogger" disabled class="bg-gray-400 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-not-allowed shrink-0 flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4 animate-spin hidden" id="sync-spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        🌐 Quét dữ liệu mới
-                    </button>
-
-                    <!-- Nút Xóa Cache -->
-                    <button id="btn-clear-cache" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shrink-0 flex items-center justify-center gap-2">
-                        Xóa dữ liệu AI
-                    </button>
-                </div>
-
-                <!-- Nút Xuất / Nhập Cache (.zip & .json) -->
-                <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100 items-center">
-                    <span class="text-xs text-gray-500 font-medium">Sao lưu/Khôi phục:</span>
-                    
-                    <!-- Nút Xuất Cache ZIP -->
-                    <button id="btn-export-zip" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5">
-                        📦 Xuất dữ liệu (.zip)
-                    </button>
-                    
-                    <!-- Nút Nhập File Cache -->
-                    <label class="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5">
-                        📤 Nhập dữ liệu (.zip / .json)
-                        <input type="file" id="import-file-input" class="hidden" accept=".zip,.json">
-                    </label>
-                </div>
+            <div class="p-5 border-t border-gray-100 flex gap-3">
+                <button id="btn-sync" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all w-full sm:w-auto">
+                    🔄 Đồng bộ dữ liệu giả lập
+                </button>
+                <button id="btn-clear-cache" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all w-full sm:w-auto">
+                    🗑️ Xóa dữ liệu
+                </button>
             </div>
         </details>
 
-        <!-- BƯỚC 1: Tìm kiếm hình ảnh -->
+        <!-- BƯỚC 1: Tải ảnh lên -->
         <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
             <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <span class="bg-blue-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs">1</span>
-                Tải ảnh hoặc chụp ảnh để tìm kiếm
+                Tải ảnh để tìm kiếm
             </h2>
-            
-            <div id="action-container" class="grid grid-cols-1 gap-4 mb-4">
-                <!-- Dropzone / Upload -->
-                <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-blue-500 hover:bg-blue-50/50 min-h-[140px]">
-                    <svg class="w-9 h-9 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                    <span class="text-sm font-medium text-gray-700">Kéo thả ảnh vào đây</span>
-                    <span class="text-xs text-gray-400 mt-1">hoặc nhấp để tải lên từ thiết bị</span>
-                    <input type="file" id="file-input" class="hidden" accept="image/jpeg, image/png, image/webp, image/avif">
-                </div>
-
-                <!-- Camera Control (Mobile/Tablet) -->
-                <div id="camera-section" class="hidden h-full">
-                    <button id="btn-camera" class="w-full h-full min-h-[140px] bg-indigo-50 border-2 border-dashed border-indigo-200 text-indigo-700 rounded-xl font-medium hover:bg-indigo-100 transition-all flex flex-col items-center justify-center gap-2">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        <span>Mở Máy Ảnh Chụp Ngay</span>
-                    </button>
-                    <input type="file" id="camera-input" class="hidden" accept="image/*" capture="environment">
-                </div>
+            <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-blue-500 hover:bg-blue-50/50 min-h-[140px]">
+                <svg class="w-9 h-9 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                <span class="text-sm font-medium text-gray-700">Kéo thả ảnh vào đây</span>
+                <span class="text-xs text-gray-400 mt-1">hoặc nhấp để tải lên từ thiết bị</span>
+                <input type="file" id="file-input" class="hidden" accept="image/jpeg, image/png, image/webp">
             </div>
-
-            <!-- Slider ngưỡng điểm tương đồng -->
-            <div class="flex items-center gap-4 border-t pt-4 mt-2">
-                <label class="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">Độ tương đồng tối thiểu:</label>
-                <input type="range" id="threshold-slider" min="0.55" max="0.95" step="0.01" value="0.60" class="flex-1 accent-blue-600" hidden>
+            
+            <div class="flex items-center gap-4 border-t pt-4 mt-4">
+                <label class="text-sm font-medium text-gray-700">Độ tương đồng tối thiểu:</label>
+                <input type="range" id="threshold-slider" min="0.50" max="0.95" step="0.01" value="0.60" class="flex-1 accent-blue-600">
                 <span id="threshold-value" class="text-sm font-bold text-blue-600 w-12 text-right">60%</span>
             </div>
         </div>
 
-        <!-- BƯỚC 2: Kết quả hiển thị -->
+        <!-- BƯỚC 2: Kết quả -->
         <div id="results-section" class="hidden bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <h3 class="text-md font-bold text-gray-900 mb-3 pb-2 border-b">Ảnh tìm kiếm</h3>
             <div class="flex items-center gap-4 mb-6">
-                <img id="query-preview" class="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border shadow-sm" src="" alt="Preview">
+                <img id="query-preview" class="w-24 h-24 object-cover rounded-lg border shadow-sm" src="" alt="Preview">
                 <div>
                     <div id="search-status" class="text-sm font-semibold text-blue-600">Đang phân tích hình ảnh...</div>
-                    <p class="text-xs text-gray-500 mt-1">Đang trích xuất đặc trưng AI và so sánh với cơ sở dữ liệu Vector.</p>
+                    <p class="text-xs text-gray-500 mt-1">Đang trích xuất đặc trưng AI...</p>
                 </div>
             </div>
-
             <h3 class="text-md font-bold text-gray-900 mb-3 pb-2 border-b flex items-center justify-between">
                 <span>Kết quả</span>
                 <span id="match-count-badge" class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-semibold">0</span>
             </h3>
-            <div id="results-list" class="space-y-3"></div>
+            <div id="results-list" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
         </div>
     </div>
 
-    <!-- Script Transformer & Engine Core -->
     <script type="module">
         import { AutoProcessor, CLIPVisionModelWithProjection, RawImage, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
 
@@ -171,116 +115,232 @@
         let processor = null;
         let model = null;
         let db = null;
+        let cachedStamps = [];
 
+        // UI Elements
         const ui = {
+            newDeviceWarning: document.getElementById('new-device-warning'),
             modelBadge: document.getElementById('model-badge'),
             modelStatus: document.getElementById('model-status'),
             cacheCount: document.getElementById('cache-count'),
-            btnSyncBlogger: document.getElementById('btn-sync-blogger'),
-            syncSpinner: document.getElementById('sync-spinner'),
-            btnClearCache: document.getElementById('btn-clear-cache'),
-            btnExportZip: document.getElementById('btn-export-zip'),
-            importFileInput: document.getElementById('import-file-input'),
-            blogUrl: document.getElementById('blog-url'),
-            syncLogBox: document.getElementById('sync-log-box'),
-            syncLog: document.getElementById('sync-log'),
-            progressBarContainer: document.getElementById('progress-bar-container'),
-            progressBar: document.getElementById('progress-bar'),
-            
-            newDeviceWarning: document.getElementById('new-device-warning'), // Element cảnh báo
-            
-            actionContainer: document.getElementById('action-container'),
             dropZone: document.getElementById('drop-zone'),
             fileInput: document.getElementById('file-input'),
-            
-            cameraSection: document.getElementById('camera-section'),
-            btnCamera: document.getElementById('btn-camera'),
-            cameraInput: document.getElementById('camera-input'),
-            
             thresholdSlider: document.getElementById('threshold-slider'),
             thresholdValue: document.getElementById('threshold-value'),
-            
             resultsSection: document.getElementById('results-section'),
             queryPreview: document.getElementById('query-preview'),
             searchStatus: document.getElementById('search-status'),
             resultsList: document.getElementById('results-list'),
-            matchCountBadge: document.getElementById('match-count-badge')
+            matchCountBadge: document.getElementById('match-count-badge'),
+            btnSync: document.getElementById('btn-sync'),
+            btnClear: document.getElementById('btn-clear-cache')
         };
 
-        function checkMobileDevice() {
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
-            if (isMobile) {
-                ui.cameraSection.classList.remove('hidden');
-                ui.actionContainer.classList.add('sm:grid-cols-2'); 
-            } else {
-                ui.cameraSection.classList.add('hidden');
-                ui.actionContainer.classList.remove('sm:grid-cols-2'); 
-            }
-        }
-
-        // --- 1. KHỞI TẠO HỆ THỐNG VÀ TẢI AI TRƯỚC TIÊN ---
-        async function init() {
-            checkMobileDevice(); 
-            
-            try {
-                await initDB();
-                
-                // Mặc định hiện thông báo để người dùng đợi
-                ui.newDeviceWarning.classList.remove('hidden');
-
-                // ƯU TIÊN 1: TẢI HOẶC KIỂM TRA MÔ HÌNH AI (Rất nhanh nếu đã cache trong trình duyệt)
-                ui.modelStatus.textContent = "Đang kiểm tra & nạp mô hình AI Vision...";
-
-                const onProgress = (data) => {
-                    if (data.status === 'progress' && data.progress) {
-                        const pct = Math.round(data.progress);
-                        ui.modelStatus.textContent = `Đang tải AI Model: ${pct}%`;
+        // 1. DATABASE (IndexedDB)
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('StampDB', 1);
+                request.onupgradeneeded = (e) => {
+                    db = e.target.result;
+                    if (!db.objectStoreNames.contains('stamps')) {
+                        db.createObjectStore('stamps', { keyPath: 'id' });
                     }
                 };
-
-                processor = await AutoProcessor.from_pretrained(MODEL_ID, { progress_callback: onProgress });
-                model = await CLIPVisionModelWithProjection.from_pretrained(MODEL_ID, { progress_callback: onProgress });
-
-                ui.modelBadge.className = "w-3 h-3 rounded-full bg-green-500";
-                ui.modelStatus.textContent = "AI đã sẵn sàng!";
-                ui.btnSyncBlogger.disabled = false;
-                ui.btnSyncBlogger.classList.replace('bg-gray-400', 'bg-blue-600');
-                ui.btnSyncBlogger.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
-                
-                // KIỂM TRA NGAY LẬP TỨC: NẾU ĐÃ CÓ AI VÀ DATA -> TẮT CẢNH BÁO LUÔN
-                await checkAndToggleWarning(); 
-
-                // ƯU TIÊN 2: TIẾN HÀNH ĐỒNG BỘ NGẦM TỪ CACHE.ZIP (Sau khi AI đã load xong)
-                await syncFromRepoCacheZip();
-
-            } catch (err) {
-                ui.modelBadge.className = "w-3 h-3 rounded-full bg-red-500";
-                ui.modelStatus.textContent = "Lỗi tải AI Model: " + err.message;
-            }
-
-            setupEventListeners();
+                request.onsuccess = (e) => {
+                    db = e.target.result;
+                    resolve();
+                };
+                request.onerror = (e) => reject(e.target.error);
+            });
         }
 
-        // --- KIỂM TRA TRẠNG THÁI HIỂN THỊ CẢNH BÁO ---
+        function getAllStamps() {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('stamps', 'readonly');
+                const store = tx.objectStore('stamps');
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function saveStamp(stamp) {
+            return new Promise((resolve) => {
+                const tx = db.transaction('stamps', 'readwrite');
+                tx.objectStore('stamps').put(stamp);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        function clearDB() {
+            return new Promise((resolve) => {
+                const tx = db.transaction('stamps', 'readwrite');
+                tx.objectStore('stamps').clear();
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        // 2. KHỞI TẠO HỆ THỐNG
+        async function init() {
+            try {
+                ui.newDeviceWarning.classList.remove('hidden'); // Bật cảnh báo mặc định
+                await initDB();
+                
+                cachedStamps = await getAllStamps();
+                updateCacheUI();
+
+                ui.modelStatus.textContent = "Đang kiểm tra & nạp mô hình AI Vision...";
+                
+                // Tải Processor và Model
+                processor = await AutoProcessor.from_pretrained(MODEL_ID);
+                model = await CLIPVisionModelWithProjection.from_pretrained(MODEL_ID);
+
+                ui.modelBadge.className = "w-3 h-3 rounded-full bg-green-500";
+                ui.modelStatus.textContent = "AI Model đã sẵn sàng!";
+                
+                await checkAndToggleWarning();
+
+                // Events
+                setupEvents();
+            } catch (err) {
+                console.error(err);
+                ui.modelBadge.className = "w-3 h-3 rounded-full bg-red-500";
+                ui.modelStatus.textContent = "Lỗi tải AI Model!";
+            }
+        }
+
         async function checkAndToggleWarning() {
-            const posts = await dbGetAllPosts();
+            if (cachedStamps.length > 0 && processor && model) {
+                ui.newDeviceWarning.classList.add('hidden'); // Tắt cảnh báo nếu đủ AI và dữ liệu
+            } else {
+                ui.newDeviceWarning.classList.remove('hidden');
+            }
+        }
+
+        function updateCacheUI() {
+            ui.cacheCount.textContent = `Cache: ${cachedStamps.length} ảnh`;
+        }
+
+        // 3. XỬ LÝ SỰ KIỆN GIAO DIỆN
+        function setupEvents() {
+            ui.thresholdSlider.addEventListener('input', (e) => {
+                ui.thresholdValue.textContent = `${Math.round(e.target.value * 100)}%`;
+            });
+
+            // Kéo thả ảnh
+            ui.dropZone.addEventListener('click', () => ui.fileInput.click());
+            ui.dropZone.addEventListener('dragover', (e) => { e.preventDefault(); ui.dropZone.classList.add('drag-over'); });
+            ui.dropZone.addEventListener('dragleave', () => ui.dropZone.classList.remove('drag-over'));
+            ui.dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                ui.dropZone.classList.remove('drag-over');
+                if (e.dataTransfer.files.length) handleImage(e.dataTransfer.files[0]);
+            });
+
+            ui.fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) handleImage(e.target.files[0]);
+            });
+
+            // Nút mô phỏng thêm dữ liệu
+            ui.btnSync.addEventListener('click', async () => {
+                const dummyVector = new Array(512).fill(0).map(() => Math.random()); // Tạo Vector giả lập
+                await saveStamp({
+                    id: Date.now().toString(),
+                    name: 'Tem giả lập ' + Math.floor(Math.random() * 100),
+                    image: 'https://via.placeholder.com/150/0000FF/808080?Text=Tem',
+                    vector: dummyVector
+                });
+                cachedStamps = await getAllStamps();
+                updateCacheUI();
+                checkAndToggleWarning();
+                alert('Đã thêm 1 tem giả lập vào cơ sở dữ liệu!');
+            });
+
+            ui.btnClear.addEventListener('click', async () => {
+                await clearDB();
+                cachedStamps = [];
+                updateCacheUI();
+                checkAndToggleWarning();
+                alert('Đã xóa bộ nhớ đệm!');
+            });
+        }
+
+        // 4. XỬ LÝ ẢNH VÀ TÌM KIẾM AI
+        async function handleImage(file) {
+            if (!model || !processor) return alert('AI chưa sẵn sàng!');
+            if (cachedStamps.length === 0) return alert('Không có dữ liệu trong Cache. Vui lòng thêm dữ liệu!');
+
+            const imgURL = URL.createObjectURL(file);
+            ui.queryPreview.src = imgURL;
+            ui.resultsSection.classList.remove('hidden');
+            ui.searchStatus.textContent = "Đang trích xuất Vector AI...";
+            ui.resultsList.innerHTML = '';
+            ui.matchCountBadge.textContent = '0';
+
+            try {
+                // Trích xuất đặc trưng ảnh truy vấn
+                const image = await RawImage.fromURL(imgURL);
+                const inputs = await processor(image);
+                const { image_embeds } = await model(inputs);
+                const queryVector = Array.from(image_embeds.data);
+
+                ui.searchStatus.textContent = "Đang so sánh dữ liệu...";
+
+                // Tính toán độ tương đồng (Cosine Similarity)
+                const threshold = parseFloat(ui.thresholdSlider.value);
+                const results = [];
+
+                for (const stamp of cachedStamps) {
+                    const similarity = cosineSimilarity(queryVector, stamp.vector);
+                    if (similarity >= threshold) {
+                        results.push({ ...stamp, similarity });
+                    }
+                }
+
+                // Sắp xếp giảm dần và hiển thị
+                results.sort((a, b) => b.similarity - a.similarity);
+                renderResults(results);
+
+            } catch (error) {
+                console.error(error);
+                ui.searchStatus.textContent = "Lỗi khi phân tích hình ảnh.";
+            }
+        }
+
+        // Hàm tính Cosine Similarity cho 2 mảng Vector
+        function cosineSimilarity(vecA, vecB) {
+            let dotProduct = 0, normA = 0, normB = 0;
+            for (let i = 0; i < vecA.length; i++) {
+                dotProduct += vecA[i] * vecB[i];
+                normA += vecA[i] * vecA[i];
+                normB += vecB[i] * vecB[i];
+            }
+            if (normA === 0 || normB === 0) return 0;
+            return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+        }
+
+        function renderResults(results) {
+            ui.searchStatus.textContent = "Hoàn tất tìm kiếm!";
+            ui.matchCountBadge.textContent = results.length;
             
-            // Logic mới: Chỉ hiện thông báo nếu thiết bị thật sự trống dữ liệu HOẶC chưa có AI.
-            // Ngược lại, nếu AI đãDựa trên mã nguồn bạn cung cấp, hệ thống thực hiện việc kiểm tra trạng thái tải AI và ẩn thông báo thiết bị mới chủ yếu thông qua hàm `checkAndToggleWarning()`[cite: 1]. 
+            if (results.length === 0) {
+                ui.resultsList.innerHTML = '<p class="text-sm text-gray-500 col-span-full">Không tìm thấy tem nào phù hợp với ngưỡng hiện tại.</p>';
+                return;
+            }
 
-Dưới đây là chi tiết cách hệ thống hoạt động:
+            ui.resultsList.innerHTML = results.map(r => `
+                <div class="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition">
+                    <img src="${r.image}" class="w-full h-24 object-cover" alt="Stamp">
+                    <div class="p-2">
+                        <p class="text-xs font-bold truncate">${r.name}</p>
+                        <p class="text-xs text-blue-600 font-semibold mt-1">Khớp: ${(r.similarity * 100).toFixed(1)}%</p>
+                    </div>
+                </div>
+            `).join('');
+        }
 
-### Điều kiện để tắt thông báo thiết bị mới
-Trong hàm `checkAndToggleWarning()`, hệ thống sẽ đánh giá các biến lưu trữ để quyết định việc hiển thị hay ẩn cảnh báo[cite: 1]:
-* Hệ thống tiến hành lấy danh sách dữ liệu bộ nhớ đệm (cache) từ cơ sở dữ liệu IndexedDB thông qua lệnh `const posts = await dbGetAllPosts();`[cite: 1].
-* Hệ thống kiểm tra xem danh sách bài viết có bị trống hay không thông qua điều kiện `posts.length === 0`[cite: 1].
-* Hệ thống kiểm tra xem bộ xử lý hình ảnh của AI đã tồn tại hay chưa thông qua điều kiện `!processor`[cite: 1].
-* Hệ thống kiểm tra xem mô hình AI Vision (CLIP) đã được nạp thành công hay chưa thông qua điều kiện `!model`[cite: 1].
-* Nếu bất kỳ điều kiện nào ở trên là đúng (thiếu dữ liệu, thiếu processor, hoặc thiếu model), hệ thống sẽ hiển thị thông báo bằng cách xóa lớp `hidden` (`ui.newDeviceWarning.classList.remove('hidden');`)[cite: 1].
-* Ngược lại, nếu AI đã được nạp đầy đủ (`processor` và `model` đã có dữ liệu) và cơ sở dữ liệu không trống, hệ thống sẽ tự động tắt thông báo bằng cách thêm lớp `hidden` vào phần tử giao diện (`ui.newDeviceWarning.classList.add('hidden');`)[cite: 1].
-
-### Trình tự kiểm tra trong quá trình khởi tạo
-Việc gọi hàm kiểm tra này được sắp xếp một cách có chủ đích bên trong hàm `init()` (hàm khởi tạo hệ thống)[cite: 1]:
-* **Kiểm tra lần đầu tiên:** Hàm `await checkAndToggleWarning();` được gọi ngay sau khi khởi tạo cơ sở dữ liệu xong[cite: 1]. Ở thời điểm này, do chưa tải AI nên các biến `processor` và `model` vẫn mang giá trị mặc định là `null`, dẫn đến việc thông báo thiết bị mới sẽ được bật lên[cite: 1].
-* **Quá trình nạp AI:** Hệ thống bắt đầu tải và nạp mô hình AI vào các biến thông qua lệnh `processor = await AutoProcessor.from_pretrained(...)` và `model = await CLIPVisionModelWithProjection.from_pretrained(...)`[cite: 1].
-* **Kiểm tra lần cuối:** Sau khi AI đã nạp xong (không bị rơi vào khối `catch` bắt lỗi), hệ thống gọi lại `await checkAndToggleWarning();` một lần nữa[cite: 1]. Lúc này, các biến AI đã mang giá trị hợp lệ, điều kiện kiểm tra được thỏa mãn và thông báo thiết bị mới sẽ được tắt đi[cite: 1].
+        // Kích hoạt
+        init();
+    </script>
+</body>
+</html>
