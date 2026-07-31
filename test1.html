@@ -3,779 +3,353 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tìm bài viết Blogger theo hình ảnh - AI Vision Search</title>
+    <title>Tìm Kiếm Bài Viết Theo Hình Ảnh (AI Vision)</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .drag-over { border-color: #2563eb; background-color: #eff6ff; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        /* Ẩn mũi tên mặc định của thẻ details trên một số trình duyệt */
-        details > summary { list-style: none; }
-        details > summary::-webkit-details-marker { display: none; }
-    </style>
+    <!-- JSZip CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Transformers.js CDN (Xenova) -->
+    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2"></script>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 min-h-screen">
 
-    <div class="max-w-5xl mx-auto p-4 sm:p-6">
+    <div class="max-w-4xl mx-auto p-4 sm:p-6">
         <!-- Header -->
         <header class="mb-6 text-center">
-            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tìm bài viết Blogger theo hình ảnh</h1>
-            <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Tự động đồng bộ Cache</p>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tìm Bài Viết Theo Hình Ảnh</h1>
+            <p class="text-sm text-gray-600 mt-1">Sử dụng AI CLIP Vector & IndexedDB Cache</p>
         </header>
 
-        <!-- Trạng thái Hệ thống & Model AI -->
-        <div id="status-panel" class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-2">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <span id="model-badge" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
-                    <span id="model-status" class="text-sm font-medium text-gray-700">Đang khởi tạo hệ thống...</span>
-                </div>
-                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-semibold">Cache: 0 bài (0 ảnh)</span>
-            </div>
-            <div id="progress-bar-container" class="w-full bg-gray-200 rounded-full h-2 mt-3 hidden overflow-hidden">
-                <div id="progress-bar" class="bg-blue-600 h-2 transition-all duration-300" style="width: 0%"></div>
+        <!-- 🌟 1. THÔNG BÁO CHO THIẾT BỊ MỚI (Mặc định ẩn, hiện khi chưa có cache) -->
+        <div id="first-time-notice" class="hidden bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl shadow-sm mb-4 flex items-start gap-3">
+            <span class="text-blue-500 text-xl leading-none mt-0.5">💡</span>
+            <div class="text-xs sm:text-sm text-blue-900 leading-relaxed">
+                <strong class="font-bold">Lưu ý cho thiết bị / lần truy cập đầu tiên:</strong> 
+                Hệ thống đang tự động tải mô hình AI Vision và đồng bộ dữ liệu Cache về máy. Vui lòng chờ đến khi dòng chữ <span class="font-semibold text-green-700">"Hệ thống đã sẵn sàng"</span> xuất hiện trước khi bắt đầu tải ảnh tìm kiếm!
             </div>
         </div>
 
-        <!-- Log tiến trình (Đã chuyển lên đây, ngay dưới Status Panel) -->
-        <div id="sync-log-box" class="mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-600 font-mono h-28 overflow-y-auto custom-scrollbar hidden">
-            <div id="sync-log">Sẵn sàng xử lý.</div>
-        </div>
-
-        <!-- Dropdown: Cấu hình & Đồng bộ dữ liệu thủ công -->
-        <details class="group bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-            <summary class="font-bold text-gray-800 p-4 cursor-pointer flex items-center justify-between hover:bg-gray-50 transition-colors rounded-xl">
+        <!-- Panel Trạng thái AI & Cache -->
+        <div id="status-panel" class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-3">
                 <div class="flex items-center gap-2">
-                    <span class="bg-gray-700 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs group-open:bg-blue-600 transition-colors">⚙️</span>
-                    <span class="text-sm sm:text-base">Công cụ nâng cao: Quản lý Cache & Quét Blogger thủ công</span>
+                    <span id="status-indicator" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
+                    <span id="status-text" class="text-sm font-medium text-gray-700">Đang khởi tạo hệ thống...</span>
                 </div>
-                <!-- Icon mũi tên xoay khi mở -->
-                <svg class="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </summary>
-            
-            <div class="p-5 border-t border-gray-100">
-                <div class="flex flex-col sm:flex-row gap-3 mb-4">
-                    <input type="url" id="blog-url" value="https://www.stamp.io.vn/" placeholder="https://tenblog.blogspot.com" class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-
-                    <!-- Nút Đồng bộ thủ công từ Blogger -->
-                    <button id="btn-sync-blogger" disabled class="bg-gray-400 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-not-allowed shrink-0 flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4 animate-spin hidden" id="sync-spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        🌐 Quét Blogger
-                    </button>
-
-                    <!-- Nút Xóa Cache -->
-                    <button id="btn-clear-cache" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shrink-0 flex items-center justify-center gap-2">
-                        Xóa Cache
-                    </button>
-                </div>
-
-                <!-- Các nút Xuất / Nhập Cache JSON -->
-                <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100 items-center">
-                    <span class="text-xs text-gray-500 font-medium">Sao lưu/Khôi phục nhanh:</span>
-                    <button id="btn-export" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5">
-                        📥 Xuất Cache (.json)
-                    </button>
-                    <label class="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5">
-                        📤 Nhập Cache (.json)
-                        <input type="file" id="import-file-input" class="hidden" accept=".json">
-                    </label>
+                <div class="text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">
+                    Cache hiện tại: <strong id="cache-count" class="text-gray-800">0</strong> bài viết
                 </div>
             </div>
-        </details>
-
-        <!-- BƯỚC 1: Tìm kiếm hình ảnh -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
-            <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <span class="bg-blue-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs">1</span>
-                Tải ảnh hoặc chụp ảnh để tìm kiếm
-            </h2>
-            
-            <div id="action-container" class="grid grid-cols-1 gap-4 mb-4">
-                <!-- Dropzone / Upload -->
-                <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-blue-500 hover:bg-blue-50/50 min-h-[140px]">
-                    <svg class="w-9 h-9 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                    <span class="text-sm font-medium text-gray-700">Kéo thả ảnh vào đây</span>
-                    <span class="text-xs text-gray-400 mt-1">hoặc nhấp để tải lên từ thiết bị</span>
-                    <input type="file" id="file-input" class="hidden" accept="image/jpeg, image/png, image/webp, image/avif">
-                </div>
-
-                <!-- Camera Control (Chỉ hiển thị trên Mobile/Tablet) -->
-                <div id="camera-section" class="hidden h-full">
-                    <button id="btn-camera" class="w-full h-full min-h-[140px] bg-indigo-50 border-2 border-dashed border-indigo-200 text-indigo-700 rounded-xl font-medium hover:bg-indigo-100 transition-all flex flex-col items-center justify-center gap-2">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        <span>Mở Máy Ảnh Chụp Ngay</span>
-                    </button>
-                    <input type="file" id="camera-input" class="hidden" accept="image/*" capture="environment">
-                </div>
-            </div>
-
-            <!-- Slider ngưỡng điểm tương đồng -->
-            <div class="flex items-center gap-4 border-t pt-4 mt-2">
-                <label class="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">Độ tương đồng tối thiểu:</label>
-                <input type="range" id="threshold-slider" min="0.55" max="0.95" step="0.01" value="0.75" class="flex-1 accent-blue-600">
-                <span id="threshold-value" class="text-sm font-bold text-blue-600 w-12 text-right">75%</span>
-            </div>
+            <!-- Log đồng bộ chi tiết -->
+            <div id="sync-log" class="mt-3 text-xs text-gray-500 bg-gray-50 p-2.5 rounded border border-gray-100 max-h-24 overflow-y-auto hidden font-mono"></div>
         </div>
 
-        <!-- BƯỚC 2: Kết quả hiển thị -->
-        <div id="results-section" class="hidden bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <h3 class="text-md font-bold text-gray-900 mb-3 pb-2 border-b">Ảnh tìm kiếm</h3>
-            <div class="flex items-center gap-4 mb-6">
-                <img id="query-preview" class="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border shadow-sm" src="" alt="Preview">
+        <!-- Ô Tải Ảnh / Chụp Ảnh -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 text-center mb-6">
+            <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+            <label for="image-input" class="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-3 rounded-lg cursor-pointer transition shadow-sm">
+                📸 Chọn Ảnh Hoặc Chụp Ảnh Tìm Kiếm
+            </label>
+        </div>
+
+        <!-- 🌟 KHU VỰC KẾT QUẢ TÌM KIẾM -->
+        <div id="results-section" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between border-b pb-4 mb-4">
+                <h2 class="text-lg font-bold text-gray-800">Kết Quả Tìm Kiếm (Top 10 Khớp Nhất)</h2>
+                <span id="search-status-badge" class="text-xs font-semibold px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full">Đang xử lý...</span>
+            </div>
+
+            <!-- Preview Ảnh Đã Chọn -->
+            <div class="flex items-center gap-4 p-3 bg-gray-50 rounded-lg mb-6 border">
+                <img id="query-preview" class="w-16 h-16 object-cover rounded border bg-white" alt="Query Preview">
                 <div>
-                    <div id="search-status" class="text-sm font-semibold text-blue-600">Đang phân tích hình ảnh...</div>
-                    <p class="text-xs text-gray-500 mt-1">Đang trích xuất đặc trưng AI và so sánh với cơ sở dữ liệu Vector.</p>
+                    <p class="text-xs text-gray-500">Ảnh tìm kiếm của bạn:</p>
+                    <p id="search-progress-text" class="text-sm font-medium text-gray-700 mt-0.5">Đang trích xuất Vector AI...</p>
                 </div>
             </div>
 
-            <h3 class="text-md font-bold text-gray-900 mb-3 pb-2 border-b flex items-center justify-between">
-                <span>10 bài viết tương đồng nhất</span>
-                <span id="match-count-badge" class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-semibold">0 bài viết</span>
-            </h3>
-            <div id="results-list" class="space-y-3">
-                <!-- Data Render -->
-            </div>
+            <!-- Danh sách 10 bài viết kết quả -->
+            <div id="results-list" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
         </div>
     </div>
 
-    <!-- Script Transformer & Engine Core -->
-    <script type="module">
-        import { AutoProcessor, CLIPVisionModelWithProjection, RawImage, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
+    <script>
+        // --- 1. KHỞI TẠO INDEXEDDB ---
+        const DB_NAME = 'BloggerCacheDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'posts';
 
-        env.allowLocalModels = false;
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'postId' });
+                    }
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
 
-        const MODEL_ID = 'Xenova/clip-vit-base-patch32';
+        async function dbGetAllPosts() {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function dbSavePostsBulk(posts) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                for (const post of posts) {
+                    store.put(post);
+                }
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+
+        // --- 2. BIẾN HỆ THỐNG & UI ELEMENTS ---
         let processor = null;
         let model = null;
-        let db = null;
 
         const ui = {
-            modelBadge: document.getElementById('model-badge'),
-            modelStatus: document.getElementById('model-status'),
+            notice: document.getElementById('first-time-notice'),
+            statusText: document.getElementById('status-text'),
+            statusIndicator: document.getElementById('status-indicator'),
             cacheCount: document.getElementById('cache-count'),
-            btnSyncBlogger: document.getElementById('btn-sync-blogger'),
-            syncSpinner: document.getElementById('sync-spinner'),
-            btnClearCache: document.getElementById('btn-clear-cache'),
-            btnExport: document.getElementById('btn-export'),
-            importFileInput: document.getElementById('import-file-input'),
-            blogUrl: document.getElementById('blog-url'),
-            syncLogBox: document.getElementById('sync-log-box'),
             syncLog: document.getElementById('sync-log'),
-            progressBarContainer: document.getElementById('progress-bar-container'),
-            progressBar: document.getElementById('progress-bar'),
-            
-            actionContainer: document.getElementById('action-container'),
-            dropZone: document.getElementById('drop-zone'),
-            fileInput: document.getElementById('file-input'),
-            
-            cameraSection: document.getElementById('camera-section'),
-            btnCamera: document.getElementById('btn-camera'),
-            cameraInput: document.getElementById('camera-input'),
-            
-            thresholdSlider: document.getElementById('threshold-slider'),
-            thresholdValue: document.getElementById('threshold-value'),
-            
             resultsSection: document.getElementById('results-section'),
-            queryPreview: document.getElementById('query-preview'),
-            searchStatus: document.getElementById('search-status'),
             resultsList: document.getElementById('results-list'),
-            matchCountBadge: document.getElementById('match-count-badge')
+            queryPreview: document.getElementById('query-preview'),
+            searchProgressText: document.getElementById('search-progress-text'),
+            searchStatusBadge: document.getElementById('search-status-badge')
         };
 
-        // --- Kiểm tra thiết bị Di động (Mobile/Tablet) ---
-        function checkMobileDevice() {
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
-            if (isMobile) {
-                ui.cameraSection.classList.remove('hidden');
-                ui.actionContainer.classList.add('sm:grid-cols-2'); 
+        function log(msg) {
+            ui.syncLog.classList.remove('hidden');
+            ui.syncLog.innerHTML += `<div>> ${msg}</div>`;
+            ui.syncLog.scrollTop = ui.syncLog.scrollHeight;
+        }
+
+        // --- 3. BƯỚC KIỂM TRA LẦN ĐẦU & TẢI MÔ HÌNH AI ---
+        async function checkCacheAndShowNotice() {
+            const posts = await dbGetAllPosts();
+            ui.cacheCount.textContent = posts.length;
+            
+            // Nếu chưa có cache -> Hiện khung lưu ý
+            if (!posts || posts.length === 0) {
+                ui.notice.classList.remove('hidden');
             } else {
-                ui.cameraSection.classList.add('hidden');
-                ui.actionContainer.classList.remove('sm:grid-cols-2'); 
+                ui.notice.classList.add('hidden');
             }
+            return posts.length;
         }
 
-        // --- 1. KHỞI TẠO HỆ THỐNG & TỰ ĐỘNG ĐỒNG BỘ CACHE REPO ---
-        async function init() {
-            checkMobileDevice(); 
-            
+        async function initSystem() {
             try {
-                await initDB();
-                await updateCacheBadge();
+                const cacheSize = await checkCacheAndShowNotice();
 
-                // 🚀 Tự động so sánh & đồng bộ cache từ Repo ngầm ngay khi mở trang
-                syncFromRepoCache();
-
-                ui.modelStatus.textContent = "Đang nạp mô hình AI Vision (CLIP)...";
-
-                const onProgress = (data) => {
-                    if (data.status === 'progress' && data.progress) {
-                        const pct = Math.round(data.progress);
-                        ui.modelStatus.textContent = `Đang tải AI Model: ${pct}%`;
-                    }
-                };
-
-                processor = await AutoProcessor.from_pretrained(MODEL_ID, { progress_callback: onProgress });
-                model = await CLIPVisionModelWithProjection.from_pretrained(MODEL_ID, { progress_callback: onProgress });
-
-                ui.modelBadge.className = "w-3 h-3 rounded-full bg-green-500";
-                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
-                ui.btnSyncBlogger.disabled = false;
-                ui.btnSyncBlogger.classList.replace('bg-gray-400', 'bg-blue-600');
-                ui.btnSyncBlogger.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
+                // Tải Transformers.js CLIP Model
+                ui.statusText.textContent = "Đang nạp mô hình AI CLIP Vision...";
+                const { AutoProcessor, CLIPVisionModelWithProjection } = transformers;
                 
-            } catch (err) {
-                ui.modelBadge.className = "w-3 h-3 rounded-full bg-red-500";
-                ui.modelStatus.textContent = "Lỗi tải AI Model: " + err.message;
-            }
+                // Dùng model CLIP siêu nhẹ
+                const modelId = 'Xenova/clip-vit-base-patch32';
+                processor = await AutoProcessor.from_pretrained(modelId);
+                model = await CLIPVisionModelWithProjection.from_pretrained(modelId);
 
-            setupEventListeners();
-        }
-
-        // --- 2. INDEXEDDB DATABASE ---
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const req = indexedDB.open('BloggerImageSearchV2', 1);
-                req.onupgradeneeded = (e) => {
-                    const database = e.target.result;
-                    if (!database.objectStoreNames.contains('posts')) {
-                        database.createObjectStore('posts', { keyPath: 'postId' });
-                    }
-                };
-                req.onsuccess = (e) => { db = e.target.result; resolve(); };
-                req.onerror = (e) => reject(e.target.error);
-            });
-        }
-
-        function dbSavePost(post) {
-            return new Promise((resolve) => {
-                const tx = db.transaction('posts', 'readwrite');
-                tx.objectStore('posts').put(post);
-                tx.oncomplete = resolve;
-            });
-        }
-
-        function dbGetAllPosts() {
-            return new Promise((resolve) => {
-                const tx = db.transaction('posts', 'readonly');
-                const req = tx.objectStore('posts').getAll();
-                req.onsuccess = () => resolve(req.result || []);
-            });
-        }
-
-        function dbClearAllPosts() {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction('posts', 'readwrite');
-                const req = tx.objectStore('posts').clear();
-                req.onsuccess = () => resolve();
-                req.onerror = (e) => reject(e.target.error);
-            });
-        }
-
-        async function updateCacheBadge() {
-            const posts = await dbGetAllPosts();
-            let totalImg = 0;
-            posts.forEach(p => totalImg += (p.embeddings || []).length);
-            ui.cacheCount.textContent = `Cache: ${posts.length} bài (${totalImg} ảnh)`;
-        }
-
-        function appendLog(msg) {
-            const div = document.createElement('div');
-            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            ui.syncLog.appendChild(div);
-            ui.syncLogBox.scrollTop = ui.syncLogBox.scrollHeight;
-        }
-
-        // --- 3. TỰ ĐỘNG SO SÁNH & ĐỒNG BỘ CACHE TỪ REPO ---
-        async function syncFromRepoCache() {
-            try {
-                ui.syncLogBox.classList.remove('hidden'); // Hiển thị khung log ngay
-                appendLog("🔄 Đang tự động kiểm tra cache mới từ Repo...");
-
-                const res = await fetch('./cache.json?t=' + Date.now());
-                if (!res.ok) {
-                    appendLog("⚠️ Không tìm thấy file cache.json trên Repo.");
-                    return;
-                }
-
-                const repoPosts = await res.json();
-                if (!Array.isArray(repoPosts) || repoPosts.length === 0) {
-                    appendLog("⚠️ File cache.json trên Repo trống.");
-                    return;
-                }
-
-                const localPosts = await dbGetAllPosts();
-                const localMap = new Map(localPosts.map(p => [p.postId, p]));
-
-                let newAdded = 0;
-                let updatedCount = 0;
-
-                for (const repoPost of repoPosts) {
-                    const localPost = localMap.get(repoPost.postId);
-
-                    if (!localPost) {
-                        await dbSavePost(repoPost);
-                        newAdded++;
-                    } else {
-                        const repoEmbedsCount = (repoPost.embeddings || []).length;
-                        const localEmbedsCount = (localPost.embeddings || []).length;
-
-                        if (repoEmbedsCount > localEmbedsCount) {
-                            await dbSavePost(repoPost);
-                            updatedCount++;
-                        }
-                    }
-                }
-
-                await updateCacheBadge();
-
-                if (newAdded > 0 || updatedCount > 0) {
-                    const msg = `🎉 Tự động đồng bộ Repo thành công: Thêm ${newAdded} bài mới, cập nhật ${updatedCount} bài!`;
-                    appendLog(msg);
-                } else {
-                    appendLog("✨ Dữ liệu Cache trên máy đã trùng khớp 100% với Repo.");
-                }
-
-            } catch (err) {
-                appendLog(`❌ Lỗi đồng bộ từ Repo: ${err.message}`);
-            }
-        }
-
-        // --- 4. BỘ TẢI ẢNH CHỐNG LỖI (CORS) & QUÉT BLOGGER THỦ CÔNG ---
-        function normalizeBloggerUrl(url) {
-            if (!url) return '';
-            let clean = url.replace(/^http:/i, 'https:');
-            clean = clean.replace(/\/(s\d+(-[c|p|k|r|w]+)?|w\d+-h\d+(-[a-z]+)?)\//i, '/s800/');
-            return clean;
-        }
-
-        function loadImageViaCanvas(url) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.crossOrigin = 'Anonymous';
-                img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.naturalWidth || img.width;
-                        canvas.height = img.naturalHeight || img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-                        canvas.toBlob((blob) => {
-                            if (blob) resolve(blob);
-                            else reject(new Error('Canvas null'));
-                        }, 'image/jpeg', 0.9);
-                    } catch (err) {
-                        reject(err);
-                    }
-                };
-                img.onerror = () => reject(new Error('Image load error'));
-                img.src = url;
-            });
-        }
-
-        async function fetchImageBlobSafe(originalUrl) {
-            const targetUrl = normalizeBloggerUrl(originalUrl);
-            try {
-                const res = await fetch(targetUrl, { mode: 'cors' });
-                if (res.ok) return await res.blob();
-            } catch (e) {}
-
-            try {
-                const blob = await loadImageViaCanvas(targetUrl);
-                if (blob) return blob;
-            } catch (e) {}
-
-            try {
-                const res = await fetch(`https://images.weserv.nl/?url=${encodeURIComponent(targetUrl)}&output=jpg&q=80`);
-                if (res.ok) return await res.blob();
-            } catch (e) {}
-
-            throw new Error(`Không thể tải ảnh`);
-        }
-
-        function fetchBloggerPageJSONP(blogUrl, startIndex) {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'bloggerCallback_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-                window[callbackName] = function(data) {
-                    delete window[callbackName];
-                    if (script.parentNode) document.head.removeChild(script);
-                    resolve(data);
-                };
-
-                const script = document.createElement('script');
-                script.src = `${blogUrl}/feeds/posts/default?alt=json-in-script&max-results=150&start-index=${startIndex}&callback=${callbackName}`;
-                script.onerror = () => {
-                    delete window[callbackName];
-                    if (script.parentNode) document.head.removeChild(script);
-                    reject(new Error("Lỗi kết nối RSS Blogger."));
-                };
-                document.head.appendChild(script);
-            });
-        }
-
-        async function syncBlogger() {
-            let urlStr = ui.blogUrl.value.trim();
-            if (!urlStr) return alert("Vui lòng nhập đường dẫn Blogger!");
-
-            if(!urlStr.startsWith('http')) urlStr = 'https://' + urlStr;
-            if(urlStr.endsWith('/')) urlStr = urlStr.slice(0, -1);
-
-            ui.btnSyncBlogger.disabled = true;
-            ui.syncSpinner.classList.remove('hidden');
-            ui.progressBarContainer.classList.remove('hidden');
-            ui.syncLogBox.classList.remove('hidden');
-
-            appendLog("🔄 Đang bắt đầu quét bài viết từ Blogger...");
-
-            try {
-                let allEntries = [];
-                let startIndex = 1;
-                let pageSize = 150;
-
-                while (true) {
-                    appendLog(`Đang lấy bài viết từ trang số ${startIndex}...`);
-                    const data = await fetchBloggerPageJSONP(urlStr, startIndex);
-                    const entries = data.feed.entry || [];
-                    
-                    if (entries.length === 0) break;
-                    
-                    allEntries = allEntries.concat(entries);
-                    if (entries.length < pageSize) break;
-                    startIndex += pageSize;
-                }
-
-                appendLog(`✅ Tìm thấy ${allEntries.length} bài viết trên Blogger.`);
-
-                const parser = new DOMParser();
-                const postsToProcess = [];
-
-                allEntries.forEach(entry => {
-                    const postId = entry.id.$t;
-                    const title = entry.title.$t;
-                    const link = entry.link.find(l => l.rel === 'alternate')?.href || urlStr;
-                    const html = entry.content ? entry.content.$t : (entry.summary ? entry.summary.$t : "");
-                    
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const imgElements = Array.from(doc.querySelectorAll('img')).map(img => img.src).filter(Boolean);
-                    
-                    postsToProcess.push({ postId, title, link, images: imgElements, embeddings: [] });
-                });
-
-                const existingPosts = await dbGetAllPosts();
-                const existingMap = new Map(existingPosts.map(p => [p.postId, p]));
-
-                let totalImgs = postsToProcess.reduce((sum, p) => sum + p.images.length, 0);
-                let currentImgIndex = 0;
-                let newImagesProcessed = 0;
-
-                for (let i = 0; i < postsToProcess.length; i++) {
-                    const post = postsToProcess[i];
-                    const cachedPost = existingMap.get(post.postId);
-                    const updatedEmbeddings = [];
-                    const totalPostImgs = post.images.length;
-
-                    for (let j = 0; j < totalPostImgs; j++) {
-                        const rawImgUrl = post.images[j];
-                        const cleanUrl = normalizeBloggerUrl(rawImgUrl);
-                        const cached = cachedPost?.embeddings?.find(e => e.url === cleanUrl || e.rawUrl === rawImgUrl);
-                        
-                        if (cached) {
-                            updatedEmbeddings.push(cached);
-                            currentImgIndex++;
-                            updateProgress(currentImgIndex, totalImgs);
-                            continue;
-                        }
-
-                        newImagesProcessed++;
-                        ui.modelStatus.textContent = `Đang xử lý ảnh mới (${newImagesProcessed}): "${post.title.substring(0, 20)}..."`;
-                        
-                        try {
-                            const blob = await fetchImageBlobSafe(rawImgUrl);
-                            const blobUrl = URL.createObjectURL(blob);
-                            const rawImage = await RawImage.fromURL(blobUrl);
-
-                            const inputs = await processor(rawImage);
-                            const { image_embeds } = await model(inputs);
-
-                            updatedEmbeddings.push({
-                                url: cleanUrl,
-                                rawUrl: rawImgUrl,
-                                vector: Array.from(image_embeds.data)
-                            });
-
-                            URL.revokeObjectURL(blobUrl);
-                        } catch (err) {
-                            // Bỏ qua lỗi ảnh
-                        }
-
-                        currentImgIndex++;
-                        updateProgress(currentImgIndex, totalImgs);
-                    }
-
-                    post.embeddings = updatedEmbeddings;
-                    await dbSavePost(post);
-                }
-
-                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
+                ui.statusText.textContent = "AI sẵn sàng! Đang kiểm tra Cache...";
                 
-                if (newImagesProcessed > 0) {
-                    appendLog(`🎉 Đã xử lý thêm ${newImagesProcessed} ảnh mới vào Cache thành công!`);
-                    alert(`Đã hoàn tất đồng bộ! Thêm mới ${newImagesProcessed} ảnh.`);
+                // Nếu chưa có cache -> Tự động kích hoạt đồng bộ ZIP từ Repo (Hoặc Release)
+                if (cacheSize === 0) {
+                    await syncCacheFromRepo();
                 } else {
-                    appendLog("✨ Không có bài viết/hình ảnh mới nào.");
-                    alert("Dữ liệu của bạn đã là mới nhất!");
+                    setSystemReady();
                 }
 
-                await updateCacheBadge();
-
             } catch (err) {
-                appendLog(`❌ Lỗi quét Blogger: ${err.message}`);
-                alert("Lỗi quét Blogger: " + err.message);
-                ui.modelStatus.textContent = "AI Model đã sẵn sàng xử lý!";
-            } finally {
-                ui.btnSyncBlogger.disabled = false;
-                ui.syncSpinner.classList.add('hidden');
-                setTimeout(() => ui.progressBarContainer.classList.add('hidden'), 3000);
+                ui.statusText.textContent = "❌ Lỗi khởi tạo: " + err.message;
+                ui.statusIndicator.className = "w-3 h-3 rounded-full bg-red-500";
             }
         }
 
-        function updateProgress(cur, total) {
-            const pct = total > 0 ? Math.round((cur / total) * 100) : 0;
-            ui.progressBar.style.width = `${pct}%`;
+        function setSystemReady() {
+            ui.statusText.textContent = "Hệ thống đã sẵn sàng tìm kiếm!";
+            ui.statusIndicator.className = "w-3 h-3 rounded-full bg-green-500";
+            ui.notice.classList.add('hidden'); // Tự động ẩn lưu ý khi đã sẵn sàng
         }
 
-        async function handleClearCache() {
-            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ cache?")) return;
+        // --- 4. ĐỒNG BỘ CACHE TỪ FILE ZIP ---
+        async function syncCacheFromRepo() {
             try {
-                ui.btnClearCache.disabled = true;
-                await dbClearAllPosts();
-                await updateCacheBadge();
-                ui.syncLogBox.classList.remove('hidden');
-                appendLog("🗑️ Đã xóa toàn bộ cache thành công.");
-                ui.resultsList.innerHTML = "";
-                ui.matchCountBadge.textContent = "0 bài viết";
+                log("Đang tải file cache.zip...");
+                // Đổi đường dẫn thành link cache.zip thực tế của bạn
+                const res = await fetch('./cache.zip?t=' + Date.now()); 
+                if (!res.ok) throw new Error("Không thể tải file cache.zip từ Repo");
+
+                const blob = await res.blob();
+                log("Giải nén cache dữ liệu...");
+                const jszip = new JSZip();
+                const zip = await jszip.loadAsync(blob);
+                const jsonFile = zip.file("cache.json");
+
+                if (!jsonFile) throw new Error("File ZIP không chứa cache.json");
+
+                const jsonStr = await jsonFile.async("string");
+                const posts = JSON.parse(jsonStr);
+
+                log(`Đang lưu ${posts.length} bài viết vào bộ nhớ thiết bị...`);
+                await dbSavePostsBulk(posts);
+
+                const newCount = await checkCacheAndShowNotice();
+                log("✅ Đồng bộ hoàn tất!");
+                setSystemReady();
+
             } catch (err) {
-                alert("Lỗi: " + err.message);
-            } finally {
-                ui.btnClearCache.disabled = false;
+                log("⚠️ Đồng bộ thất bại: " + err.message);
+                ui.statusText.textContent = "Chưa có dữ liệu Cache. Bạn có thể tải ảnh nhưng chưa thể so sánh.";
             }
         }
 
-        async function exportCacheToJson() {
-            const posts = await dbGetAllPosts();
-            if (posts.length === 0) return alert("Cache đang trống, không có gì để xuất!");
-            
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(posts));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", `cache.json`);
-            dlAnchorElem.click();
+        // --- 5. TÌM KIẾM VECTOR & XỬ LÝ GOM NHÓM (TOP 10) ---
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processAndSearch(file);
+            }
         }
 
-        async function importCacheFromJson(file) {
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                try {
-                    const posts = JSON.parse(e.target.result);
-                    if (!Array.isArray(posts)) throw new Error("File JSON không hợp lệ!");
+        async function processAndSearch(file) {
+            if (!processor || !model) return alert("Hệ thống AI chưa nạp xong, vui lòng chờ!");
 
-                    ui.syncLogBox.classList.remove('hidden');
-                    appendLog(`Đang nạp ${posts.length} bài viết từ file Cache...`);
-
-                    for (const post of posts) {
-                        await dbSavePost(post);
-                    }
-
-                    await updateCacheBadge();
-                    appendLog("✅ Nhập Cache thành công! Bạn có thể tìm kiếm ngay.");
-                    alert("Đã khôi phục thành công toàn bộ dữ liệu AI Cache!");
-                } catch (err) {
-                    alert("Lỗi đọc file Cache: " + err.message);
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        // --- 5. SEARCH & VECTOR MATCHING ---
-        async function processAndSearch(fileOrBlob) {
-            if (!processor || !model) return alert("Mô hình AI chưa sẵn sàng!");
-
+            // 🚀 AUTO SCROLL: Mở khung kết quả và cuộn trang xuống ngay lập tức
             ui.resultsSection.classList.remove('hidden');
-            ui.searchStatus.textContent = "Đang xử lý hình ảnh...";
-            ui.resultsList.innerHTML = "";
+            ui.resultsList.innerHTML = '<div class="col-span-2 text-center py-8 text-gray-500">Đang phân tích hình ảnh...</div>';
+            ui.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-            const previewUrl = URL.createObjectURL(fileOrBlob);
-            ui.queryPreview.src = previewUrl;
+            // Hiển thị preview ảnh chọn
+            ui.queryPreview.src = URL.createObjectURL(file);
+            ui.searchProgressText.textContent = "Đang trích xuất Vector AI từ ảnh...";
+            ui.searchStatusBadge.textContent = "Đang xử lý";
 
             try {
-                const resizedBlob = await resizeImageIfNeeded(fileOrBlob);
-                const queryBlobUrl = URL.createObjectURL(resizedBlob);
-                const rawImage = await RawImage.fromURL(queryBlobUrl);
-
-                ui.searchStatus.textContent = "Đang sinh Embedding Vector AI...";
-                const inputs = await processor(rawImage);
+                // 1. Trích xuất Embeddings từ ảnh
+                const { RawImage } = transformers;
+                const rawImg = await RawImage.fromURL(ui.queryPreview.src);
+                const inputs = await processor(rawImg);
                 const { image_embeds } = await model(inputs);
+                const queryVector = image_embeds.data;
 
-                URL.revokeObjectURL(queryBlobUrl);
+                ui.searchProgressText.textContent = "Đang so sánh điểm Vector với Cache...";
 
-                ui.searchStatus.textContent = "Đang so sánh điểm Vector...";
-                await runVectorSearch(image_embeds.data);
+                // 2. Chạy thuật toán tìm kiếm Vector
+                await runVectorSearch(queryVector);
 
             } catch (err) {
-                ui.searchStatus.textContent = "❌ Lỗi: " + err.message;
+                ui.searchProgressText.textContent = "❌ Lỗi: " + err.message;
+                ui.searchStatusBadge.textContent = "Lỗi";
             }
         }
 
-        async function runVectorSearch(queryVector) {
-            const posts = await dbGetAllPosts();
-            if (posts.length === 0) {
-                ui.searchStatus.textContent = "Cơ sở dữ liệu trống. Vui lòng bấm quét Blogger!";
-                return;
-            }
-
-            const minThreshold = parseFloat(ui.thresholdSlider.value);
-            const matches = [];
-
-            for (const post of posts) {
-                let maxScore = -1;
-                let bestImg = "";
-
-                for (const imgItem of (post.embeddings || [])) {
-                    const score = cosineSimilarity(queryVector, imgItem.vector);
-                    if (score > maxScore) {
-                        maxScore = score;
-                        bestImg = imgItem.url;
-                    }
-                }
-
-                if (maxScore >= minThreshold) {
-                    matches.push({
-                        title: post.title,
-                        link: post.link,
-                        score: maxScore,
-                        thumb: bestImg
-                    });
-                }
-            }
-
-            // Sắp xếp điểm số từ cao xuống thấp
-            matches.sort((a, b) => b.score - a.score);
-            
-            // Giới hạn chỉ lấy 10 bài tương đồng nhất
-            const top10Matches = matches.slice(0, 10);
-
-            // Render giao diện
-            renderResults(top10Matches);
-        }
-
+        // 🌟 THUẬT TOÁN COSINE SIMILARITY & GOM NHÓM POST (TOP 10)
         function cosineSimilarity(vecA, vecB) {
-            let dot = 0, normA = 0, normB = 0;
+            let dotProduct = 0, normA = 0, normB = 0;
             for (let i = 0; i < vecA.length; i++) {
-                dot += vecA[i] * vecB[i];
+                dotProduct += vecA[i] * vecB[i];
                 normA += vecA[i] * vecA[i];
                 normB += vecB[i] * vecB[i];
             }
             if (normA === 0 || normB === 0) return 0;
-            return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+            return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
         }
 
-        function renderResults(matches) {
-            ui.searchStatus.textContent = "Hoàn tất tìm kiếm!";
-            ui.matchCountBadge.textContent = matches.length > 0 ? `${matches.length} bài viết` : `0 bài viết`;
-            ui.resultsList.innerHTML = "";
-
-            if (matches.length === 0) {
-                ui.resultsList.innerHTML = `<div class="p-4 text-center text-sm text-gray-500 italic">Không tìm thấy bài viết nào đạt ngưỡng tương đồng.</div>`;
+        async function runVectorSearch(queryVector) {
+            const posts = await dbGetAllPosts();
+            if (!posts || posts.length === 0) {
+                ui.resultsList.innerHTML = '<div class="col-span-2 text-center text-red-500 py-4">Chưa có dữ liệu cache bài viết để so sánh!</div>';
                 return;
             }
 
-            matches.forEach(item => {
-                const pct = Math.round(item.score * 100);
-                const el = document.createElement('div');
-                el.className = "flex items-center gap-4 p-3.5 bg-gray-50 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50/30 transition-all";
-                el.innerHTML = `
-                    <img src="${item.thumb}" class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-md border shrink-0 bg-gray-200" onerror="this.src='https://via.placeholder.com/150?text=Error'">
-                    <div class="flex-1 min-w-0">
-                        <h4 class="text-sm font-bold text-gray-900 truncate" title="${item.title}">${item.title}</h4>
-                        <div class="flex items-center gap-2 mt-1.5">
-                            <span class="text-xs text-gray-500">Độ giống:</span>
-                            <span class="text-xs font-extrabold px-2 py-0.5 rounded ${pct >= 85 ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}">${pct}%</span>
+            // 🌟 Map để gom nhóm bài viết trùng khớp: Key = postId
+            const bestMatchesMap = new Map();
+
+            for (const post of posts) {
+                if (!post.embeddings || post.embeddings.length === 0) continue;
+
+                let maxPostScore = -1;
+                let bestMatchedImg = post.thumbnail || '';
+
+                // Duyệt qua tất cả các vector ảnh trong cùng 1 bài viết
+                for (const emb of post.embeddings) {
+                    if (!emb.vector) continue;
+
+                    const score = cosineSimilarity(queryVector, emb.vector);
+
+                    // Lấy điểm cao nhất trong các ảnh của bài viết đó
+                    if (score > maxPostScore) {
+                        maxPostScore = score;
+                        bestMatchedImg = emb.imageUrl || post.thumbnail;
+                    }
+                }
+
+                // Nếu có điểm khớp hợp lệ (Ngưỡng > 0.40)
+                if (maxPostScore > 0.40) {
+                    bestMatchesMap.set(post.postId, {
+                        post: post,
+                        score: maxPostScore,
+                        matchedImageUrl: bestMatchedImg
+                    });
+                }
+            }
+
+            // 🌟 Lọc lấy TOP 10 bài viết có độ chính xác cao nhất
+            const top10Results = Array.from(bestMatchesMap.values())
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 10);
+
+            // Cập nhật giao diện
+            ui.searchProgressText.textContent = `Hoàn tất! Tìm thấy ${top10Results.length} bài viết phù hợp.`;
+            ui.searchStatusBadge.textContent = "Thành công";
+
+            renderResults(top10Results);
+        }
+
+        function renderResults(results) {
+            if (results.length === 0) {
+                ui.resultsList.innerHTML = '<div class="col-span-2 text-center py-8 text-gray-500">Không tìm thấy bài viết nào khớp với hình ảnh này.</div>';
+                return;
+            }
+
+            ui.resultsList.innerHTML = results.map((item, index) => {
+                const percentage = (item.score * 100).toFixed(1);
+                return `
+                    <div class="border rounded-lg p-3 bg-white shadow-sm flex gap-3 hover:border-blue-400 transition">
+                        <img src="${item.matchedImageUrl}" class="w-24 h-24 object-cover rounded bg-gray-100 flex-shrink-0" alt="Thumbnail">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-1 mb-1">
+                                <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">#${index + 1}</span>
+                                <span class="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded">Khớp: ${percentage}%</span>
+                            </div>
+                            <h3 class="text-sm font-bold text-gray-900 truncate" title="${item.post.title}">${item.post.title}</h3>
+                            <p class="text-xs text-gray-500 line-clamp-2 mt-1">${item.post.snippet || 'Không có mô tả'}</p>
+                            <a href="${item.post.url}" target="_blank" class="inline-block text-xs text-blue-600 hover:underline mt-2 font-medium">👉 Xem bài viết</a>
                         </div>
                     </div>
-                    <a href="${item.link}" target="_blank" class="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all">
-                        Xem bài
-                    </a>
                 `;
-                ui.resultsList.appendChild(el);
-            });
+            }).join('');
         }
 
-        // --- 6. EVENT HANDLERS ---
-        function setupEventListeners() {
-            ui.btnClearCache.addEventListener('click', handleClearCache);
-            ui.btnExport.addEventListener('click', exportCacheToJson);
-            ui.importFileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) importCacheFromJson(e.target.files[0]);
-            });
-
-            ui.thresholdSlider.addEventListener('input', (e) => {
-                ui.thresholdValue.textContent = Math.round(e.target.value * 100) + '%';
-            });
-
-            // Nút đồng bộ Blogger thủ công
-            ui.btnSyncBlogger.addEventListener('click', syncBlogger);
-
-            // Upload & Chụp ảnh
-            ui.dropZone.addEventListener('click', () => ui.fileInput.click());
-            ui.fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) processAndSearch(e.target.files[0]);
-            });
-
-            ui.dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                ui.dropZone.classList.add('drag-over');
-            });
-            ui.dropZone.addEventListener('dragleave', () => ui.dropZone.classList.remove('drag-over'));
-            ui.dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                ui.dropZone.classList.remove('drag-over');
-                if (e.dataTransfer.files.length > 0) processAndSearch(e.dataTransfer.files[0]);
-            });
-
-            // Camera điện thoại
-            if (ui.btnCamera && ui.cameraInput) {
-                ui.btnCamera.addEventListener('click', () => ui.cameraInput.click());
-                ui.cameraInput.addEventListener('change', (e) => {
-                    if (e.target.files.length > 0) processAndSearch(e.target.files[0]);
-                });
-            }
-        }
-
-        function resizeImageIfNeeded(file) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => {
-                    const MAX = 1024;
-                    let w = img.width, h = img.height;
-                    if (w > MAX || h > MAX) {
-                        const ratio = Math.min(MAX / w, MAX / h);
-                        w = Math.round(w * ratio);
-                        h = Math.round(h * ratio);
-                    } else {
-                        return resolve(file);
-                    }
-                    const canvas = document.createElement('canvas');
-                    canvas.width = w;
-                    canvas.height = h;
-                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    canvas.toBlob(resolve, 'image/jpeg', 0.9);
-                };
-                img.src = URL.createObjectURL(file);
-            });
-        }
-
-        window.addEventListener('DOMContentLoaded', init);
+        // Tự động khởi chạy ứng dụng khi tải xong trang
+        document.addEventListener('DOMContentLoaded', initSystem);
     </script>
 </body>
 </html>
