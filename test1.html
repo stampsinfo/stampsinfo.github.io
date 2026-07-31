@@ -8,8 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- JSZip CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <!-- Transformers.js CDN (Bản Global, sửa lỗi không cần dùng export/module) -->
-    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js"></script>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 min-h-screen">
 
@@ -73,10 +71,14 @@
         </div>
     </div>
 
-    <!-- MÃ SCRIPT JAVASCRIPT THUẦN (KHÔNG CHỨA EXPORT, KHÔNG CẦN MODULE) -->
-    <script>
-        // Cấu hình môi trường cho thư viện AI chạy mượt trên Web
-        transformers.env.allowLocalModels = false;
+    <!-- SỬ DỤNG MODULE IMPORT TRỰC TIẾP TỪ JSDELIVR -->
+    <script type="module">
+        // 🌟 SỬ DỤNG PHIÊN BẢN IMPORT MODULE CHUẨN CỦA TRANSFORMERS.JS
+        import { AutoProcessor, CLIPVisionModelWithProjection, RawImage, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
+
+        // Cấu hình môi trường cho thư viện AI
+        env.allowLocalModels = false;
+        env.useBrowserCache = true;
 
         // --- 1. KHỞI TẠO INDEXEDDB ---
         const DB_NAME = 'BloggerCacheDB';
@@ -149,7 +151,6 @@
             const posts = await dbGetAllPosts();
             ui.cacheCount.textContent = posts.length;
             
-            // Nếu chưa có cache -> Hiện khung lưu ý
             if (!posts || posts.length === 0) {
                 ui.notice.classList.remove('hidden');
             } else {
@@ -163,16 +164,13 @@
                 const cacheSize = await checkCacheAndShowNotice();
 
                 ui.statusText.textContent = "Đang nạp mô hình AI CLIP Vision...";
-                const { AutoProcessor, CLIPVisionModelWithProjection } = transformers;
                 
-                // Dùng model CLIP siêu nhẹ
                 const modelId = 'Xenova/clip-vit-base-patch32';
                 processor = await AutoProcessor.from_pretrained(modelId);
                 model = await CLIPVisionModelWithProjection.from_pretrained(modelId);
 
                 ui.statusText.textContent = "AI sẵn sàng! Đang kiểm tra Cache...";
                 
-                // Nếu chưa có cache -> Tự động kích hoạt đồng bộ ZIP từ Repo (Hoặc file cục bộ)
                 if (cacheSize === 0) {
                     await syncCacheFromRepo();
                 } else {
@@ -180,22 +178,22 @@
                 }
 
             } catch (err) {
-                ui.statusText.textContent = "❌ Lỗi khởi tạo: " + err.message;
+                ui.statusText.textContent = "❌ Lỗi khởi tạo AI: " + err.message;
                 ui.statusIndicator.className = "w-3 h-3 rounded-full bg-red-500";
+                console.error(err);
             }
         }
 
         function setSystemReady() {
             ui.statusText.textContent = "Hệ thống đã sẵn sàng tìm kiếm!";
             ui.statusIndicator.className = "w-3 h-3 rounded-full bg-green-500";
-            ui.notice.classList.add('hidden'); // Tự động ẩn lưu ý khi đã sẵn sàng
+            ui.notice.classList.add('hidden'); 
         }
 
         // --- 4. ĐỒNG BỘ CACHE TỪ FILE ZIP ---
         async function syncCacheFromRepo() {
             try {
                 log("Đang tải file cache.zip...");
-                // Đường dẫn tương đối trỏ thẳng vào file cache.zip đã Push lên GitHub Pages
                 const res = await fetch('./cache.zip?t=' + Date.now()); 
                 if (!res.ok) throw new Error("Không thể tải file cache.zip từ Repo");
 
@@ -213,53 +211,48 @@
                 log(`Đang lưu ${posts.length} bài viết vào bộ nhớ thiết bị...`);
                 await dbSavePostsBulk(posts);
 
-                const newCount = await checkCacheAndShowNotice();
+                await checkCacheAndShowNotice();
                 log("✅ Đồng bộ hoàn tất!");
                 setSystemReady();
 
             } catch (err) {
                 log("⚠️ Đồng bộ thất bại: " + err.message);
-                ui.statusText.textContent = "Lỗi nạp bộ nhớ đệm Cache. Hãy kiểm tra lại file cache.zip";
+                ui.statusText.textContent = "Lỗi nạp bộ nhớ đệm Cache. Kiểm tra file cache.zip.";
             }
         }
 
         // --- 5. XỬ LÝ ẢNH & TÌM KIẾM ---
-        window.handleFileSelect = function(event) {
+        window.handleFileSelect = async function(event) {
             const file = event.target.files[0];
             if (file) {
-                processAndSearch(file);
+                await processAndSearch(file);
             }
         };
 
         async function processAndSearch(file) {
             if (!processor || !model) return alert("Hệ thống AI chưa nạp xong, vui lòng chờ!");
 
-            // 🚀 AUTO SCROLL: Mở khung kết quả và cuộn trang xuống ngay lập tức
             ui.resultsSection.classList.remove('hidden');
             ui.resultsList.innerHTML = '<div class="col-span-2 text-center py-8 text-gray-500">Đang phân tích hình ảnh...</div>';
             ui.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-            // Hiển thị preview ảnh chọn
             ui.queryPreview.src = URL.createObjectURL(file);
             ui.searchProgressText.textContent = "Đang trích xuất Vector AI từ ảnh...";
             ui.searchStatusBadge.textContent = "Đang xử lý";
 
             try {
-                // Trích xuất Embeddings từ ảnh
-                const { RawImage } = transformers;
                 const rawImg = await RawImage.fromURL(ui.queryPreview.src);
                 const inputs = await processor(rawImg);
                 const { image_embeds } = await model(inputs);
                 const queryVector = image_embeds.data;
 
                 ui.searchProgressText.textContent = "Đang so sánh điểm Vector với Cache...";
-
-                // Chạy thuật toán tìm kiếm Vector
                 await runVectorSearch(queryVector);
 
             } catch (err) {
-                ui.searchProgressText.textContent = "❌ Lỗi: " + err.message;
+                ui.searchProgressText.textContent = "❌ Lỗi xử lý ảnh: " + err.message;
                 ui.searchStatusBadge.textContent = "Lỗi";
+                console.error(err);
             }
         }
 
@@ -278,11 +271,10 @@
         async function runVectorSearch(queryVector) {
             const posts = await dbGetAllPosts();
             if (!posts || posts.length === 0) {
-                ui.resultsList.innerHTML = '<div class="col-span-2 text-center text-red-500 py-4">Chưa có dữ liệu cache bài viết để so sánh!</div>';
+                ui.resultsList.innerHTML = '<div class="col-span-2 text-center text-red-500 py-4">Chưa có dữ liệu cache để so sánh!</div>';
                 return;
             }
 
-            // Map để gom nhóm bài viết trùng khớp
             const bestMatchesMap = new Map();
 
             for (let i = 0; i < posts.length; i++) {
@@ -292,21 +284,18 @@
                 let maxPostScore = -1;
                 let bestMatchedImg = post.thumbnail || '';
 
-                // Quét từng ảnh trong bài viết
                 for (let j = 0; j < post.embeddings.length; j++) {
                     const emb = post.embeddings[j];
                     if (!emb.vector) continue;
 
                     const score = cosineSimilarity(queryVector, emb.vector);
 
-                    // Lưu lại ảnh có điểm cao nhất của bài viết
                     if (score > maxPostScore) {
                         maxPostScore = score;
                         bestMatchedImg = emb.imageUrl || post.thumbnail;
                     }
                 }
 
-                // Lọc ngưỡng: Chỉ giữ bài viết nếu ảnh tốt nhất có độ khớp > 40%
                 if (maxPostScore > 0.40) {
                     bestMatchesMap.set(post.postId, {
                         post: post,
@@ -316,12 +305,10 @@
                 }
             }
 
-            // Chuyển sang mảng, sắp xếp giảm dần và lấy đúng Top 10
             const top10Results = Array.from(bestMatchesMap.values())
                 .sort((a, b) => b.score - a.score)
                 .slice(0, 10);
 
-            // Cập nhật giao diện
             ui.searchProgressText.textContent = `Hoàn tất! Hiển thị ${top10Results.length} kết quả khớp nhất.`;
             ui.searchStatusBadge.textContent = "Thành công";
 
@@ -353,7 +340,7 @@
             }).join('');
         }
 
-        // Khởi động khi tải xong trang
+        // Khởi động khi DOM tải xong
         document.addEventListener('DOMContentLoaded', initSystem);
     </script>
 </body>
