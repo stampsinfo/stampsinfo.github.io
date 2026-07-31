@@ -77,12 +77,12 @@
                 <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100 items-center">
                     <span class="text-xs text-gray-500 font-medium">Sao lưu/Khôi phục:</span>
                     
-                    <!-- Nút Xuất Cache ZIP (Đã nâng cấp nén ZIP) -->
+                    <!-- Nút Xuất Cache ZIP -->
                     <button id="btn-export-zip" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5">
                         📦 Xuất dữ liệu (.zip)
                     </button>
                     
-                    <!-- Nút Nhập File Cache (Chấp nhận .zip và .json) -->
+                    <!-- Nút Nhập File Cache -->
                     <label class="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5">
                         📤 Nhập dữ liệu (.zip / .json)
                         <input type="file" id="import-file-input" class="hidden" accept=".zip,.json">
@@ -90,6 +90,23 @@
                 </div>
             </div>
         </details>
+
+        <!-- THÔNG BÁO THIẾT BỊ MỚI CHỜ CACHE & AI -->
+        <div id="new-device-warning" class="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded-r-lg shadow-sm hidden">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-bold text-amber-800">Hệ thống đang chuẩn bị...</h3>
+                    <p class="text-xs text-amber-700 mt-1">
+                        Thiết bị của bạn chưa có dữ liệu. Vui lòng chờ hệ thống tải mô hình AI và đồng bộ Cache trước khi bắt đầu tìm kiếm!
+                    </p>
+                </div>
+            </div>
+        </div>
 
         <!-- BƯỚC 1: Tìm kiếm hình ảnh -->
         <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
@@ -170,6 +187,8 @@
             progressBarContainer: document.getElementById('progress-bar-container'),
             progressBar: document.getElementById('progress-bar'),
             
+            newDeviceWarning: document.getElementById('new-device-warning'), // Element cảnh báo
+            
             actionContainer: document.getElementById('action-container'),
             dropZone: document.getElementById('drop-zone'),
             fileInput: document.getElementById('file-input'),
@@ -205,10 +224,10 @@
             
             try {
                 await initDB();
-                await updateCacheBadge();
+                await checkAndToggleWarning(); // Kiểm tra lần đầu
 
-                // 🚀 Tự động tải, giải nén và đối chiếu cache.zip từ Repo
-                syncFromRepoCacheZip();
+                // Tự động tải, giải nén và đối chiếu cache.zip từ Repo
+                await syncFromRepoCacheZip();
 
                 ui.modelStatus.textContent = "Đang nạp mô hình AI Vision (CLIP)...";
 
@@ -228,12 +247,25 @@
                 ui.btnSyncBlogger.classList.replace('bg-gray-400', 'bg-blue-600');
                 ui.btnSyncBlogger.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
                 
+                await checkAndToggleWarning(); // Kiểm tra lần cuối sau khi AI load xong
+
             } catch (err) {
                 ui.modelBadge.className = "w-3 h-3 rounded-full bg-red-500";
                 ui.modelStatus.textContent = "Lỗi tải AI Model: " + err.message;
             }
 
             setupEventListeners();
+        }
+
+        // --- KIỂM TRA TRẠNG THÁI HIỂN THỊ CẢNH BÁO ---
+        async function checkAndToggleWarning() {
+            const posts = await dbGetAllPosts();
+            if (posts.length === 0 || !processor || !model) {
+                ui.newDeviceWarning.classList.remove('hidden');
+            } else {
+                ui.newDeviceWarning.classList.add('hidden');
+            }
+            await updateCacheBadge();
         }
 
         // --- 2. INDEXEDDB DATABASE ---
@@ -296,7 +328,6 @@
                 ui.syncLogBox.classList.remove('hidden');
                 appendLog("🔄 Đang tải file dữ liệu từ trang chủ...");
 
-                // Gọi trực tiếp file tương đối, 100% không dính CORS
                 const res = await fetch('./cache.zip?t=' + Date.now());
                 if (!res.ok) {
                     appendLog("⚠️ Không tìm thấy dữ liệu trên trang chủ.");
@@ -307,7 +338,6 @@
                 const mb = (blob.size / 1024 / 1024).toFixed(2);
                 appendLog(`📦 Tải dữ liệu thành công (${mb} MB). Đang giải nén...`);
 
-                // Giải nén file nén ZIP trực tiếp trên trình duyệt
                 const jszip = new JSZip();
                 const zip = await jszip.loadAsync(blob);
                 const jsonFile = zip.file("cache.json");
@@ -337,11 +367,9 @@
                     const localPost = localMap.get(repoPost.postId);
 
                     if (!localPost) {
-                        // Trường hợp 1: Máy chưa có bài viết này -> Thêm mới
                         await dbSavePost(repoPost);
                         newAdded++;
                     } else {
-                        // Trường hợp 2: Đã có bài viết, kiểm tra số lượng Vector Embedding xem trên Repo có nhiều hơn không
                         const repoEmbedsCount = (repoPost.embeddings || []).length;
                         const localEmbedsCount = (localPost.embeddings || []).length;
 
@@ -352,7 +380,7 @@
                     }
                 }
 
-                await updateCacheBadge();
+                await checkAndToggleWarning();
 
                 if (newAdded > 0 || updatedCount > 0) {
                     appendLog(`🎉 Đồng bộ hoàn tất: Thêm ${newAdded} bài mới, cập nhật ${updatedCount} bài!`);
@@ -372,15 +400,13 @@
                 if (!posts || posts.length === 0) return alert("Dữ liệu hiện tại đang trống!");
 
                 ui.syncLogBox.classList.remove('hidden');
-                appendLog("⏳ Đang nén dữ liệu dữ liệu thành file zip...");
+                appendLog("⏳ Đang nén dữ liệu thành file zip...");
 
                 const jsonString = JSON.stringify(posts);
                 const zip = new JSZip();
                 
-                // Đưa dữ liệu json vào file cache.json bên trong mảng nén
                 zip.file("cache.json", jsonString);
 
-                // Nén bằng thuật toán DEFLATE level 9 (Nén nhỏ nhất có thể)
                 const blob = await zip.generateAsync({
                     type: "blob",
                     compression: "DEFLATE",
@@ -431,13 +457,13 @@
                     throw new Error("Định dạng file không được hỗ trợ! Vui lòng chọn file .zip hoặc .json.");
                 }
 
-                if (!Array.isArray(posts)) throw new Error("Cấu trúc dữ liệu dữ liệu không hợp lệ!");
+                if (!Array.isArray(posts)) throw new Error("Cấu trúc dữ liệu không hợp lệ!");
 
                 for (const post of posts) {
                     await dbSavePost(post);
                 }
 
-                await updateCacheBadge();
+                await checkAndToggleWarning();
                 appendLog(`✅ Đã nạp thành công ${posts.length} bài viết!`);
                 alert("Nạp dữ liệu thành công!");
                 
@@ -627,7 +653,7 @@
                     alert("Dữ liệu của bạn đã là mới nhất!");
                 }
 
-                await updateCacheBadge();
+                await checkAndToggleWarning();
 
             } catch (err) {
                 appendLog(`❌ Lỗi quét máy chủ: ${err.message}`);
@@ -650,7 +676,7 @@
             try {
                 ui.btnClearCache.disabled = true;
                 await dbClearAllPosts();
-                await updateCacheBadge();
+                await checkAndToggleWarning();
                 ui.syncLogBox.classList.remove('hidden');
                 appendLog("🗑️ Đã xóa toàn bộ dữ liệu thành công.");
                 ui.resultsList.innerHTML = "";
@@ -663,39 +689,39 @@
         }
 
         // --- 6. PHÂN TÍCH HÌNH ẢNH & SO SÁNH VECTOR ---
-async function processAndSearch(fileOrBlob) {
-    if (!processor || !model) return alert("Mô hình AI chưa sẵn sàng!");
+        async function processAndSearch(fileOrBlob) {
+            // Khóa chức năng nếu hệ thống chưa sẵn sàng
+            if (!processor || !model || (await dbGetAllPosts()).length === 0) {
+                alert("Hệ thống chưa sẵn sàng hoặc dữ liệu rỗng. Vui lòng chờ đồng bộ Cache và AI!");
+                return;
+            }
 
-    // 1. Hiển thị khu vực kết quả
-    ui.resultsSection.classList.remove('hidden');
-    ui.searchStatus.textContent = "Đang xử lý hình ảnh...";
-    ui.resultsList.innerHTML = "";
+            ui.resultsSection.classList.remove('hidden');
+            ui.searchStatus.textContent = "Đang xử lý hình ảnh...";
+            ui.resultsList.innerHTML = "";
+            ui.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    // 🚀 BỔ SUNG DÒNG NÀY: Tự động cuộn mượt đến khung kết quả ngay lập tức
-    ui.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const previewUrl = URL.createObjectURL(fileOrBlob);
+            ui.queryPreview.src = previewUrl;
 
-    // 2. Tạo preview ảnh
-    const previewUrl = URL.createObjectURL(fileOrBlob);
-    ui.queryPreview.src = previewUrl;
+            try {
+                const resizedBlob = await resizeImageIfNeeded(fileOrBlob);
+                const queryBlobUrl = URL.createObjectURL(resizedBlob);
+                const rawImage = await RawImage.fromURL(queryBlobUrl);
 
-    try {
-        const resizedBlob = await resizeImageIfNeeded(fileOrBlob);
-        const queryBlobUrl = URL.createObjectURL(resizedBlob);
-        const rawImage = await RawImage.fromURL(queryBlobUrl);
+                ui.searchStatus.textContent = "Đang sinh Embedding Vector AI...";
+                const inputs = await processor(rawImage);
+                const { image_embeds } = await model(inputs);
 
-        ui.searchStatus.textContent = "Đang sinh Embedding Vector AI...";
-        const inputs = await processor(rawImage);
-        const { image_embeds } = await model(inputs);
+                URL.revokeObjectURL(queryBlobUrl);
 
-        URL.revokeObjectURL(queryBlobUrl);
+                ui.searchStatus.textContent = "Đang so sánh điểm Vector...";
+                await runVectorSearch(image_embeds.data);
 
-        ui.searchStatus.textContent = "Đang so sánh điểm Vector...";
-        await runVectorSearch(image_embeds.data);
-
-    } catch (err) {
-        ui.searchStatus.textContent = "❌ Lỗi: " + err.message;
-    }
-}
+            } catch (err) {
+                ui.searchStatus.textContent = "❌ Lỗi: " + err.message;
+            }
+        }
 
         async function runVectorSearch(queryVector) {
             const posts = await dbGetAllPosts();
@@ -704,9 +730,10 @@ async function processAndSearch(fileOrBlob) {
                 return;
             }
 
-           const minThreshold = parseFloat(ui.thresholdSlider.value);
+            const minThreshold = parseFloat(ui.thresholdSlider.value);
             const matches = [];
 
+            // Thuật toán: Duyệt từng bài viết, chỉ giữ lại ảnh có điểm cao nhất của bài viết đó (Gom nhóm thành 1)
             for (const post of posts) {
                 let maxScore = -1;
                 let bestImg = "";
@@ -719,6 +746,7 @@ async function processAndSearch(fileOrBlob) {
                     }
                 }
 
+                // Nếu ảnh tốt nhất trong bài viết vượt qua ngưỡng yêu cầu, đưa bài viết vào danh sách kết quả
                 if (maxScore >= minThreshold) {
                     matches.push({
                         title: post.title,
@@ -729,8 +757,12 @@ async function processAndSearch(fileOrBlob) {
                 }
             }
 
+            // Sắp xếp bài viết giảm dần theo độ chính xác
             matches.sort((a, b) => b.score - a.score);
-            renderResults(matches.slice(0, 10));
+
+            // Cắt đúng Top 10 bài viết có độ chính xác cao nhất
+            const top10Matches = matches.slice(0, 10);
+            renderResults(top10Matches);
         }
 
         function cosineSimilarity(vecA, vecB) {
