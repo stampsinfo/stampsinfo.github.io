@@ -25,7 +25,14 @@
             <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tìm tem thư theo hình ảnh</h1>
             <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Tự động đồng bộ Cache ZIP</p>
         </header>
-
+        <!-- Thông báo lưu ý lần đầu sử dụng (Mặc định ẩn) -->
+<div id="first-time-notice" class="hidden bg-blue-50 border-l-4 border-blue-500 p-3.5 rounded-r-xl shadow-sm mb-4 flex items-start gap-3">
+    <span class="text-blue-500 text-lg leading-none mt-0.5">💡</span>
+    <div class="text-xs sm:text-sm text-blue-900 leading-relaxed">
+        <strong class="font-bold">Lưu ý cho lần truy cập đầu tiên:</strong> 
+        Vui lòng chờ vài giây để hệ thống tự động tải mô hình AI Vision và đồng bộ dữ liệu Cache về thiết bị của bạn trước khi bắt đầu tìm kiếm!
+    </div>
+</div>
         <!-- Trạng thái Hệ thống & Model AI -->
         <div id="status-panel" class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-2">
             <div class="flex items-center justify-between">
@@ -198,6 +205,46 @@
                 ui.actionContainer.classList.remove('sm:grid-cols-2'); 
             }
         }
+        // 1. Khai báo element trong object UI (hoặc lấy trực tiếp qua getElementById)
+const noticeEl = document.getElementById('first-time-notice');
+
+// 2. Hàm kiểm tra dữ liệu cache cục bộ
+async function checkCacheAndShowNotice() {
+    try {
+        const posts = await dbGetAllPosts();
+        
+        // Nếu IndexedDB chưa có bài viết nào -> Mới truy cập lần đầu -> Hiện thông báo
+        if (!posts || posts.length === 0) {
+            if (noticeEl) noticeEl.classList.remove('hidden');
+        } else {
+            // Đã có cache trong máy -> Ẩn thông báo
+            if (noticeEl) noticeEl.classList.add('hidden');
+        }
+    } catch (err) {
+        console.error("Lỗi kiểm tra cache:", err);
+    }
+}
+
+// 3. Gọi hàm này ngay khi trang web vừa tải xong
+document.addEventListener('DOMContentLoaded', () => {
+    checkCacheAndShowNotice();
+});
+        async function syncFromRepoCacheZip() {
+    try {
+        // ... Các bước fetch và giải nén cache ...
+
+        // Sau khi lưu thành công bài viết vào IndexedDB:
+        await updateCacheBadge();
+        appendLog(`🎉 Đồng bộ hoàn tất!`);
+
+        // 🚀 BỔ SUNG DÒNG NÀY: Tự động ẩn thông báo lần đầu sau khi đã tải xong dữ liệu
+        const noticeEl = document.getElementById('first-time-notice');
+        if (noticeEl) noticeEl.classList.add('hidden');
+
+    } catch (err) {
+        appendLog(`❌ Lỗi đồng bộ: ${err.message}`);
+    }
+}
 
         // --- 1. KHỞI TẠO HỆ THỐNG & ĐỒNG BỘ NGHẦM TỪ CACHE.ZIP ---
         async function init() {
