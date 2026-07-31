@@ -704,33 +704,43 @@ async function processAndSearch(fileOrBlob) {
                 return;
             }
 
-            const minThreshold = parseFloat(ui.thresholdSlider.value);
-            const matches = [];
+            // 🌟 Dùng Map để nhóm kết quả theo postId
+    // Key: postId | Value: { post, maxScore, matchedImage }
+    const bestMatchesMap = new Map();
 
-            for (const post of posts) {
-                let maxScore = -1;
-                let bestImg = "";
+    for (const post of posts) {
+        if (!post.embeddings || post.embeddings.length === 0) continue;
 
-                for (const imgItem of (post.embeddings || [])) {
-                    const score = cosineSimilarity(queryVector, imgItem.vector);
-                    if (score > maxScore) {
-                        maxScore = score;
-                        bestImg = imgItem.url;
-                    }
-                }
+        for (const emb of post.embeddings) {
+            if (!emb.vector) continue;
 
-                if (maxScore >= minThreshold) {
-                    matches.push({
-                        title: post.title,
-                        link: post.link,
-                        score: maxScore,
-                        thumb: bestImg
+            // Tính điểm tương đồng Cosine (Cosine Similarity)
+            const score = cosineSimilarity(queryVector, emb.vector);
+
+            // Chỉ lấy các ảnh có điểm tương đồng đạt tiêu chuẩn (ví dụ > 0.6 hoặc 60%)
+            if (score > 0.5) { 
+                const existing = bestMatchesMap.get(post.postId);
+
+                // Nếu bài viết này chưa có trong Map HOẶC ảnh này có điểm cao hơn ảnh trước đó trong cùng bài
+                if (!existing || score > existing.score) {
+                    bestMatchesMap.set(post.postId, {
+                        post: post,
+                        score: score,
+                        matchedImageUrl: emb.imageUrl || post.thumbnail // Ảnh khớp nhất
                     });
                 }
             }
+        }
+    }
 
-            matches.sort((a, b) => b.score - a.score);
-            renderResults(matches.slice(0, 10));
+    // Chuyển Map thành mảng và sắp xếp điểm từ cao xuống thấp
+    const uniqueResults = Array.from(bestMatchesMap.values())
+        .sort((a, b) => b.score - a.score);
+
+    ui.searchStatus.textContent = `Tìm thấy ${uniqueResults.length} bài viết phù hợp!`;
+
+    // Hiển thị kết quả ra màn hình
+    renderResults(uniqueResults);
         }
 
         function cosineSimilarity(vecA, vecB) {
