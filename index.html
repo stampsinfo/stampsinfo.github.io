@@ -663,34 +663,39 @@
         }
 
         // --- 6. PHÂN TÍCH HÌNH ẢNH & SO SÁNH VECTOR ---
-        async function processAndSearch(fileOrBlob) {
-            if (!processor || !model) return alert("AI chưa sẵn sàng!");
+async function processAndSearch(fileOrBlob) {
+    if (!processor || !model) return alert("Mô hình AI chưa sẵn sàng!");
 
-            ui.resultsSection.classList.remove('hidden');
-            ui.searchStatus.textContent = "Đang xử lý hình ảnh...";
-            ui.resultsList.innerHTML = "";
+    // 1. Hiển thị khu vực kết quả
+    ui.resultsSection.classList.remove('hidden');
+    ui.searchStatus.textContent = "Đang xử lý hình ảnh...";
+    ui.resultsList.innerHTML = "";
 
-            const previewUrl = URL.createObjectURL(fileOrBlob);
-            ui.queryPreview.src = previewUrl;
+    // 🚀 BỔ SUNG DÒNG NÀY: Tự động cuộn mượt đến khung kết quả ngay lập tức
+    ui.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-            try {
-                const resizedBlob = await resizeImageIfNeeded(fileOrBlob);
-                const queryBlobUrl = URL.createObjectURL(resizedBlob);
-                const rawImage = await RawImage.fromURL(queryBlobUrl);
+    // 2. Tạo preview ảnh
+    const previewUrl = URL.createObjectURL(fileOrBlob);
+    ui.queryPreview.src = previewUrl;
 
-                ui.searchStatus.textContent = "Đang sinh Embedding Vector AI...";
-                const inputs = await processor(rawImage);
-                const { image_embeds } = await model(inputs);
+    try {
+        const resizedBlob = await resizeImageIfNeeded(fileOrBlob);
+        const queryBlobUrl = URL.createObjectURL(resizedBlob);
+        const rawImage = await RawImage.fromURL(queryBlobUrl);
 
-                URL.revokeObjectURL(queryBlobUrl);
+        ui.searchStatus.textContent = "Đang sinh Embedding Vector AI...";
+        const inputs = await processor(rawImage);
+        const { image_embeds } = await model(inputs);
 
-                ui.searchStatus.textContent = "Đang so sánh điểm Vector...";
-                await runVectorSearch(image_embeds.data);
+        URL.revokeObjectURL(queryBlobUrl);
 
-            } catch (err) {
-                ui.searchStatus.textContent = "❌ Lỗi: " + err.message;
-            }
-        }
+        ui.searchStatus.textContent = "Đang so sánh điểm Vector...";
+        await runVectorSearch(image_embeds.data);
+
+    } catch (err) {
+        ui.searchStatus.textContent = "❌ Lỗi: " + err.message;
+    }
+}
 
         async function runVectorSearch(queryVector) {
             const posts = await dbGetAllPosts();
