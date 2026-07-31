@@ -297,7 +297,8 @@
                 appendLog("🔄 Đang tải file cache.zip từ Repo...");
 
                 // Tải file cache.zip ngầm, thêm timestamp để tránh bị dính cache trình duyệt
-                const res = await fetch('./cache.zip?t=' + Date.now());
+                const releaseUrl = 'https://github.com/Tên_User/Tên_Repo/releases/download/v1.0.0/cache.zip';
+                const res = await fetch(releaseUrl);
                 if (!res.ok) {
                     appendLog("⚠️ Không tìm thấy file cache.zip trên Repo.");
                     return;
