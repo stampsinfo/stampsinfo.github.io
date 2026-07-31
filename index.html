@@ -229,22 +229,6 @@ async function checkCacheAndShowNotice() {
 document.addEventListener('DOMContentLoaded', () => {
     checkCacheAndShowNotice();
 });
-        async function syncFromRepoCacheZip() {
-    try {
-        // ... Các bước fetch và giải nén cache ...
-
-        // Sau khi lưu thành công bài viết vào IndexedDB:
-        await updateCacheBadge();
-        appendLog(`🎉 Đồng bộ hoàn tất!`);
-
-        // 🚀 BỔ SUNG DÒNG NÀY: Tự động ẩn thông báo lần đầu sau khi đã tải xong dữ liệu
-        const noticeEl = document.getElementById('first-time-notice');
-        if (noticeEl) noticeEl.classList.add('hidden');
-
-    } catch (err) {
-        appendLog(`❌ Lỗi đồng bộ: ${err.message}`);
-    }
-}
 
         // --- 1. KHỞI TẠO HỆ THỐNG & ĐỒNG BỘ NGHẦM TỪ CACHE.ZIP ---
         async function init() {
