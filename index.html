@@ -472,6 +472,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendLog(`✅ Đã nạp thành công ${posts.length} bài viết!`);
                 alert("Nạp dữ liệu thành công!");
 
+                // 🚀 BỔ SUNG DÒNG NÀY: Tự động ẩn thông báo lần đầu sau khi đã tải xong dữ liệu
+        const noticeEl = document.getElementById('first-time-notice');
+        if (noticeEl) noticeEl.classList.add('hidden');
+                
             } catch (err) {
                 appendLog(`❌ Lỗi nhập dữ liệu: ${err.message}`);
                 alert("Lỗi nhập file: " + err.message);
