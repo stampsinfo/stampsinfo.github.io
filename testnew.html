@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đồng bộ & Xuất Cache AI (Hỗ trợ ZIP)</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+        .btn { padding: 10px 20px; font-size: 16px; cursor: pointer; margin-right: 10px; border-radius: 5px; border: none; }
+        .btn-export { background-color: #28a745; color: white; }
+        .btn-sync { background-color: #007bff; color: white; }
+        .btn-dummy { background-color: #ffc107; color: black; }
+        #sync-log { margin-top: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; height: 300px; overflow-y: auto; font-family: monospace; }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }
+    </style>
+    <!-- 1. THÊM THƯ VIỆN JSZIP TỪ CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+    <h2>Quản lý Vector AI Cache (Phiên bản ZIP)</h2>
+    
+    <div>
+        <!-- Các nút chức năng -->
+        <button class="btn btn-dummy" onclick="addDummyData()">1. Thêm data mẫu vào máy</button>
+        <button class="btn btn-export" onclick="exportCacheToZip()">2. Xuất file cache.zip</button>
+        <button class="btn btn-sync" onclick="syncFromRepoCache()">3. Đồng bộ từ GitHub (Tải cache.zip)</button>
+    </div>
+
+    <!-- Hộp thoại hiển thị quá trình -->
+    <div id="sync-log">
+        <i>Logs sẽ hiển thị ở đây...</i>
+    </div>
+
+    <script>
+        // =========================================================
+        // PHẦN 1: CÁC HÀM TƯƠNG TÁC VỚI INDEXEDDB (CƠ SỞ DỮ LIỆU)
+        // =========================================================
+        const DB_NAME = "VectorCacheDB";
+        const STORE_NAME = "posts";
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: "postId" }); // postId là khóa chính
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function dbGetAllPosts() {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, "readonly");
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function dbSavePost(postObj) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.put(postObj); // Put sẽ thêm mới nếu chưa có, hoặc ghi đè nếu đã tồn tại
+                request.onsuccess = () => resolve();
+                request.onerror =Chào bạn, tôi hiện không thấy thông tin về "vấn đề trên" do ngữ cảnh của cuộc trò chuyện trước đó chưa được cung cấp trong phiên làm việc này.
+
+Để tôi có thể giúp bạn tạo mã nguồn chi tiết và chính xác nhất, bạn vui lòng cung cấp thêm các thông tin sau nhé:
+
+*   **Mô tả bài toán:** Vấn đề hoặc tính năng cụ thể bạn đang muốn lập trình là gì?
+*   **Ngôn ngữ lập trình:** Bạn muốn viết mã bằng ngôn ngữ nào (ví dụ: Python, C++, Java, JavaScript, C#, v.v.)?
+*   **Yêu cầu đặc biệt (nếu có):** Bạn có muốn sử dụng thư viện, framework, hoặc ràng buộc thuật toán cụ thể nào không?
+
+Ngay khi bạn cung cấp thông tin chi tiết, tôi sẽ viết ngay đoạn mã hoàn chỉnh kèm theo giải thích từng bước cho bạn!
