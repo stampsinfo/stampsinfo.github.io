@@ -746,7 +746,7 @@ async function processAndSearch(fileOrBlob) {
 
         function renderResults(matches) {
             ui.searchStatus.textContent = "Hoàn tất tìm kiếm!";
-            ui.matchCountBadge.textContent = matches.length > 0 ? `${matches.length} bài viết` : `0`;
+            ui.matchCountBadge.textContent = matches.length > 0 ? `${matches.length}` : `0`;
             ui.resultsList.innerHTML = "";
 
             if (matches.length === 0) {
