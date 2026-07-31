@@ -297,8 +297,13 @@
                 appendLog("🔄 Đang tải file cache.zip từ Repo...");
 
                 // Tải file cache.zip ngầm, thêm timestamp để tránh bị dính cache trình duyệt
-                const releaseUrl = 'https://cdn.jsdelivr.net/gh/stampsinfo/stampsinfo.github.io@data/cache.zip';
-                const res = await fetch(releaseUrl);
+                // Đường dẫn gốc của file trên Release
+const releaseUrl = 'https://github.com/stampsinfo/stampsinfo.github.io/releases/download/data/cache.zip';
+
+// Bọc qua corsproxy.io để vượt rào CORS/404
+const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(releaseUrl);
+
+const res = await fetch(proxyUrl);
                 if (!res.ok) {
                     appendLog("⚠️ Không tìm thấy file cache.zip trên Repo.");
                     return;
