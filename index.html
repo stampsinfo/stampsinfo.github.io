@@ -6,6 +6,7 @@
     <title>Tìm tem thư theo hình ảnh - AI Vision Search</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         .drag-over { border-color: #2563eb; background-color: #eff6ff; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
@@ -75,7 +76,7 @@
                 <!-- Các nút Xuất / Nhập Cache JSON -->
                 <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100 items-center">
                     <span class="text-xs text-gray-500 font-medium">Sao lưu/Khôi phục nhanh:</span></br>
-                    <button id="btn-export" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5">
+                    <button id="btn-export" onclick="exportCacheToZip()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5">
                         📥 Xuất dữ liệu (.json)
                     </button>
                     <label class="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5">
@@ -289,59 +290,99 @@
         }
 
         // --- 3. TỰ ĐỘNG SO SÁNH & ĐỒNG BỘ CACHE TỪ REPO ---
-        async function syncFromRepoCache() {
-            try {
-                ui.syncLogBox.classList.remove('hidden'); // Hiển thị khung log ngay
-                appendLog("🔄 Đang tự động kiểm tra dữ liệu mới từ máy chủ...");
+        // --- HÀM TỰ ĐỘNG ĐỒNG BỘ DỮ LIỆU TỪ GITHUB REPO ---
+async function syncFromRepoCache() {
+    try {
+        // (Tùy chọn) Hiện hộp thoại log của bạn
+        if (ui && ui.syncLogBox) ui.syncLogBox.classList.remove('hidden');
+        appendLog("🔄 Đang kiểm tra dữ liệu Cache từ hệ thống...");
 
-                const res = await fetch('./cache.json?t=' + Date.now());
-                if (!res.ok) {
-                    appendLog("⚠️ Không tìm thấy dữ liệu trên trang chủ.");
-                    return;
+        // 1. Fetch file cache.zip (thay ./cache.zip bằng link raw github nếu cần, và giữ ?t=Date.now() để chống cache trình duyệt)
+        const repoUrl = './cache.zip?t=' + Date.now(); 
+        const res = await fetch(repoUrl);
+        
+        if (!res.ok) {
+            appendLog("⚠️ Không tìm thấy file cache.zip trên Repo (hoặc chưa upload).");
+            return;
+        }
+
+        // 2. Tải file dưới dạng Blob (dữ liệu nhị phân)
+        const blob = await res.blob();
+        appendLog(`📦 Đã tải xong file nén (${(blob.size / 1024 / 1024).toFixed(2)} MB). Đang giải nén...`);
+
+        // 3. Sử dụng JSZip để đọc file zip
+        const jszip = new JSZip();
+        const zip = await jszip.loadAsync(blob);
+        
+        // 4. Lấy file "cache.json" nằm bên trong file nén
+        const jsonFile = zip.file("cache.json");
+        if (!jsonFile) {
+            throw new Error("Không tìm thấy file 'cache.json' bên trong file ZIP!");
+        }
+        
+        // 5. Giải nén thành chuỗi văn bản và parse sang JSON
+        const jsonString = await jsonFile.async("string");
+        const repoPosts = JSON.parse(jsonString);
+
+        if (!Array.isArray(repoPosts) || repoPosts.length === 0) {
+            appendLog("⚠️ File cache.zip trên hệ thống trống.");
+            return;
+        }
+
+        appendLog("🔄 Đang đồng bộ và so sánh dữ liệu với máy của bạn...");
+
+        // 6. Logic so sánh và lưu vào IndexedDB
+        const localPosts = await dbGetAllPosts();
+        const localMap = new Map(localPosts.map(p => [p.postId, p]));
+
+        let newAdded = 0;
+        let updatedCount = 0;
+
+        for (const repoPost of repoPosts) {
+            const localPost = localMap.get(repoPost.postId);
+
+            // Nếu máy người dùng chưa có bài này -> Thêm mới
+            if (!localPost) {
+                await dbSavePost(repoPost);
+                newAdded++;
+            } 
+            // Nếu đã có, so sánh số lượng vector embeddings (nếu trên mạng có nhiều hơn thì cập nhật)
+            else {
+                const repoEmbedsCount = (repoPost.embeddings || []).length;
+                const localEmbedsCount = (localPost.embeddings || []).length;
+
+                if (repoEmbedsCount > localEmbedsCount) {
+                    await dbSavePost(repoPost);
+                    updatedCount++;
                 }
-
-                const repoPosts = await res.json();
-                if (!Array.isArray(repoPosts) || repoPosts.length === 0) {
-                    appendLog("⚠️ Dữ liệu trên trang chủ trống.");
-                    return;
-                }
-
-                const localPosts = await dbGetAllPosts();
-                const localMap = new Map(localPosts.map(p => [p.postId, p]));
-
-                let newAdded = 0;
-                let updatedCount = 0;
-
-                for (const repoPost of repoPosts) {
-                    const localPost = localMap.get(repoPost.postId);
-
-                    if (!localPost) {
-                        await dbSavePost(repoPost);
-                        newAdded++;
-                    } else {
-                        const repoEmbedsCount = (repoPost.embeddings || []).length;
-                        const localEmbedsCount = (localPost.embeddings || []).length;
-
-                        if (repoEmbedsCount > localEmbedsCount) {
-                            await dbSavePost(repoPost);
-                            updatedCount++;
-                        }
-                    }
-                }
-
-                await updateCacheBadge();
-
-                if (newAdded > 0 || updatedCount > 0) {
-                    const msg = `🎉 Tự động đồng bộ dữ liệu thành công: Thêm ${newAdded} bài mới, cập nhật ${updatedCount} bài!`;
-                    appendLog(msg);
-                } else {
-                    appendLog("✨ Dữ liệu dữ liệu trên máy đã trùng khớp 100% với máy chủ.");
-                }
-
-            } catch (err) {
-                appendLog(`❌ Lỗi đồng bộ từ máy chủ: ${err.message}`);
             }
         }
+
+        // Cập nhật lại giao diện (nếu có hàm này)
+        if (typeof updateCacheBadge === "function") {
+            await updateCacheBadge();
+        }
+
+        // 7. Thông báo kết quả
+        if (newAdded > 0 || updatedCount > 0) {
+            appendLog(`🎉 Đồng bộ thành công: Tải thêm ${newAdded} bài, cập nhật ${updatedCount} bài!`);
+        } else {
+            appendLog("✨ Dữ liệu AI của bạn đã là phiên bản mới nhất.");
+        }
+
+    } catch (err) {
+        console.error(err);
+        appendLog(`❌ Lỗi đồng bộ: ${err.message}`);
+    }
+}
+
+// (Tùy chọn) Hàm in log ra màn hình, nếu bạn chưa có thì dùng console.log tạm
+function appendLog(message) {
+    console.log(message);
+    // Nếu có thẻ div hiển thị log trên UI thì cập nhật:
+    // const logDiv = document.getElementById("sync-log");
+    // if(logDiv) logDiv.innerHTML += `<div>${message}</div>`;
+}
 
         // --- 4. BỘ TẢI ẢNH CHỐNG LỖI (CORS) & QUÉT BLOGGER THỦ CÔNG ---
         function normalizeBloggerUrl(url) {
@@ -563,16 +604,53 @@
             }
         }
 
-        async function exportCacheToJson() {
-            const posts = await dbGetAllPosts();
-            if (posts.length === 0) return alert("Dữ liệu đang trống, không có gì để xuất!");
-            
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(posts));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", `cache.json`);
-            dlAnchorElem.click();
+        // --- HÀM TẠO VÀ TẢI XUỐNG FILE CACHE.ZIP ---
+async function exportCacheToZip() {
+    try {
+        // 1. Lấy toàn bộ dữ liệu từ IndexedDB (đảm bảo bạn đang dùng đúng tên hàm của bạn)
+        const allPosts = await dbGetAllPosts();
+        
+        if (!allPosts || allPosts.length === 0) {
+            alert("⚠️ Không có dữ liệu trong Cache để xuất!");
+            return;
         }
+
+        alert("⏳ Đang nén dữ liệu, vui lòng đợi vài giây...");
+
+        // 2. Chuyển đổi dữ liệu thành chuỗi JSON
+        const jsonString = JSON.stringify(allPosts);
+
+        // 3. Khởi tạo JSZip và đưa nội dung JSON vào file có tên "cache.json" bên trong mảng nén
+        const zip = new JSZip();
+        zip.file("cache.json", jsonString);
+
+        // 4. Bắt đầu nén (Sử dụng DEFLATE level 9 để nén nhỏ nhất có thể, rất tốt cho file text)
+        const content = await zip.generateAsync({ 
+            type: "blob",
+            compression: "DEFLATE",
+            compressionOptions: {
+                level: 9 
+            }
+        });
+
+        // 5. Tự động kích hoạt tải xuống file cache.zip
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(content);
+        link.download = "cache.zip";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Giải phóng bộ nhớ
+        URL.revokeObjectURL(link.href);
+
+        alert(`✅ Đã xuất thành công file cache.zip! Dung lượng nén khoảng: ${(content.size / 1024 / 1024).toFixed(2)} MB. \nHãy upload file này lên GitHub.`);
+
+    } catch (error) {
+        console.error("❌ Lỗi khi xuất file ZIP:", error);
+        alert("Đã xảy ra lỗi khi xuất file ZIP. Xem Console để biết chi tiết.");
+    }
+}
 
         async function importCacheFromJson(file) {
             const reader = new FileReader();
