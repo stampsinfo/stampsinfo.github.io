@@ -25,7 +25,22 @@
             <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Tìm tem thư theo hình ảnh</h1>
             <p class="text-sm text-gray-600 mt-1">Sử dụng AI Vision (CLIP Vector) &bull; Tự động đồng bộ Cache ZIP</p>
         </header>
-
+        <!-- THÔNG BÁO THIẾT BỊ MỚI CHỜ CACHE & AI -->
+        <div id="new-device-warning" class="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded-r-lg shadow-sm hidden">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-bold text-amber-800">Hệ thống đang chuẩn bị...</h3>
+                    <p class="text-xs text-amber-700 mt-1">
+                        Hệ thống đang kiểm tra và thiết lập dữ liệu AI vui lòng chờ trong giây lát!
+                    </p>
+                </div>
+            </div>
+        </div>
         <!-- Trạng thái Hệ thống & Model AI -->
         <div id="status-panel" class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-2">
             <div class="flex items-center justify-between">
@@ -90,23 +105,6 @@
                 </div>
             </div>
         </details>
-
-        <!-- THÔNG BÁO THIẾT BỊ MỚI CHỜ CACHE & AI -->
-        <div id="new-device-warning" class="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded-r-lg shadow-sm hidden">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="h-6 w-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                </div>
-                <div class="ml-3">
-                    <h3 class="text-sm font-bold text-amber-800">Hệ thống đang chuẩn bị...</h3>
-                    <p class="text-xs text-amber-700 mt-1">
-                        Thiết bị của bạn chưa có dữ liệu. Vui lòng chờ hệ thống tải mô hình AI và đồng bộ Cache trước khi bắt đầu tìm kiếm!
-                    </p>
-                </div>
-            </div>
-        </div>
 
         <!-- BƯỚC 1: Tìm kiếm hình ảnh -->
         <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
