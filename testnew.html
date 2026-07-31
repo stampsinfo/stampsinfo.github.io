@@ -296,14 +296,8 @@
                 ui.syncLogBox.classList.remove('hidden');
                 appendLog("🔄 Đang tải file cache.zip từ Repo...");
 
-                // Tải file cache.zip ngầm, thêm timestamp để tránh bị dính cache trình duyệt
-                // Đường dẫn gốc của file trên Release
-const releaseUrl = 'https://github.com/stampsinfo/stampsinfo.github.io/releases/download/data/cache.zip';
-
-// Bọc qua corsproxy.io để vượt rào CORS/404
-const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(releaseUrl);
-
-const res = await fetch(proxyUrl);
+                // Gọi trực tiếp file tương đối, 100% không dính CORS
+                const res = await fetch('./cache.zip?t=' + Date.now());
                 if (!res.ok) {
                     appendLog("⚠️ Không tìm thấy file cache.zip trên Repo.");
                     return;
