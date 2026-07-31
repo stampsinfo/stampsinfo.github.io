@@ -296,28 +296,8 @@
                 ui.syncLogBox.classList.remove('hidden');
                 appendLog("🔄 Đang tải file cache.zip từ Repo...");
 
-                export default {
-  async fetch(request) {
-    // URL file trên GitHub Release của bạn
-    const fileUrl = "https://github.com/stampsinfo/stampsinfo.github.io/releases/download/data/cache.zip";
-
-    // Tải file từ GitHub giả lập trình duyệt thật
-    const response = await fetch(fileUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-      }
-    });
-
-    // Tạo header cho phép CORS
-    const newHeaders = new Headers(response.headers);
-    newHeaders.set("Access-Control-Allow-Origin", "*");
-
-    return new Response(response.body, {
-      status: response.status,
-      headers: newHeaders
-    });
-  }
-};
+                // Gọi trực tiếp file tương đối, 100% không dính CORS
+                const res = await fetch('./cache.zip?t=' + Date.now());
                 if (!res.ok) {
                     appendLog("⚠️ Không tìm thấy file cache.zip trên Repo.");
                     return;
