@@ -839,7 +839,67 @@
                 ui.resultsList.appendChild(el);
             });
         }
+// --- CÁC HÀM XỬ LÝ CẮT ẢNH ---
+        function openCropperModal(file) {
+            if (!file) return;
+            const imageUrl = URL.createObjectURL(file);
+            ui.cropperImage.src = imageUrl;
+            
+            // Hiển thị modal
+            ui.cropperModal.classList.remove('hidden');
+            ui.cropperModal.classList.add('flex');
 
+            // Đợi ảnh tải xong mới khởi tạo Cropper
+            ui.cropperImage.onload = () => {
+                if (cropperInstance) cropperInstance.destroy();
+                
+                cropperInstance = new Cropper(ui.cropperImage, {
+                    viewMode: 1, // Không cho kéo khung ra ngoài ảnh
+                    dragMode: 'crop',
+                    autoCropArea: 0.9, // Khung cắt chiếm 90% ban đầu
+                    restore: false,
+                    guides: true,
+                    center: true,
+                    highlight: false,
+                    cropBoxMovable: true,
+                    cropBoxResizable: true,
+                    toggleDragModeOnDblclick: false,
+                });
+            };
+        }
+
+        function closeCropperModal() {
+            ui.cropperModal.classList.add('hidden');
+            ui.cropperModal.classList.remove('flex');
+            if (cropperInstance) {
+                cropperInstance.destroy();
+                cropperInstance = null;
+            }
+            ui.cropperImage.src = '';
+            ui.fileInput.value = ''; // Reset input để có thể chọn lại cùng 1 file
+            if (ui.cameraInput) ui.cameraInput.value = '';
+        }
+
+        function handleConfirmCrop() {
+            if (!cropperInstance) return;
+            
+            // Lấy canvas của vùng ảnh đã được cắt (giới hạn kích thước để chạy AI mượt hơn)
+            const canvas = cropperInstance.getCroppedCanvas({
+                maxWidth: 1024,
+                maxHeight: 1024
+            });
+
+            if (!canvas) {
+                alert("Lỗi khi xử lý hình ảnh!");
+                return;
+            }
+
+            // Chuyển canvas thành Blob và gửi vào hàm tìm kiếm AI
+            canvas.toBlob((blob) => {
+                closeCropperModal();
+                processAndSearch(blob); // Tiến hành tìm kiếm bằng ảnh đã xén
+            }, 'image/jpeg', 0.9);
+        }
         // --- 7. LẮP ĐẶT SỰ KIỆN NÚT VÀ LỰA CHỌN FILE ---
         function setupEventListeners() {
             ui.btnClearCache.addEventListener('click', handleClearCache);
@@ -856,8 +916,10 @@
             ui.btnSyncBlogger.addEventListener('click', syncBlogger);
 
             ui.dropZone.addEventListener('click', () => ui.fileInput.click());
+            
+            // 🛑 THAY ĐỔI: Chuyển ảnh vào openCropperModal thay vì processAndSearch
             ui.fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) processAndSearch(e.target.files[0]);
+                if (e.target.files.length > 0) openCropperModal(e.target.files[0]);
             });
 
             ui.dropZone.addEventListener('dragover', (e) => {
@@ -865,18 +927,26 @@
                 ui.dropZone.classList.add('drag-over');
             });
             ui.dropZone.addEventListener('dragleave', () => ui.dropZone.classList.remove('drag-over'));
+            
             ui.dropZone.addEventListener('drop', (e) => {
                 e.preventDefault();
                 ui.dropZone.classList.remove('drag-over');
-                if (e.dataTransfer.files.length > 0) processAndSearch(e.dataTransfer.files[0]);
+                // 🛑 THAY ĐỔI Ở ĐÂY TƯƠNG TỰ
+                if (e.dataTransfer.files.length > 0) openCropperModal(e.dataTransfer.files[0]);
             });
 
             if (ui.btnCamera && ui.cameraInput) {
                 ui.btnCamera.addEventListener('click', () => ui.cameraInput.click());
                 ui.cameraInput.addEventListener('change', (e) => {
-                    if (e.target.files.length > 0) processAndSearch(e.target.files[0]);
+                    // 🛑 THAY ĐỔI Ở ĐÂY TƯƠNG TỰ
+                    if (e.target.files.length > 0) openCropperModal(e.target.files[0]);
                 });
             }
+
+            // --- Sự kiện cho Cửa sổ (Modal) Cắt ảnh ---
+            ui.btnCancelCrop.addEventListener('click', closeCropperModal);
+            ui.btnCloseCropper.addEventListener('click', closeCropperModal);
+            ui.btnConfirmCrop.addEventListener('click', handleConfirmCrop);
         }
 
         function resizeImageIfNeeded(file) {
