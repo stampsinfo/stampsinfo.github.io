@@ -69,12 +69,32 @@
 
         <div class="row-2 form-group">
             <div>
+                <label>Trạng thái bài viết <span class="req">(*)</span></label>
+                <select id="postStatus">
+                    <option value="public">Công khai (Public)</option>
+                    <option value="private">Riêng tư (Private)</option>
+                </select>
+            </div>
+            <div>
+                <label>Kiểu in</label>
+                <select id="printType">
+                    <option value="Offset">Offset</option>
+                    <option value="Thạch bản">Thạch bản</option>
+                    <option value="Tinh khắc">Tinh khắc</option>
+                    <option value="Họa ảnh">Họa ảnh</option>
+                    <option value="Nhiệt nổi">Nhiệt nổi</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row-2 form-group">
+            <div>
                 <label>Người thiết kế</label>
                 <input type="text" id="designer">
             </div>
             <div>
                 <label>In tại</label>
-                <input type="text" id="printer" value="Công ty In tem Bưu điện">
+                <input type="text" id="printer" value="Cty In tem Bưu điện">
             </div>
         </div>
 
@@ -90,16 +110,6 @@
         </div>
 
         <div class="row-2 form-group">
-            <div>
-                <label>Kiểu in</label>
-                <select id="printType">
-                    <option value="Offset">Offset</option>
-                    <option value="Thạch bản">Thạch bản</option>
-                    <option value="Tinh khắc">Tinh khắc</option>
-                    <option value="Họa ảnh">Họa ảnh</option>
-                    <option value="Nhiệt nổi">Nhiệt nổi</option>
-                </select>
-            </div>
             <div style="display: flex; gap: 5px;">
                 <div style="flex: 1;">
                     <label>Kích thước Dài (mm)</label>
@@ -110,16 +120,15 @@
                     <input type="number" id="sizeH">
                 </div>
             </div>
-        </div>
-
-        <div class="row-2 form-group">
-            <div>
-                <label>Số lượng Tem <span class="req">(*)</span></label>
-                <input type="number" id="qtyTem" required>
-            </div>
-            <div>
-                <label>Số lượng Bloc</label>
-                <input type="number" id="qtyBloc">
+            <div style="display: flex; gap: 5px;">
+                <div style="flex: 1;">
+                    <label>Số lượng Tem <span class="req">(*)</span></label>
+                    <input type="number" id="qtyTem" required>
+                </div>
+                <div style="flex: 1;">
+                    <label>Số lượng Bloc</label>
+                    <input type="number" id="qtyBloc">
+                </div>
             </div>
         </div>
 
@@ -168,12 +177,10 @@
 </div>
 
 <script>
-    // Hàm chuyển đổi vị trí kích thước trong đường dẫn ảnh về s1080
     function convertImageUrl(url) {
         if (!url) return '';
         const trimmedUrl = url.trim();
         const parts = trimmedUrl.split('/');
-        // Nếu đường dẫn hợp lệ dạng [phần đầu]/[vị trí cần đổi]/tên ảnh
         if (parts.length >= 2) {
             parts[parts.length - 2] = 's1080';
             return parts.join('/');
@@ -181,7 +188,6 @@
         return trimmedUrl;
     }
 
-    // Trích xuất Năm từ chuỗi dd/mm/yyyy
     function getYear(dateString) {
         if (!dateString) return '';
         const parts = dateString.split('/');
@@ -191,7 +197,6 @@
         return '';
     }
 
-    // Quản lý danh sách Tem trong bộ
     let temIndex = 0;
     function addTemRow() {
         const div = document.createElement('div');
@@ -214,7 +219,6 @@
         temIndex++;
     }
 
-    // Quản lý danh sách Dị bản
     let dibanIndex = 0;
     function addDibanRow() {
         const div = document.createElement('div');
@@ -235,15 +239,14 @@
         dibanIndex++;
     }
 
-    // Hàm tạo bài viết
     function generateCode() {
-        // Lấy dữ liệu cơ bản
         const imgMain = document.getElementById('imgMain').value.trim();
         const name = document.getElementById('name').value.trim();
         const code = document.getElementById('code').value.trim();
         const countryCode = document.getElementById('countryCode').value.trim();
+        const postStatus = document.getElementById('postStatus').value;
         const designer = document.getElementById('designer').value.trim();
-        const printer = document.getElementById('printer').value.trim() || 'Công ty In tem Bưu điện';
+        const printer = document.getElementById('printer').value.trim() || 'Cty In tem Bưu điện';
         const dateIssue = document.getElementById('dateIssue').value.trim();
         const dateExpire = document.getElementById('dateExpire').value.trim();
         const printType = document.getElementById('printType').value;
@@ -253,42 +256,37 @@
         const qtyBloc = document.getElementById('qtyBloc').value;
         const contentRaw = document.getElementById('content').value;
 
-        // Báo lỗi nếu thiếu trường bắt buộc
         if(!imgMain || !name || !code || !countryCode || !dateIssue || !qtyTem) {
             alert("Vui lòng nhập đầy đủ các trường có dấu (*)");
             return;
         }
 
-        // 1. TẠO TÊN
         document.getElementById('outTitle').value = name;
 
-        // 2. TẠO LABEL (Trích xuất năm từ chuỗi dd/mm/yyyy)
         const year = getYear(dateIssue);
         document.getElementById('outLabel').value = `${code}, ${countryCode}, stamp, Year${year}`;
-
-        // 3. TẠO ĐƯỜNG DẪN
         document.getElementById('outUrl').value = `${countryCode}${code}`;
 
-        // Xử lý dữ liệu động
         const sizeStr = (sizeL && sizeH) ? `${sizeL} x ${sizeH} mm` : '';
         let qtyStr = `${qtyTem} tem`;
         if (qtyBloc && parseInt(qtyBloc) > 0) qtyStr += ` + ${qtyBloc} bloc`;
 
-        // Xử lý nội dung (tự tạo thẻ p)
+        const statusClass = postStatus === 'public' ? 'status-public' : 'status-private';
+        const statusText = postStatus === 'public' ? 'Công khai' : 'Riêng tư';
+
         const pContent = contentRaw.split('\n')
                                    .map(line => line.trim())
                                    .filter(line => line.length > 0)
                                    .map(line => `<p>${line}</p>`)
                                    .join('\n    ');
 
-        // Lấy danh sách Tem trong bộ
         const temRows = document.querySelectorAll('#listTem .item-row');
         let temHtml = '';
         if (temRows.length > 0) {
             temHtml = `\n  <div class="tbText-2">\n`;
             temRows.forEach(row => {
                 const rawImg = row.querySelector('.t-img').value.trim();
-                const imgS1080 = convertImageUrl(rawImg); // Đường dẫn đã chuyển về s1080
+                const imgS1080 = convertImageUrl(rawImg);
                 const orient = row.querySelector('.t-orient').value;
                 const mCode = row.querySelector('.t-code').value.trim();
                 const price = row.querySelector('.t-price').value.trim();
@@ -325,14 +323,13 @@
             temHtml += `  </div>`;
         }
 
-        // Lấy danh sách Dị bản
         const dibanRows = document.querySelectorAll('#listDiban .item-row');
         let dibanHtml = '';
         if (dibanRows.length > 0) {
             dibanHtml = `\n  <div class="tbText-3">\n`;
             dibanRows.forEach(row => {
                 const rawImg = row.querySelector('.d-img').value.trim();
-                const imgS1080 = convertImageUrl(rawImg); // Đường dẫn đã chuyển về s1080
+                const imgS1080 = convertImageUrl(rawImg);
                 const orient = row.querySelector('.d-orient').value;
                 const desc = row.querySelector('.d-desc').value.trim();
                 
@@ -361,7 +358,6 @@
             dibanHtml += `  </div>`;
         }
 
-        // Tạo Tabs Header
         let tabHeaders = `  <label for="fTabs-1" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Thông tin"></label>\n`;
         if (temRows.length > 0) {
             tabHeaders += `  <label for="fTabs-2" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Tem trong bộ"></label>\n`;
@@ -370,8 +366,33 @@
             tabHeaders += `  <label for="fTabs-3" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Dị bản"></label>\n`;
         }
 
-        // 4. GHÉP MÃ NGUỒN HTML CUỐI CÙNG
-        const finalHTML = `<div class="separator">
+        const finalHTML = `<style>
+  .status-rect {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, sans-serif;
+  border: 1px solid transparent;
+}
+
+/* Kiểu dáng Public (Màu xanh) */
+.status-public {
+  background-color: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+/* Kiểu dáng Private (Màu vàng) */
+.status-private {
+  background-color: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+</style>
+
+<div class="separator">
   <img src="${imgMain}" width="640" height="480">
 </div>
 
@@ -388,14 +409,16 @@
     <small>Người thiết kế</small><span>${designer}</span>
     <small>In tại</small><span>${printer}</span>
     <small>Kích thước</small><span>${sizeStr}</span>
+    <small>Số lượng</small><span>${qtyStr}</span>
   </div>
   <div class="R">
+    <small>Trạng thái</small><span class="status-rect ${statusClass}">${statusText}</span>
     <small>Ngày phát hành</small><span>${dateIssue}</span>
     <small>Ngày hết hạn</small><span>${dateExpire}</span>
     <small>Kiểu in</small><span>${printType}</span>
-    <small>Số lượng</small><span>${qtyStr}</span>
   </div>
 </div>
+<div class="pInfo o pPad"><small>Thông tin chi tiết</small></div>
 
 <!--[ Active function ]-->
 <input class="tbIn hidden" id="fTabs-1" type="radio" name="postTabs" checked="">
@@ -418,7 +441,6 @@ ${tabHeaders.trimEnd()}
 ${temHtml}${dibanHtml}
 </div>`;
 
-        // Xuất HTML ra Textarea
         document.getElementById('outHtml').value = finalHTML;
     }
 </script>
