@@ -177,6 +177,7 @@
 </div>
 
 <script>
+    // Hàm chuyển đổi vị trí kích thước trong đường dẫn ảnh về s1080
     function convertImageUrl(url) {
         if (!url) return '';
         const trimmedUrl = url.trim();
@@ -188,6 +189,7 @@
         return trimmedUrl;
     }
 
+    // Trích xuất Năm từ chuỗi dd/mm/yyyy
     function getYear(dateString) {
         if (!dateString) return '';
         const parts = dateString.split('/');
@@ -197,6 +199,7 @@
         return '';
     }
 
+    // Quản lý danh sách Tem trong bộ
     let temIndex = 0;
     function addTemRow() {
         const div = document.createElement('div');
@@ -219,6 +222,7 @@
         temIndex++;
     }
 
+    // Quản lý danh sách Dị bản
     let dibanIndex = 0;
     function addDibanRow() {
         const div = document.createElement('div');
@@ -239,6 +243,7 @@
         dibanIndex++;
     }
 
+    // Hàm tạo bài viết
     function generateCode() {
         const imgMain = document.getElementById('imgMain').value.trim();
         const name = document.getElementById('name').value.trim();
@@ -261,16 +266,26 @@
             return;
         }
 
+        // 1. TẠO TÊN
         document.getElementById('outTitle').value = name;
 
+        // 2. TẠO LABEL (Thêm ', nopub' nếu trạng thái là private)
         const year = getYear(dateIssue);
-        document.getElementById('outLabel').value = `${code}, ${countryCode}, stamp, Year${year}`;
+        let labelVal = `${code}, ${countryCode}, stamp, Year${year}`;
+        if (postStatus === 'private') {
+            labelVal += ', nopub';
+        }
+        document.getElementById('outLabel').value = labelVal;
+
+        // 3. TẠO ĐƯỜNG DẪN
         document.getElementById('outUrl').value = `${countryCode}${code}`;
 
+        // Xử lý dữ liệu động
         const sizeStr = (sizeL && sizeH) ? `${sizeL} x ${sizeH} mm` : '';
         let qtyStr = `${qtyTem} tem`;
         if (qtyBloc && parseInt(qtyBloc) > 0) qtyStr += ` + ${qtyBloc} bloc`;
 
+        // Xử lý trạng thái (Public / Private)
         const statusClass = postStatus === 'public' ? 'status-public' : 'status-private';
         const statusText = postStatus === 'public' ? 'Công khai' : 'Riêng tư';
 
@@ -280,6 +295,7 @@
                                    .map(line => `<p>${line}</p>`)
                                    .join('\n    ');
 
+        // Lấy danh sách Tem trong bộ
         const temRows = document.querySelectorAll('#listTem .item-row');
         let temHtml = '';
         if (temRows.length > 0) {
@@ -323,6 +339,7 @@
             temHtml += `  </div>`;
         }
 
+        // Lấy danh sách Dị bản
         const dibanRows = document.querySelectorAll('#listDiban .item-row');
         let dibanHtml = '';
         if (dibanRows.length > 0) {
@@ -358,6 +375,7 @@
             dibanHtml += `  </div>`;
         }
 
+        // Tạo Tabs Header
         let tabHeaders = `  <label for="fTabs-1" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Thông tin"></label>\n`;
         if (temRows.length > 0) {
             tabHeaders += `  <label for="fTabs-2" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Tem trong bộ"></label>\n`;
@@ -370,7 +388,7 @@
   .status-rect {
   display: inline-block;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: 6px; /* Bo góc dạng chữ nhật (không tròn như viên thuốc) */
   font-size: 13px;
   font-weight: 600;
   font-family: system-ui, -apple-system, sans-serif;
