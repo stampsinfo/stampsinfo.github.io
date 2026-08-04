@@ -78,7 +78,6 @@
             <div>
                 <label>Kiểu in</label>
                 <select id="printType">
-					<option value=""></option>
                     <option value="Offset">Offset</option>
                     <option value="Thạch bản">Thạch bản</option>
                     <option value="Tinh khắc">Tinh khắc</option>
@@ -102,7 +101,7 @@
         <div class="row-2 form-group">
             <div>
                 <label>Ngày phát hành (dd/mm/yyyy) <span class="req">(*)</span></label>
-                <input type="text" id="dateIssue" placeholder="VD: 02/08/2026" required>
+                <input type="text" id="dateIssue" placeholder="VD: 02/08/2026, 08/2026, 2026" required>
             </div>
             <div>
                 <label>Ngày hết hạn (dd/mm/yyyy)</label>
@@ -135,7 +134,7 @@
 
         <div class="form-group">
             <label>Nội dung bài viết</label>
-            <textarea id="content" rows="5" placeholder="Nhập nội dung... (để trống nếu bài viết không có chữ)"></textarea>
+            <textarea id="content" rows="5" placeholder="Nhập nội dung. Khi xuất tự động xóa xuống dòng và thay bằng thẻ <p>..."></textarea>
         </div>
 
         <!-- TEM TRONG BỘ -->
@@ -178,6 +177,7 @@
 </div>
 
 <script>
+    // Hàm chuyển đổi vị trí kích thước trong đường dẫn ảnh về s1080
     function convertImageUrl(url) {
         if (!url) return '';
         const trimmedUrl = url.trim();
@@ -189,15 +189,14 @@
         return trimmedUrl;
     }
 
+    // Trích xuất Năm từ chuỗi dd/mm/yyyy
     function getYear(dateString) {
-        if (!dateString) return '';
-        const parts = dateString.split('/');
-        if (parts.length === 3) {
-            return parts[2].trim();
-        }
-        return '';
+		if (!dateString) return '';
+        // Loại bỏ khoảng trắng thừa ở 2 đầu và lấy 4 ký tự cuối cùng
+        return dateString.trim().slice(-4);
     }
 
+    // Quản lý danh sách Tem trong bộ
     let temIndex = 0;
     function addTemRow() {
         const div = document.createElement('div');
@@ -220,6 +219,7 @@
         temIndex++;
     }
 
+    // Quản lý danh sách Dị bản
     let dibanIndex = 0;
     function addDibanRow() {
         const div = document.createElement('div');
@@ -240,6 +240,7 @@
         dibanIndex++;
     }
 
+    // Hàm tạo bài viết
     function generateCode() {
         const imgMain = document.getElementById('imgMain').value.trim();
         const name = document.getElementById('name').value.trim();
@@ -265,7 +266,7 @@
         // 1. TẠO TÊN
         document.getElementById('outTitle').value = name;
 
-        // 2. TẠO LABEL
+        // 2. TẠO LABEL (Thêm ', nopub' nếu trạng thái là private)
         const year = getYear(dateIssue);
         let labelVal = `${code}, ${countryCode}, stamp, year${year}`;
         if (postStatus === 'private') {
@@ -281,6 +282,7 @@
         let qtyStr = `${qtyTem} tem`;
         if (qtyBloc && parseInt(qtyBloc) > 0) qtyStr += ` + ${qtyBloc} bloc`;
 
+        // Xử lý trạng thái (Public / Private)
         const statusClass = postStatus === 'public' ? 'status-public' : 'status-private';
         const statusText = postStatus === 'public' ? 'Công khai' : 'Riêng tư';
 
@@ -290,10 +292,11 @@
                                    .map(line => `<p>${line}</p>`)
                                    .join('\n    ');
 
-        // Tem trong bộ
+        // Lấy danh sách Tem trong bộ
         const temRows = document.querySelectorAll('#listTem .item-row');
-        let temInnerHtml = '';
+        let temHtml = '';
         if (temRows.length > 0) {
+            temHtml = `\n  <div class="tbText-2">\n`;
             temRows.forEach(row => {
                 const rawImg = row.querySelector('.t-img').value.trim();
                 const imgS1080 = convertImageUrl(rawImg);
@@ -310,7 +313,7 @@
                 if(desc) captionArr.push(desc);
                 const caption = captionArr.join(' - ');
 
-                temInnerHtml += `
+                temHtml += `
     <table class='tr-caption-container'>
         <tbody>
          <tr>
@@ -330,12 +333,14 @@
         </tbody>
     </table>\n`;
             });
+            temHtml += `  </div>`;
         }
 
-        // Dị bản
+        // Lấy danh sách Dị bản
         const dibanRows = document.querySelectorAll('#listDiban .item-row');
-        let dibanInnerHtml = '';
+        let dibanHtml = '';
         if (dibanRows.length > 0) {
+            dibanHtml = `\n  <div class="tbText-3">\n`;
             dibanRows.forEach(row => {
                 const rawImg = row.querySelector('.d-img').value.trim();
                 const imgS1080 = convertImageUrl(rawImg);
@@ -344,7 +349,7 @@
                 
                 const style = orient === 'doc' ? 'height: 320px; width: 240px' : 'height: 240px; width: 320px';
 
-                dibanInnerHtml += `
+                dibanHtml += `
     <table class='tr-caption-container'>
         <tbody>
          <tr>
@@ -364,54 +369,37 @@
         </tbody>
     </table>\n`;
             });
+            dibanHtml += `  </div>`;
         }
 
-        // XỬ LÝ ĐỘNG TABS VÀ TỰ ĐỘNG ĐÁNH SỐ (tbText-1, tbText-2, tbText-3)
-        const hasContent = contentRaw.trim().length > 0;
-        const hasTem = temRows.length > 0;
-        const hasDiban = dibanRows.length > 0;
-
-        let tabHeaders = '';
-        let tabsContentHtml = '';
-        let activeTabIndex = 1;
-
-        if (hasContent) {
-            tabHeaders += `  <label for="fTabs-${activeTabIndex}" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Thông tin"></label>\n`;
-            tabsContentHtml += `\n  <div class="tbText-${activeTabIndex}">\n\n    ${pContent}\n\n  </div>`;
-            activeTabIndex++;
+        // Tạo Tabs Header
+        let tabHeaders = `  <label for="fTabs-1" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Thông tin"></label>\n`;
+        if (temRows.length > 0) {
+            tabHeaders += `  <label for="fTabs-2" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Tem trong bộ"></label>\n`;
         }
-
-        if (hasTem) {
-            tabHeaders += `  <label for="fTabs-${activeTabIndex}" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Tem trong bộ"></label>\n`;
-            tabsContentHtml += `\n  <div class="tbText-${activeTabIndex}">\n${temInnerHtml}  </div>`;
-            activeTabIndex++;
+        if (dibanRows.length > 0) {
+            tabHeaders += `  <label for="fTabs-3" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Dị bản"></label>\n`;
         }
-
-        if (hasDiban) {
-            tabHeaders += `  <label for="fTabs-${activeTabIndex}" style="font-family: Arial, Helvetica, sans-serif; font-weight: bold" data-text="Dị bản"></label>\n`;
-            tabsContentHtml += `\n  <div class="tbText-${activeTabIndex}">\n${dibanInnerHtml}  </div>`;
-            activeTabIndex++;
-        }
-
-        const r1Checked = activeTabIndex > 1 ? ' checked=""' : '';
 
         const finalHTML = `<style>
   .status-rect {
   display: inline-block;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: 6px; /* Bo góc dạng chữ nhật (không tròn như viên thuốc) */
   font-size: 13px;
   font-weight: 600;
   font-family: system-ui, -apple-system, sans-serif;
   border: 1px solid transparent;
 }
 
+/* Kiểu dáng Public (Màu xanh) */
 .status-public {
   background-color: #ecfdf5;
   color: #047857;
   border-color: #a7f3d0;
 }
 
+/* Kiểu dáng Private (Màu vàng) */
 .status-private {
   background-color: #fffbeb;
   color: #b45309;
@@ -445,19 +433,27 @@
     <small>Kiểu in</small><span>${printType}</span>
   </div>
 </div>
+<div class="pInfo o pPad"><small>Thông tin chi tiết</small></div>
 
 <!--[ Active function ]-->
-<input class="tbIn hidden" id="fTabs-1" type="radio" name="postTabs"${r1Checked}>
+<input class="tbIn hidden" id="fTabs-1" type="radio" name="postTabs" checked="">
 <input class="tbIn hidden" id="fTabs-2" type="radio" name="postTabs">
 <input class="tbIn hidden" id="fTabs-3" type="radio" name="postTabs">
 
-<!--[ Tabs header/title ]-->
+<!--[ Tabs header/title, replace class attribute to class='tbHd scrlH stick' if you want to create a floating tab title ]-->
 <div class="tbHd scrlH">
+  <!--[ Change atribute data-text='...' to replace tabs title ]-->
 ${tabHeaders.trimEnd()}
 </div>
 
 <div class="tbCn">
-  <!--[ Tabs content ]-->${tabsContentHtml}
+  <!--[ Tabs content ]-->
+  <div class="tbText-1">
+
+    ${pContent}
+
+  </div>
+${temHtml}${dibanHtml}
 </div>`;
 
         document.getElementById('outHtml').value = finalHTML;
