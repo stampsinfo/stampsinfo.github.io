@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Công Cụ Tạo Bài Viết Tem Blogger</title>
+    <!-- [Thêm mới] Thư viện Google API -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
     <style>
         body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; color: #333; }
         .container { display: flex; gap: 20px; max-width: 1400px; margin: auto; }
@@ -39,10 +42,21 @@
     <!-- CỘT NHẬP DỮ LIỆU -->
     <div class="col">
         <h2>Nhập Thông Tin Bộ Tem</h2>
+
+        <!-- [Thêm mới] Nút Đăng nhập Google -->
+        <div class="form-group" style="background: #eef2f5; padding: 15px; border-radius: 4px;">
+            <label>1. Xác thực Tài khoản Google (Bắt buộc để tải ảnh lên Drive)</label>
+            <button id="authorize_button" class="btn" style="background: #db4437; width: auto;" onclick="handleAuthClick()">Đăng nhập bằng Google</button>
+            <button id="signout_button" class="btn" style="background: #7f8c8d; width: auto; display: none;" onclick="handleSignoutClick()">Đăng xuất</button>
+            <span id="auth_status" style="margin-left: 10px; font-weight: bold; color: #db4437;">Chưa đăng nhập</span>
+        </div>
         
         <div class="form-group">
-            <label>Đường dẫn hình ảnh chính <span class="req">(*)</span></label>
-            <input type="text" id="imgMain" placeholder="https://..." required>
+            <label>2. Hình ảnh chính <span class="req">(*)</span></label>
+            <!-- [Đã sửa] Thành nút chọn file -->
+            <input type="file" id="imgMainUpload" accept="image/*" onchange="uploadToDrive(this, 'imgMain')" disabled>
+            <span id="status_imgMain" style="font-size: 12px; color: blue;">Vui lòng đăng nhập Google trước khi chọn ảnh.</span>
+            <input type="hidden" id="imgMain">
         </div>
         
         <div class="row-2 form-group">
@@ -95,7 +109,7 @@
             </div>
             <div>
                 <label>In tại</label>
-                <input type="text" id="printer" value="Công ty In tem Bưu điện">
+                <input type="text" id="printer" value="Cty In tem Bưu điện">
             </div>
         </div>
 
@@ -178,6 +192,108 @@
 </div>
 
 <script>
+    // --- KHAI BÁO CẤU HÌNH GOOGLE DRIVE API ---
+    const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com'; // BẠN CẦN THAY THẾ CLIENT ID TẠI ĐÂY
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+    
+    let tokenClient;
+    let accessToken = null;
+
+    window.onload = function () {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: (tokenResponse) => {
+                if (tokenResponse && tokenResponse.access_token) {
+                    accessToken = tokenResponse.access_token;
+                    document.getElementById('auth_status').innerText = "Đã kết nối Google Drive";
+                    document.getElementById('auth_status').style.color = "green";
+                    document.getElementById('authorize_button').style.display = 'none';
+                    document.getElementById('signout_button').style.display = 'inline-block';
+                    
+                    // Mở khóa các ô tải ảnh
+                    document.getElementById('imgMainUpload').disabled = false;
+                    document.getElementById('status_imgMain').innerText = "Đã sẵn sàng tải lên.";
+                    document.querySelectorAll('.file-upload-input').forEach(el => el.disabled = false);
+                }
+            },
+        });
+    };
+
+    function handleAuthClick() {
+        tokenClient.requestAccessToken({prompt: 'consent'});
+    }
+
+    function handleSignoutClick() {
+        accessToken = null;
+        document.getElementById('auth_status').innerText = "Chưa đăng nhập";
+        document.getElementById('auth_status').style.color = "#db4437";
+        document.getElementById('authorize_button').style.display = 'inline-block';
+        document.getElementById('signout_button').style.display = 'none';
+        
+        document.getElementById('imgMainUpload').disabled = true;
+        document.querySelectorAll('.file-upload-input').forEach(el => el.disabled = true);
+    }
+
+    async function uploadToDrive(fileInput, targetType) {
+        if (!accessToken) {
+            alert("Vui lòng đăng nhập Google trước!");
+            fileInput.value = "";
+            return;
+        }
+
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const statusSpan = fileInput.nextElementSibling;
+        statusSpan.innerText = "Đang tải ảnh lên Drive...";
+        statusSpan.style.color = "orange";
+
+        const metadata = { 'name': file.name, 'mimeType': file.type };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', file);
+
+        try {
+            // Upload
+            const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+                method: 'POST',
+                headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
+                body: form
+            });
+            const data = await res.json();
+            const fileId = data.id;
+
+            // Set quyền Public
+            await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 'role': 'reader', 'type': 'anyone' })
+            });
+
+            // Lấy link
+            const directUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+            
+            // Gán link vào ô input ẩn tương ứng
+            if (targetType === 'imgMain') {
+                document.getElementById('imgMain').value = directUrl;
+            } else if (targetType === 'tem') {
+                fileInput.parentElement.querySelector('.t-img').value = directUrl;
+            } else if (targetType === 'diban') {
+                fileInput.parentElement.querySelector('.d-img').value = directUrl;
+            }
+
+            statusSpan.innerText = "Đã tải lên thành công!";
+            statusSpan.style.color = "green";
+
+        } catch (err) {
+            console.error(err);
+            statusSpan.innerText = "Lỗi khi tải lên!";
+            statusSpan.style.color = "red";
+        }
+    }
+
+    // --- CÁC HÀM XỬ LÝ HTML HIỆN TẠI ---
     function convertImageUrl(url) {
         if (!url) return '';
         const trimmedUrl = url.trim();
@@ -191,7 +307,6 @@
 
     function getYear(dateString) {
         if (!dateString) return '';
-        // Loại bỏ khoảng trắng thừa ở 2 đầu và lấy 4 ký tự cuối cùng
         return dateString.trim().slice(-4);
     }
 
@@ -200,8 +315,14 @@
         const div = document.createElement('div');
         div.className = 'item-row';
         div.id = `tem-${temIndex}`;
+        const isDisabled = accessToken ? '' : 'disabled';
+        // [Đã sửa] Cấu trúc ô nhập đường dẫn ảnh bằng input file
         div.innerHTML = `
-            <div style="flex: 2;"><input type="text" class="t-img" placeholder="Đường dẫn ảnh"></div>
+            <div style="flex: 2; display: flex; flex-direction: column; gap: 5px;">
+                <input type="file" class="file-upload-input" accept="image/*" onchange="uploadToDrive(this, 'tem')" ${isDisabled}>
+                <span style="font-size: 11px; color: blue;"></span>
+                <input type="hidden" class="t-img">
+            </div>
             <div style="flex: 1;">
                 <select class="t-orient">
                     <option value="ngang">Ngang</option>
@@ -222,8 +343,14 @@
         const div = document.createElement('div');
         div.className = 'item-row';
         div.id = `diban-${dibanIndex}`;
+        const isDisabled = accessToken ? '' : 'disabled';
+        // [Đã sửa] Cấu trúc ô nhập đường dẫn ảnh bằng input file
         div.innerHTML = `
-            <div style="flex: 3;"><input type="text" class="d-img" placeholder="Đường dẫn ảnh"></div>
+            <div style="flex: 3; display: flex; flex-direction: column; gap: 5px;">
+                <input type="file" class="file-upload-input" accept="image/*" onchange="uploadToDrive(this, 'diban')" ${isDisabled}>
+                <span style="font-size: 11px; color: blue;"></span>
+                <input type="hidden" class="d-img">
+            </div>
             <div style="flex: 1;">
                 <select class="d-orient">
                     <option value="ngang">Ngang</option>
@@ -255,7 +382,7 @@
         const contentRaw = document.getElementById('content').value;
 
         if(!imgMain || !name || !code || !countryCode || !dateIssue || !qtyTem) {
-            alert("Vui lòng nhập đầy đủ các trường có dấu (*)");
+            alert("Vui lòng nhập đầy đủ các trường có dấu (*) và đảm bảo ảnh đã tải lên hoàn tất!");
             return;
         }
 
