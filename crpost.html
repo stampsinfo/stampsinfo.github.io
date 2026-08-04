@@ -78,6 +78,7 @@
             <div>
                 <label>Kiểu in</label>
                 <select id="printType">
+					<option value="-"></option>
                     <option value="Offset">Offset</option>
                     <option value="Thạch bản">Thạch bản</option>
                     <option value="Tinh khắc">Tinh khắc</option>
@@ -242,10 +243,10 @@
         const code = document.getElementById('code').value.trim();
         const countryCode = document.getElementById('countryCode').value.trim();
         const postStatus = document.getElementById('postStatus').value;
-        const designer = document.getElementById('designer').value.trim();
-        const printer = document.getElementById('printer').value.trim() || 'Công ty In tem Bưu điện';
+        const designer = document.getElementById('designer').value.trim() || '-';
+        const printer = document.getElementById('printer').value.trim() || '-';
         const dateIssue = document.getElementById('dateIssue').value.trim();
-        const dateExpire = document.getElementById('dateExpire').value.trim();
+        const dateExpire = document.getElementById('dateExpire').value.trim() || '-';
         const printType = document.getElementById('printType').value;
         const sizeL = document.getElementById('sizeL').value;
         const sizeH = document.getElementById('sizeH').value;
@@ -273,7 +274,7 @@
         document.getElementById('outUrl').value = `${countryCode}${code}`;
 
         // Xử lý dữ liệu động
-        const sizeStr = (sizeL && sizeH) ? `${sizeL} x ${sizeH} mm` : '';
+        const sizeStr = (sizeL && sizeH) ? `${sizeL} x ${sizeH} mm` : '-';
         let qtyStr = `${qtyTem} tem`;
         if (qtyBloc && parseInt(qtyBloc) > 0) qtyStr += ` + ${qtyBloc} bloc`;
 
