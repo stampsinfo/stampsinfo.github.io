@@ -624,9 +624,10 @@
                     const html = entry.content ? entry.content.$t : (entry.summary ? entry.summary.$t : "");
                     
                     const doc = parser.parseFromString(html, 'text/html');
-                    const imgElements = Array.from(doc.querySelectorAll('img')).map(img => img.src).filter(Boolean);
-                    
+                    const imgElements = Array.from(doc.querySelectorAll('img[stat="search"]')).map(img => img.src).filter(Boolean);
+                    if (imgElements.length > 0) {
                     postsToProcess.push({ postId, title, link, images: imgElements, embeddings: [] });
+                    }
                 });
 
                 const existingPosts = await dbGetAllPosts();
