@@ -299,7 +299,7 @@
                 const price = row.querySelector('.t-price').value.trim();
                 const desc = row.querySelector('.t-desc').value.trim();
                 
-                const style = orient === 'doc' ? 'height: 320px; width: 240px' : 'height: 240px; width: 320px';
+                const style = orient === 'doc' ? 'height: auto; max-width: 240px; width: 100%' : 'height: auto; max-width: 320px; width: 100%';
                 
                 let captionArr = [];
                 if(mCode) captionArr.push(mCode);
@@ -339,7 +339,7 @@
                 const orient = row.querySelector('.d-orient').value;
                 const desc = row.querySelector('.d-desc').value.trim();
                 
-                const style = orient === 'doc' ? 'height: 320px; width: 240px' : 'height: 240px; width: 320px';
+                const style = orient === 'doc' ? 'height: auto; max-width: 240px; width: 100%' : 'height: auto; max-width: 320px; width: 100%';
 
                 dibanInnerHtml += `
     <table class='tr-caption-container'>
