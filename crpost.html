@@ -242,6 +242,7 @@
         const name = document.getElementById('name').value.trim();
         const code = document.getElementById('code').value.trim();
         const countryCode = document.getElementById('countryCode').value.trim();
+		const country = document.getElementById('country').value.trim();
         const postStatus = document.getElementById('postStatus').value;
         const designer = document.getElementById('designer').value.trim() || '-';
         const printer = document.getElementById('printer').value.trim() || '-';
@@ -310,9 +311,12 @@
                 temInnerHtml += `
     <table class='tr-caption-container'>
         <tbody>
+		 <tr>
+            <td class='tr-caption'>${caption}</td>
+         </tr>
          <tr>
              <td>
-                <div class='lightBox' style='${style}'>
+                <div class='lightBox' style='margin-left: 20px; margin-bottom: 10px; ${style}'>
                     <details>
                     <summary class='n'><span class='c flex center'></span></summary>
                     </details>
@@ -320,9 +324,6 @@
                     <noscript><img alt='image_title' src='${rawImg}'/></noscript>
                 </div>
              </td>
-        </tr>
-        <tr>
-            <td class='tr-caption'>${caption}</td>
         </tr>
         </tbody>
     </table>\n`;
@@ -344,9 +345,12 @@
                 dibanInnerHtml += `
     <table class='tr-caption-container'>
         <tbody>
+		 <tr>
+            <td class='tr-caption'>${desc}</td>
+         </tr>
          <tr>
              <td>
-                <div class='lightBox' style='${style}'>
+                <div class='lightBox' style='margin-left: 20px; margin-bottom: 10px; ${style}'>
                     <details>
                     <summary class='n'><span class='c flex center'></span></summary>
                     </details>
@@ -354,9 +358,6 @@
                     <noscript><img alt='image_title' src='${rawImg}'/></noscript>
                 </div>
              </td>
-        </tr>
-        <tr>
-            <td class='tr-caption'>${desc}</td>
         </tr>
         </tbody>
     </table>\n`;
@@ -432,17 +433,18 @@
 
 <div class="pInfo pPad">
   <div class="L">
-    <small>Mã số</small><span>${code}</span>
+    <small>Mã số</small><span>${countryCode}${code}</span>
     <small>Người thiết kế</small><span>${designer}</span>
     <small>In tại</small><span>${printer}</span>
     <small>Kích thước</small><span>${sizeStr}</span>
     <small>Số lượng</small><span>${qtyStr}</span>
   </div>
   <div class="R">
-    <small>Trạng thái</small><span class="status-rect ${statusClass}">${statusText}</span>
+    <small>Quốc gia</small><span>${country}</span>
     <small>Ngày phát hành</small><span>${dateIssue}</span>
     <small>Ngày hết hạn</small><span>${dateExpire}</span>
     <small>Kiểu in</small><span>${printType}</span>
+    <small>Trạng thái</small><span class="status-rect ${statusClass}">${statusText}</span>
   </div>
 </div>
 
