@@ -256,7 +256,8 @@
         generateCode();
 
         const blogId = document.getElementById('blogId').value.trim();
-        const title = document.getElementById('outTitle').value.trim();
+        const realTitle = document.getElementById('outTitle').value.trim();
+        const urlCode = document.getElementById('outUrl').value.trim(); // Mã URL cố định (Ví dụ: VNVN01)
         const labelsStr = document.getElementById('outLabel').value.trim();
         const content = document.getElementById('outHtml').value.trim();
         const postStatus = document.getElementById('postStatus').value;
@@ -269,19 +270,19 @@
             alert("Vui lòng bấm nút 'Đăng nhập / Cấp quyền Google' trước!");
             return;
         }
-        if (!title || !content) {
-            alert("Chưa có nội dung bài viết để đăng!");
+        if (!realTitle || !content || !urlCode) {
+            alert("Chưa có đầy đủ thông tin để đăng bài!");
             return;
         }
 
         const labels = labelsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
         
-        // Cấu trúc dữ liệu gửi qua Blogger API v3
-        const postBody = {
-            title: title,
+        // Bước 1: Gọi POST tạm thời dùng 'urlCode' làm title để Blogger tạo ra URL đúng ý muốn
+        const postBodyStep1 = {
+            title: urlCode,
             content: content,
             labels: labels,
-            isDraft: (postStatus === 'private') // Nếu chọn riêng tư thì lưu dạng nháp (Draft)
+            isDraft: (postStatus === 'private')
         };
 
         try {
@@ -291,12 +292,33 @@
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(postBody)
+                body: JSON.stringify(postBodyStep1)
             });
 
             const data = await response.json();
             if (response.ok) {
-                alert("🎉 Đăng bài viết lên Blogger thành công! ID bài: " + data.id);
+                const postId = data.id;
+
+                // Bước 2: Dùng lệnh PATCH để cập nhật lại tiêu đề thật (realTitle) ngay lập tức
+                const postBodyStep2 = {
+                    title: realTitle
+                };
+
+                const updateResponse = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${postId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(postBodyStep2)
+                });
+
+                if (updateResponse.ok) {
+                    alert("🎉 Đăng bài viết và cố định đường dẫn URL thành công! ID bài: " + postId);
+                } else {
+                    const updateData = await updateResponse.json();
+                    alert("⚠️ Bài đã đăng nhưng lỗi khi cập nhật lại tiêu đề thật: " + (updateData.error ? updateData.error.message : updateResponse.statusText));
+                }
             } else {
                 alert("Lỗi khi đăng bài: " + (data.error ? data.error.message : response.statusText));
             }
@@ -394,7 +416,7 @@
         document.getElementById('outHtml').value = '';
     }
 
-    // --- HÀM TRÍCH XUẤT DỮ LIỆU TỪ HTML CŨ (Đã sửa lỗi quét đủ ảnh) ---
+    // --- HÀM TRÍCH XUẤT DỮ LIỆU TỪ HTML CŨ ---
     function importOldHTML() {
         const oldHtml = document.getElementById('oldHtmlInput').value.trim();
         if(!oldHtml) {
