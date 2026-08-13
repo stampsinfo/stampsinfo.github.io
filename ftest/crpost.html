@@ -17,6 +17,7 @@
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
         .req { color: red; }
         input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        input[readonly] { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
         .row-2 { display: flex; gap: 10px; }
         .row-2 > div { flex: 1; }
         .dynamic-list { border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-bottom: 15px; background: #fafafa; }
@@ -48,15 +49,15 @@
 <div style="max-width: 1400px; margin: auto;">
     <!-- CẤU HÌNH BLOGGER API -->
     <div class="col-full api-box">
-        <h3 style="margin-top: 0; color: #d35400;">⚙️ Cấu hình kết nối Blogger API v3 (Dùng để đăng trực tiếp)</h3>
+        <h3 style="margin-top: 0; color: #d35400;">⚙️ Cấu hình kết nối Blogger API v3 (Đã cố định sẵn)</h3>
         <div class="row-2 form-group">
             <div>
                 <label>Google OAuth Client ID:</label>
-                <input type="text" id="clientId" placeholder="Dán Client ID từ Google Cloud Console...">
+                <input type="text" id="clientId" value="213657197881-pdt222eg02b8k404fa4ikrealtcdt71a.apps.googleusercontent.com" readonly>
             </div>
             <div>
                 <label>Blogger Blog ID:</label>
-                <input type="text" id="blogId" placeholder="VD: 1234567890123456789">
+                <input type="text" id="blogId" value="562661508258286882" readonly>
             </div>
         </div>
         <button class="btn btn-login" onclick="handleAuthClick()">🔑 Đăng nhập / Cấp quyền Google</button>
@@ -230,7 +231,7 @@
     function handleAuthClick() {
         const clientId = document.getElementById('clientId').value.trim();
         if (!clientId) {
-            alert("Vui lòng nhập Google OAuth Client ID trước!");
+            alert("Vui lòng cấu hình Google OAuth Client ID!");
             return;
         }
 
@@ -263,7 +264,7 @@
         const postStatus = document.getElementById('postStatus').value;
 
         if (!blogId) {
-            alert("Vui lòng nhập Blogger Blog ID!");
+            alert("Vui lòng cấu hình Blogger Blog ID!");
             return;
         }
         if (!accessToken) {
