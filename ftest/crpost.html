@@ -3,11 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công Cụ Tạo Bài Viết Tem Blogger</title>
+    <title>Công Cụ Tạo Bài Viết Tem Blogger - Kèm API Trực Tiếp</title>
+    <!-- Google Identity Services cho API v3 -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; color: #333; }
         .container { display: flex; gap: 20px; max-width: 1400px; margin: auto; }
         .col { flex: 1; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-height: 95vh; overflow-y: auto; }
+        .col-full { width: 100%; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
         h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
         h3 { color: #34495e; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         .form-group { margin-bottom: 15px; }
@@ -27,13 +30,55 @@
         .btn-add:hover { background: #27ae60; }
         .btn-generate { width: 100%; background: #e67e22; font-size: 18px; margin-top: 20px; }
         .btn-generate:hover { background: #d35400; }
+        .btn-import { background: #9b59b6; margin-top: 10px; }
+        .btn-import:hover { background: #8e44ad; }
+        .btn-publish { width: 100%; background: #27ae60; font-size: 18px; margin-top: 10px; }
+        .btn-publish:hover { background: #219653; }
+        .btn-login { background: #4285F4; margin-top: 5px; }
+        .btn-login:hover { background: #3367D6; }
         
         .output-group { margin-bottom: 20px; }
         .output-group input { background: #eef2f5; font-weight: bold; color: #c0392b; }
-        textarea.code-output { height: 420px; font-family: monospace; font-size: 13px; background: #272822; color: #f8f8f2; white-space: pre; }
+        textarea.code-output { height: 350px; font-family: monospace; font-size: 13px; background: #272822; color: #f8f8f2; white-space: pre; }
+        .api-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
+
+<div style="max-width: 1400px; margin: auto;">
+    <!-- CẤU HÌNH BLOGGER API -->
+    <div class="col-full api-box">
+        <h3 style="margin-top: 0; color: #d35400;">⚙️ Cấu hình kết nối Blogger API v3 (Dùng để đăng trực tiếp)</h3>
+        <div class="row-2 form-group">
+            <div>
+                <label>Google OAuth Client ID:</label>
+                <input type="text" id="clientId" placeholder="Dán Client ID từ Google Cloud Console...">
+            </div>
+            <div>
+                <label>Blogger Blog ID:</label>
+                <input type="text" id="blogId" placeholder="VD: 1234567890123456789">
+            </div>
+        </div>
+        <button class="btn btn-login" onclick="handleAuthClick()">🔑 Đăng nhập / Cấp quyền Google</button>
+        <span id="authStatus" style="margin-left: 10px; font-weight: bold; color: #e74c3c;">Chưa đăng nhập</span>
+    </div>
+
+    <!-- TOOL CHUYỂN ĐỔI BÀI CŨ -->
+    <div class="col-full">
+        <details style="cursor: pointer;">
+            <summary style="font-size: 1.2em; font-weight: bold; color: #2c3e50; outline: none; padding-bottom: 10px; border-bottom: 2px solid #3498db;">
+                <h2 style="display: inline; border: none; padding: 0;">🔄 Nhập Bài Viết Cũ (Tự động điền thông tin) - Bấm để mở</h2>
+            </summary>
+            <div style="margin-top: 15px; padding-top: 5px;">
+                <div class="form-group">
+                    <label>Dán mã HTML bài viết cũ vào đây:</label>
+                    <textarea id="oldHtmlInput" rows="5" placeholder="<div class='separator'..."></textarea>
+                </div>
+                <button class="btn btn-import" onclick="importOldHTML()">TỰ ĐỘNG TRÍCH XUẤT DỮ LIỆU</button>
+            </div>
+        </details>
+    </div>
+</div>
 
 <div class="container">
     <!-- CỘT NHẬP DỮ LIỆU -->
@@ -72,7 +117,7 @@
                 <label>Trạng thái bài viết <span class="req">(*)</span></label>
                 <select id="postStatus">
                     <option value="public">Công khai (Public)</option>
-                    <option value="private">Riêng tư (Private)</option>
+                    <option value="private">Riêng tư (Private - Nháp)</option>
                 </select>
             </div>
             <div>
@@ -149,6 +194,7 @@
         <div id="listDiban" class="dynamic-list"></div>
 
         <button class="btn btn-generate" onclick="generateCode()">TẠO MÃ BÀI VIẾT</button>
+        <button class="btn btn-publish" onclick="publishToBlogger()">🚀 ĐĂNG TRỰC TIẾP LÊN BLOGGER</button>
     </div>
 
     <!-- CỘT KẾT QUẢ -->
@@ -178,6 +224,88 @@
 </div>
 
 <script>
+    let tokenClient;
+    let accessToken = null;
+
+    function handleAuthClick() {
+        const clientId = document.getElementById('clientId').value.trim();
+        if (!clientId) {
+            alert("Vui lòng nhập Google OAuth Client ID trước!");
+            return;
+        }
+
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: 'https://www.googleapis.com/auth/blogger',
+            callback: (resp) => {
+                if (resp.error !== undefined) {
+                    alert("Lỗi đăng nhập Google: " + resp.error);
+                    return;
+                }
+                accessToken = resp.access_token;
+                document.getElementById('authStatus').innerText = "Đã kết nối thành công ✓";
+                document.getElementById('authStatus').style.color = "#27ae60";
+                alert("Đăng nhập tài khoản Google thành công!");
+            },
+        });
+        tokenClient.requestAccessToken({prompt: 'consent'});
+    }
+
+    async function publishToBlogger() {
+        // Tự động gọi tạo mã trước khi đăng
+        generateCode();
+
+        const blogId = document.getElementById('blogId').value.trim();
+        const title = document.getElementById('outTitle').value.trim();
+        const labelsStr = document.getElementById('outLabel').value.trim();
+        const content = document.getElementById('outHtml').value.trim();
+        const postStatus = document.getElementById('postStatus').value;
+
+        if (!blogId) {
+            alert("Vui lòng nhập Blogger Blog ID!");
+            return;
+        }
+        if (!accessToken) {
+            alert("Vui lòng bấm nút 'Đăng nhập / Cấp quyền Google' trước!");
+            return;
+        }
+        if (!title || !content) {
+            alert("Chưa có nội dung bài viết để đăng!");
+            return;
+        }
+
+        const labels = labelsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+        
+        // Cấu trúc dữ liệu gửi qua Blogger API v3
+        const postBody = {
+            title: title,
+            content: content,
+            labels: labels,
+            isDraft: (postStatus === 'private') // Nếu chọn riêng tư thì lưu dạng nháp (Draft)
+        };
+
+        try {
+            const response = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(postBody)
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                alert("🎉 Đăng bài viết lên Blogger thành công! ID bài: " + data.id);
+            } else {
+                alert("Lỗi khi đăng bài: " + (data.error ? data.error.message : response.statusText));
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Đã xảy ra lỗi kết nối mạng khi gửi dữ liệu lên Blogger.");
+        }
+    }
+
     function convertImageUrl(url) {
         if (!url) return '';
         const trimmedUrl = url.trim();
@@ -191,7 +319,6 @@
 
     function getYear(dateString) {
         if (!dateString) return '';
-        // Loại bỏ khoảng trắng thừa ở 2 đầu và lấy 4 ký tự cuối cùng
         return dateString.trim().slice(-4);
     }
 
@@ -237,6 +364,155 @@
         dibanIndex++;
     }
 
+    function resetFormFields() {
+        document.getElementById('imgMain').value = '';
+        document.getElementById('name').value = '';
+        document.getElementById('code').value = '';
+        document.getElementById('country').value = '';
+        document.getElementById('countryCode').value = '';
+        document.getElementById('postStatus').value = 'public';
+        document.getElementById('printType').value = '-';
+        document.getElementById('designer').value = '';
+        document.getElementById('printer').value = 'Cty In tem Bưu điện';
+        document.getElementById('dateIssue').value = '';
+        document.getElementById('dateExpire').value = '';
+        document.getElementById('sizeL').value = '';
+        document.getElementById('sizeH').value = '';
+        document.getElementById('qtyTem').value = '';
+        document.getElementById('qtyBloc').value = '';
+        document.getElementById('content').value = '';
+
+        document.getElementById('listTem').innerHTML = '';
+        temIndex = 0;
+
+        document.getElementById('listDiban').innerHTML = '';
+        dibanIndex = 0;
+        
+        document.getElementById('outTitle').value = '';
+        document.getElementById('outLabel').value = '';
+        document.getElementById('outUrl').value = '';
+        document.getElementById('outHtml').value = '';
+    }
+
+    // --- HÀM TRÍCH XUẤT DỮ LIỆU TỪ HTML CŨ (Đã sửa lỗi quét đủ ảnh) ---
+    function importOldHTML() {
+        const oldHtml = document.getElementById('oldHtmlInput').value.trim();
+        if(!oldHtml) {
+            alert("Vui lòng dán HTML bài viết cũ!");
+            return;
+        }
+
+        resetFormFields();
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = oldHtml;
+
+        try {
+            const mainImgAnchor = tempDiv.querySelector('a[href] img[width="640"], a[href] img[height="480"]');
+            if (mainImgAnchor && mainImgAnchor.parentElement.tagName === 'A') {
+                document.getElementById('imgMain').value = mainImgAnchor.parentElement.href;
+            }
+
+            const titleSpan = tempDiv.querySelector('span[style*="15pt"], span[style*="font-size: 15pt"]');
+            if (titleSpan) {
+                document.getElementById('name').value = titleSpan.innerText.trim();
+            }
+
+            const pTags = tempDiv.querySelectorAll('p');
+            pTags.forEach(p => {
+                const bTag = p.querySelector('b');
+                if(!bTag) return;
+                
+                const label = bTag.innerText.trim();
+                let fullText = p.innerText.replace(label, '').trim();
+                
+                if(fullText.startsWith(':')) fullText = fullText.substring(1).trim();
+
+                if (label.includes('Người thiết kế:')) {
+                    document.getElementById('designer').value = fullText;
+                } else if (label.includes('In tại:')) {
+                    document.getElementById('printer').value = fullText.replace(/^nhà in\s+/i, '').trim();
+                } else if (label.includes('Quốc gia:')) {
+                    document.getElementById('country').value = fullText;
+                    let code = "VN";
+                    if(fullText.toLowerCase().includes("việt nam")) code = "VN";
+                    else if(fullText) {
+                        code = fullText.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
+                    }
+                    document.getElementById('countryCode').value = code;
+                } else if (label.includes('Ngày phát hành:')) {
+                    document.getElementById('dateIssue').value = fullText;
+                } else if (label.includes('Ngày hết hạn:')) {
+                    document.getElementById('dateExpire').value = fullText;
+                } else if (label.includes('Kích thước')) {
+                    const firstPart = fullText.split(',')[0];
+                    const dims = firstPart.toLowerCase().split('x').map(s => s.replace(/[^0-9.]/g, '').trim());
+                    if (dims.length >= 2) {
+                        document.getElementById('sizeL').value = dims[0];
+                        document.getElementById('sizeH').value = dims[1];
+                    }
+                } else if (label.includes('Kiểu in:')) {
+                    const textLower = fullText.toLowerCase();
+                    let printTypeVal = "-";
+                    if (textLower.includes('thạch bản')) printTypeVal = 'Thạch bản';
+                    else if (textLower.includes('offset')) printTypeVal = 'Offset';
+                    else if (textLower.includes('hoạ ảnh') || textLower.includes('họa ảnh')) printTypeVal = 'Họa ảnh';
+                    else if (textLower.includes('tinh khắc')) printTypeVal = 'Tinh khắc';
+                    else if (textLower.includes('nhiệt nổi')) printTypeVal = 'Nhiệt nổi';
+
+                    const printSelect = document.getElementById('printType');
+                    for (let i = 0; i < printSelect.options.length; i++) {
+                        if (printSelect.options[i].value === printTypeVal) {
+                            printSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                } else if (label.includes('Bộ tem:')) {
+                    const match = fullText.match(/(.*?)\s*\(\s*(\d+)\s*tem(?:.*?(\d+)\s*bloc[k]?)?.*?\)/i);
+                    if (match) {
+                        document.getElementById('code').value = match[1].trim();
+                        document.getElementById('qtyTem').value = match[2];
+                        if (match[3]) document.getElementById('qtyBloc').value = match[3];
+                    } else {
+                        document.getElementById('code').value = fullText;
+                    }
+                }
+            });
+
+            document.getElementById('listTem').innerHTML = '';
+            temIndex = 0;
+
+            const allImages = tempDiv.querySelectorAll('a[href*="blogger.googleusercontent.com"] img');
+            const processedLinks = new Set();
+
+            allImages.forEach((img, index) => {
+                if (index === 0) return; // Bỏ qua ảnh chính đầu tiên
+
+                const parentA = img.closest('a');
+                if(!parentA) return;
+                
+                const href = parentA.href;
+                if (processedLinks.has(href)) return;
+                processedLinks.add(href);
+
+                const w = parseInt(img.getAttribute('width') || "0");
+                const h = parseInt(img.getAttribute('height') || "0");
+                let orient = (h > w && w > 0) ? 'doc' : 'ngang';
+
+                addTemRow();
+                const currentRow = document.getElementById(`tem-${temIndex-1}`);
+                currentRow.querySelector('.t-img').value = href;
+                currentRow.querySelector('.t-orient').value = orient;
+            });
+
+            alert("Đã trích xuất dữ liệu thành công!");
+
+        } catch (e) {
+            console.error(e);
+            alert("Có lỗi xảy ra khi đọc cấu trúc HTML cũ.");
+        }
+    }
+
     function generateCode() {
         const imgMain = document.getElementById('imgMain').value.trim();
         const name = document.getElementById('name').value.trim();
@@ -260,21 +536,16 @@
             return;
         }
 
-        // 1. TẠO TÊN
         document.getElementById('outTitle').value = name;
 
-        // 2. TẠO LABEL
         const year = getYear(dateIssue);
         let labelVal = `${code}, ${countryCode}, stamp, year${year}`;
         if (postStatus === 'private') {
             labelVal += ', nopub';
         }
         document.getElementById('outLabel').value = labelVal;
-
-        // 3. TẠO ĐƯỜNG DẪN
         document.getElementById('outUrl').value = `${countryCode}${code}`;
 
-        // Xử lý dữ liệu động
         const sizeStr = (sizeL && sizeH) ? `${sizeL} x ${sizeH} mm` : '-';
         let qtyStr = `${qtyTem} tem`;
         if (qtyBloc && parseInt(qtyBloc) > 0) qtyStr += ` + ${qtyBloc} bloc`;
@@ -288,7 +559,6 @@
                                    .map(line => `<p>${line}</p>`)
                                    .join('\n    ');
 
-        // Tem trong bộ
         const temRows = document.querySelectorAll('#listTem .item-row');
         let temInnerHtml = '';
         if (temRows.length > 0) {
@@ -316,7 +586,7 @@
          </tr>
          <tr>
              <td>
-                <div class='lightBox' style='margin-left: 20px; margin-bottom: 10px; ${style}'>
+                <div class='lightBox' style='${style}'>
                     <details>
                     <summary class='n'><span class='c flex center'></span></summary>
                     </details>
@@ -330,7 +600,6 @@
             });
         }
 
-        // Dị bản
         const dibanRows = document.querySelectorAll('#listDiban .item-row');
         let dibanInnerHtml = '';
         if (dibanRows.length > 0) {
@@ -350,7 +619,7 @@
          </tr>
          <tr>
              <td>
-                <div class='lightBox' style='margin-left: 20px; margin-bottom: 10px; ${style}'>
+                <div class='lightBox' style='${style}'>
                     <details>
                     <summary class='n'><span class='c flex center'></span></summary>
                     </details>
@@ -364,12 +633,9 @@
             });
         }
 
-        // XỬ LÝ ĐỘNG TABS VÀ TỰ ĐỘNG ĐÁNH SỐ (tbText-1, tbText-2, tbText-3)
         const hasContent = contentRaw.trim().length > 0;
         const hasTem = temRows.length > 0;
         const hasDiban = dibanRows.length > 0;
-        
-        // CẬP NHẬT YÊU CẦU: Nếu không có Tem, chèn stat="search" vào thẻ img chính
         const mainImgStatAttribute = !hasTem ? ' stat="search"' : '';
 
         let tabHeaders = '';
@@ -423,13 +689,6 @@
 <div class="separator">
   <img${mainImgStatAttribute} src="${imgMain}" width="640" height="480">
 </div>
-
-<!--[ Price to show in homepage ]
-<div class="pPric pPad" data-text="Price">
-  <i class="strike">Rp 150.000</i>
-  <i class="price">Rp 130.000</i>
-</div>
-<a name="more"></a>-->
 
 <div class="pInfo pPad">
   <div class="L">
