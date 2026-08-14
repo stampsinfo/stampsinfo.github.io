@@ -167,7 +167,7 @@
 
                         <!-- Bảng 2: Danh sách bài viết bị bỏ qua -->
                         <div class="progress-col-box">
-                            <div class="progress-table-title" style="color: #c0392b;">⚠️ Bảng bài viết bị bỏ qua (Chưa đủ tiêu chuẩn)</div>
+                            <div class="progress-table-title" style="color: #c0392b;">⚠️ Bảng bài viết bị bỏ qua (Không có ảnh chính)</div>
                             <div class="progress-table-wrapper">
                                 <table class="prog-table">
                                     <thead>
@@ -338,7 +338,6 @@
     let accessToken = null;
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Hiển thị trạng thái cache khi tải trang
     window.addEventListener('DOMContentLoaded', () => {
         updateCacheStatusInfo();
     });
@@ -387,7 +386,6 @@
         tokenClient.requestAccessToken({prompt: 'consent'});
     }
 
-    // --- HÀM TỰ ĐỘNG CẬP NHẬT HÀNG LOẠT (CÓ LƯU TRỮ LOCALSTORAGE) ---
     async function autoBulkRepublish() {
         const blogId = document.getElementById('blogId').value.trim();
         if (!blogId || !accessToken) {
@@ -408,7 +406,6 @@
         tableBody.innerHTML = "";
         skippedTableBody.innerHTML = "";
 
-        // Tải danh sách ID đã xử lý từ localStorage
         let processedIdsArray = JSON.parse(localStorage.getItem('blogger_processed_ids') || '[]');
         let processedSet = new Set(processedIdsArray);
 
@@ -450,7 +447,6 @@
                     const newRow = document.createElement('tr');
                     newRow.id = rowId;
                     
-                    // Kiểm tra nếu bài này đã được xử lý ở phiên trước
                     if (processedSet.has(post.id)) {
                         newRow.innerHTML = `
                             <td>${processedCount}</td>
@@ -458,10 +454,9 @@
                             <td style="text-align: center;" class="status-cached">Đã lưu trước ✓</td>
                         `;
                         tableBody.appendChild(newRow);
-                        continue; // Bỏ qua không gọi API xử lý lại bài này
+                        continue; 
                     }
 
-                    // Nếu chưa xử lý, tiến hành chạy bình thường
                     newRow.innerHTML = `
                         <td>${processedCount}</td>
                         <td>${post.title || "(Không có tiêu đề)"}</td>
@@ -476,11 +471,10 @@
                     importOldHTML(); 
 
                     const imgMain = document.getElementById('imgMain').value.trim();
-                    const qtyTem = parseInt(document.getElementById('qtyTem').value) || 0;
-                    
                     const statusCell = newRow.querySelector('td:last-child');
 
-                    if (imgMain !== '' && temIndex >= qtyTem && qtyTem > 0) {
+                    // Điều kiện mới: Chỉ cần có imgMain khác rỗng là cho qua xử lý và cập nhật
+                    if (imgMain !== '') {
                         generateCode();
                         const newHtml = document.getElementById('outHtml').value.trim();
                         
@@ -530,12 +524,11 @@
                         skipRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
 
-                    // Ghi nhận ID đã xử lý vào Set và lưu vào localStorage ngay lập tức
                     processedSet.add(post.id);
                     localStorage.setItem('blogger_processed_ids', JSON.stringify([...processedSet]));
                     updateCacheStatusInfo();
 
-                    await delay(2500); // Nghỉ 2.5s giữa các request
+                    await delay(2500); 
                 }
 
                 pageToken = data.nextPageToken;
@@ -831,24 +824,24 @@
 
     function generateCode() {
         const imgMain = document.getElementById('imgMain').value.trim();
-        const name = document.getElementById('name').value.trim();
-        const code = document.getElementById('code').value.trim();
-        const countryCode = document.getElementById('countryCode').value.trim();
-		const country = document.getElementById('country').value.trim();
+        const name = document.getElementById('name').value.trim() || 'Bài viết';
+        const code = document.getElementById('code').value.trim() || '000';
+        const countryCode = document.getElementById('countryCode').value.trim() || 'VN';
+		const country = document.getElementById('country').value.trim() || 'Việt Nam';
         const postStatus = document.getElementById('postStatus').value;
         const designer = document.getElementById('designer').value.trim() || '-';
         const printer = document.getElementById('printer').value.trim() || '-';
-        const dateIssue = document.getElementById('dateIssue').value.trim();
+        const dateIssue = document.getElementById('dateIssue').value.trim() || '-';
         const dateExpire = document.getElementById('dateExpire').value.trim() || '-';
         const printType = document.getElementById('printType').value;
         const sizeL = document.getElementById('sizeL').value;
         const sizeH = document.getElementById('sizeH').value;
-        const qtyTem = document.getElementById('qtyTem').value;
+        const qtyTem = document.getElementById('qtyTem').value || '0';
         const qtyBloc = document.getElementById('qtyBloc').value;
         const contentRaw = document.getElementById('content').value;
 
-        if(!imgMain || !name || !code || !countryCode || !dateIssue || !qtyTem) {
-            alert("Vui lòng nhập đầy đủ các trường có dấu (*)");
+        if(!imgMain) {
+            alert("Vui lòng nhập đường dẫn hình ảnh chính!");
             return;
         }
 
