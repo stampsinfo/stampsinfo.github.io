@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công Cụ Tạo Bài Viết Tem Blogger - Kèm API Trực Tiếp</title>
+    <title>Công Cụ Tạo Bài Viết Tem Blogger - Kèm API Trực Tiếp - V5</title>
     <!-- Google Identity Services cho API v3 -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
@@ -16,7 +16,7 @@
         .form-group { margin-bottom: 15px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
         .req { color: red; }
-        input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        input[type="text"], input[type="number"], select, textarea, input[type="date"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         input[readonly] { background-color: #e9ecef; cursor: not-allowed; color: #555; font-weight: bold; }
         .row-2 { display: flex; gap: 10px; }
         .row-2 > div { flex: 1; }
@@ -246,6 +246,14 @@
 
         <div class="row-2 form-group">
             <div>
+                <label>Lịch đăng bài (Bỏ trống = Lấy thời gian hiện tại)</label>
+                <input type="date" id="publishDate">
+            </div>
+            <div></div> <!-- Cột rỗng để giữ bố cục -->
+        </div>
+
+        <div class="row-2 form-group">
+            <div>
                 <label>Người thiết kế</label>
                 <input type="text" id="designer">
             </div>
@@ -470,7 +478,7 @@
 
                     const statusCell = newRow.querySelector('td:last-child');
                     const postContent = post.content || "";
-                    let isSuccess = false; // Biến kiểm tra thành công để quyết định lưu cache
+                    let isSuccess = false; 
 
                     const hasStandardTabs = postContent.includes('id="fTabs-1"') && 
                                            postContent.includes('id="fTabs-2"') && 
@@ -640,7 +648,6 @@
                         }
                     }
 
-                    // Chỉ lưu vào cache khi xử lý thành công. Nếu lỗi API/mạng, bỏ qua không lưu để phiên sau quét lại.
                     if (isSuccess) {
                         processedSet.add(post.id);
                         localStorage.setItem('blogger_processed_ids', JSON.stringify([...processedSet]));
@@ -692,9 +699,18 @@
 
         const labels = labelsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
+        // --- XỬ LÝ LỊCH ĐĂNG BÀI ---
+        const publishDateInput = document.getElementById('publishDate').value;
+        const now = new Date();
+        if (publishDateInput) {
+            const [y, m, d] = publishDateInput.split('-');
+            now.setFullYear(parseInt(y), parseInt(m) - 1, parseInt(d));
+        }
+        // Luôn tạo chuỗi ISO chuẩn cho ngày giờ được tính toán
+        const publishedIso = now.toISOString();
+
         try {
             // 1. DÒ TÌM BÀI VIẾT CÓ CHỨA NHÃN MÃ SỐ BỘ TEM
-            // fetchBodies=false để tăng tốc độ tìm kiếm vì không cần tải nội dung HTML
             const searchUrl = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?labels=${encodeURIComponent(code)}&fetchBodies=false`;
             const searchResp = await fetch(searchUrl, {
                 headers: { 'Authorization': `Bearer ` + accessToken }
@@ -704,7 +720,6 @@
             if (searchResp.ok) {
                 const searchData = await searchResp.json();
                 if (searchData.items && searchData.items.length > 0) {
-                    // Lọc chính xác những bài có CẢ 2 LABEL: code VÀ countryCode
                     matchingPosts = searchData.items.filter(post => {
                         const pLabels = post.labels || [];
                         return pLabels.includes(code) && pLabels.includes(countryCode);
@@ -716,25 +731,26 @@
             if (matchingPosts.length > 0) {
                 const targetPost = matchingPosts[0];
 
-                // Cập nhật bài viết đầu tiên
+                // Cập nhật bài viết đầu tiên: KHÔNG truyền "published" để giữ nguyên ngày giờ cũ của bài viết đã đăng
+                const patchBody = {
+                    title: realTitle,
+                    content: content,
+                    labels: labels,
+                    isDraft: (postStatus === 'private')
+                };
+
                 const updateResp = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${targetPost.id}`, {
                     method: 'PATCH',
                     headers: {
                         'Authorization': `Bearer ` + accessToken,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        title: realTitle,
-                        content: content,
-                        labels: labels,
-                        isDraft: (postStatus === 'private')
-                    })
+                    body: JSON.stringify(patchBody)
                 });
 
                 if (updateResp.ok) {
                     let deleteMsg = "";
                     
-                    // Nếu có nhiều hơn 1 bài trùng -> Xóa tất cả các bài còn lại
                     if (matchingPosts.length > 1) {
                         let deletedCount = 0;
                         for (let i = 1; i < matchingPosts.length; i++) {
@@ -748,19 +764,21 @@
                         deleteMsg = `\n- Đã xóa ${deletedCount} bài viết trùng lặp dư thừa.`;
                     }
 
-                    alert(`✏️ Đã CẬP NHẬT thành công bài viết cũ (ID: ${targetPost.id})!${deleteMsg}`);
+                    alert(`✏️ Đã CẬP NHẬT thành công bài viết cũ (ID: ${targetPost.id}) và giữ nguyên ngày đăng bài gốc!${deleteMsg}`);
                 } else {
                     const errData = await updateResp.json();
                     alert("⚠️ Lỗi khi cập nhật bài viết: " + (errData.error ? errData.error.message : updateResp.statusText));
                 }
 
             } else {
-                // 3. NẾU KHÔNG CÓ BÀI NÀO TRÙNG -> TẠO BÀI VIẾT MỚI (Tạo 2 bước để có URL đẹp)
+                // 3. NẾU KHÔNG CÓ BÀI NÀO TRÙNG -> TẠO BÀI VIẾT MỚI
+                // Lúc này mới áp dụng ngày giờ đăng bài (publishedIso)
                 const postBodyStep1 = {
                     title: urlCode,
                     content: content,
                     labels: labels,
-                    isDraft: (postStatus === 'private')
+                    isDraft: (postStatus === 'private'),
+                    published: publishedIso
                 };
 
                 const response = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts`, {
@@ -870,6 +888,7 @@
         document.getElementById('countryCode').value = '';
         document.getElementById('postStatus').value = 'public';
         document.getElementById('printType').value = '-';
+        document.getElementById('publishDate').value = '';
         document.getElementById('designer').value = '';
         document.getElementById('printer').value = 'Cty In tem Bưu điện';
         document.getElementById('dateIssue').value = '';
