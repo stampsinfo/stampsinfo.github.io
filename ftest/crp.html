@@ -393,7 +393,7 @@
             return;
         }
 
-        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ. Các bài đạt chuẩn sẽ tự động bổ sung nhãn năm mà không sửa nội dung, các bài chưa đạt sẽ được xử lý lại HTML và tự động thêm đầy đủ nhãn. Bạn có muốn tiếp tục?");
+        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ. Các bài đạt chuẩn sẽ tự động bổ sung nhãn năm mà không sửa nội dung, các bài chưa đạt sẽ được xử lý lại HTML, giữ nguyên nhãn cũ và tự động thêm nhãn năm. Bạn có muốn tiếp tục?");
         if(!confirmRun) return;
 
         const container = document.getElementById('bulkProgressContainer');
@@ -535,7 +535,7 @@
                         }
 
                     } else {
-                        // VẬN HÀNH BÌNH THƯỜNG (Chưa đạt chuẩn) -> Xử lý lại HTML và thêm đầy đủ nhãn
+                        // VẬN HÀNH BÌNH THƯỜNG (Chưa đạt chuẩn): Xử lý lại HTML, giữ nguyên nhãn cũ + thêm nhãn năm
                         document.getElementById('oldHtmlInput').value = postContent;
                         importOldHTML(); 
 
@@ -544,8 +544,20 @@
                         if (imgMain !== '') {
                             generateCode();
                             const newHtml = document.getElementById('outHtml').value.trim();
-                            const newLabelsStr = document.getElementById('outLabel').value.trim();
-                            const labelsArr = newLabelsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+                            
+                            // Lấy nhãn cũ từ bài viết trên Blogger
+                            let currentLabels = post.labels || [];
+                            let mergedLabels = [...currentLabels];
+
+                            // Trích xuất năm từ ngày phát hành (hoặc từ form)
+                            const dateIssueVal = document.getElementById('dateIssue').value.trim();
+                            const year = getYear(dateIssueVal);
+                            if (year && /^\d{4}$/.test(year)) {
+                                const yearLabel = `year${year}`;
+                                if (!mergedLabels.includes(yearLabel)) {
+                                    mergedLabels.push(yearLabel);
+                                }
+                            }
 
                             try {
                                 const updateResponse = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${post.id}`, {
@@ -556,14 +568,14 @@
                                     },
                                     body: JSON.stringify({
                                         content: newHtml,
-                                        labels: labelsArr
+                                        labels: mergedLabels
                                     })
                                 });
 
                                 if(updateResponse.ok) {
                                     successCount++;
                                     statusCell.className = "status-success";
-                                    statusCell.innerText = "Chuẩn hóa & Gắn nhãn ✅";
+                                    statusCell.innerText = "Chuẩn hóa & Giữ nhãn ✅";
                                 } else if (updateResponse.status === 429) {
                                     summaryDiv.innerText = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
                                     statusCell.className = "status-running";
