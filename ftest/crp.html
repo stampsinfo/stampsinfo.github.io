@@ -347,7 +347,7 @@
         const saved = JSON.parse(localStorage.getItem('blogger_processed_ids') || '[]');
         const infoEl = document.getElementById('cacheStatusInfo');
         if (saved.length > 0) {
-            infoEl.innerText = `(Đang lưu tiến độ: ${saved.length} bài đã được xử lý/bỏ qua trước đó)`;
+            infoEl.innerText = `(Đang lưu tiến độ: ${saved.length} bài đã được xử lý thành công)`;
             infoEl.style.color = "#27ae60";
         } else {
             infoEl.innerText = "(Chưa có dữ liệu tiến độ lưu trữ)";
@@ -394,7 +394,7 @@
             return;
         }
 
-        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ. Các bài đạt chuẩn sẽ tự động bổ sung nhãn năm mà không sửa nội dung, các bài chưa đạt sẽ được xử lý lại HTML, giữ nguyên nhãn cũ và tự động thêm nhãn năm. Bạn có muốn tiếp tục?");
+        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ. Các bài đạt chuẩn sẽ tự động bổ sung nhãn năm mà không sửa nội dung, các bài chưa đạt sẽ được xử lý lại HTML, giữ nguyên nhãn cũ và tự động thêm nhãn năm. Các bài lỗi API sẽ được ghi nhận và tự động chạy lại ở phiên sau. Bạn có muốn tiếp tục?");
         if(!confirmRun) return;
 
         const container = document.getElementById('bulkProgressContainer');
@@ -470,6 +470,7 @@
 
                     const statusCell = newRow.querySelector('td:last-child');
                     const postContent = post.content || "";
+                    let isSuccess = false; // Biến kiểm tra thành công để quyết định lưu cache
 
                     const hasStandardTabs = postContent.includes('id="fTabs-1"') && 
                                            postContent.includes('id="fTabs-2"') && 
@@ -518,6 +519,7 @@
                                     successCount++;
                                     statusCell.className = "status-success";
                                     statusCell.innerText = "Đã thêm nhãn năm ✅";
+                                    isSuccess = true;
                                 } else {
                                     skippedCount++;
                                     skippedIndex++;
@@ -535,6 +537,7 @@
                                 successCount++;
                                 statusCell.className = "status-success";
                                 statusCell.innerText = "Đạt chuẩn (Đã có nhãn) ✓";
+                                isSuccess = true;
                             }
                         } catch (err) {
                             skippedCount++;
@@ -589,6 +592,7 @@
                                     successCount++;
                                     statusCell.className = "status-success";
                                     statusCell.innerText = "Chuẩn hóa & Giữ nhãn ✅";
+                                    isSuccess = true;
                                 } else if (updateResponse.status === 429) {
                                     summaryDiv.innerText = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
                                     statusCell.className = "status-running";
@@ -636,9 +640,12 @@
                         }
                     }
 
-                    processedSet.add(post.id);
-                    localStorage.setItem('blogger_processed_ids', JSON.stringify([...processedSet]));
-                    updateCacheStatusInfo();
+                    // Chỉ lưu vào cache khi xử lý thành công. Nếu lỗi API/mạng, bỏ qua không lưu để phiên sau quét lại.
+                    if (isSuccess) {
+                        processedSet.add(post.id);
+                        localStorage.setItem('blogger_processed_ids', JSON.stringify([...processedSet]));
+                        updateCacheStatusInfo();
+                    }
 
                     await delay(2000); 
                 }
@@ -831,14 +838,11 @@
         tempDiv.innerHTML = oldHtml;
 
         try {
-            // Kiểm tra điều kiện có dòng data-original-height="3072" data-original-width="3072" hay không
             const hasOriginalDim = oldHtml.includes('data-original-height="3072" data-original-width="3072"');
 
-            // Tạo bản sao để lọc, loại bỏ toàn bộ phần tem trong bộ (table.tr-caption-container) ra khỏi phần quét ảnh chính
             const tempDivForMain = tempDiv.cloneNode(true);
             tempDivForMain.querySelectorAll('table.tr-caption-container').forEach(el => el.remove());
 
-            // Thu thập các đường dẫn chứa blogger.googleusercontent.com ở phần đầu (từ href của thẻ a và src của thẻ img)
             const topUrls = [];
             tempDivForMain.querySelectorAll('a[href*="blogger.googleusercontent.com"], img[src*="blogger.googleusercontent.com"]').forEach(el => {
                 let u = el.tagName === 'A' ? el.href : el.src;
@@ -849,10 +853,8 @@
 
             let mainImgUrl = '';
             if (hasOriginalDim && topUrls.length >= 2) {
-                // Nếu có dòng kích thước và tồn tại từ 2 ảnh trở lên ở phần đầu -> lấy đường dẫn thứ 2 từ trên xuống
                 mainImgUrl = topUrls[1];
             } else if (topUrls.length > 0) {
-                // Ngược lại lấy đường dẫn đầu tiên từ trên xuống
                 mainImgUrl = topUrls[0];
             }
             document.getElementById('imgMain').value = mainImgUrl;
