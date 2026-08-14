@@ -802,19 +802,29 @@
         tempDiv.innerHTML = oldHtml;
 
         try {
-            // Kiểm tra xem trên đầu mã nguồn có thuộc tính data-original-height và data-original-width hay không
+            // Kiểm tra điều kiện có dòng data-original-height="3072" data-original-width="3072" hay không
             const hasOriginalDim = oldHtml.includes('data-original-height="3072" data-original-width="3072"');
 
-            // Lấy danh sách tất cả các đường dẫn liên kết chứa blogger.googleusercontent.com từ trên xuống
-            const gLinks = Array.from(tempDiv.querySelectorAll('a[href*="blogger.googleusercontent.com"]'));
+            // Tạo bản sao để lọc, loại bỏ toàn bộ phần tem trong bộ (table.tr-caption-container) ra khỏi phần quét ảnh chính
+            const tempDivForMain = tempDiv.cloneNode(true);
+            tempDivForMain.querySelectorAll('table.tr-caption-container').forEach(el => el.remove());
+
+            // Thu thập các đường dẫn chứa blogger.googleusercontent.com ở phần đầu (từ href của thẻ a và src của thẻ img)
+            const topUrls = [];
+            tempDivForMain.querySelectorAll('a[href*="blogger.googleusercontent.com"], img[src*="blogger.googleusercontent.com"]').forEach(el => {
+                let u = el.tagName === 'A' ? el.href : el.src;
+                if (u && u.includes('blogger.googleusercontent.com') && !topUrls.includes(u)) {
+                    topUrls.push(u);
+                }
+            });
 
             let mainImgUrl = '';
-            if (hasOriginalDim && gLinks.length >= 2) {
-                // Nếu có data-original-height & width -> Lấy đường dẫn thứ 2 từ trên xuống
-                mainImgUrl = gLinks[1].href;
-            } else if (gLinks.length > 0) {
-                // Nếu không có -> Lấy đường dẫn thứ nhất từ trên xuống
-                mainImgUrl = gLinks[0].href;
+            if (hasOriginalDim && topUrls.length >= 2) {
+                // Nếu có dòng data-original-height/width và có ít nhất 2 ảnh ở phần đầu -> lấy ảnh thứ 2 từ trên xuống
+                mainImgUrl = topUrls[1];
+            } else if (topUrls.length > 0) {
+                // Ngược lại lấy ảnh đầu tiên từ trên xuống
+                mainImgUrl = topUrls[0];
             }
             document.getElementById('imgMain').value = mainImgUrl;
 
@@ -895,7 +905,7 @@
                 if(!parentA) return;
                 
                 const href = parentA.href;
-                // Bỏ qua ảnh chính đã dùng cho phần đầu bài viết để tránh bị lặp vào tem trong bộ
+                // Bỏ qua ảnh chính đã dùng cho phần đầu bài viết
                 if (href === mainImgUrl) return;
                 if (processedLinks.has(href)) return;
                 processedLinks.add(href);
