@@ -802,16 +802,18 @@
         tempDiv.innerHTML = oldHtml;
 
         try {
-            // Lấy danh sách tất cả các đường dẫn ảnh blogger.googleusercontent.com từ trên xuống
+            // Kiểm tra xem trên đầu mã nguồn có thuộc tính data-original-height và data-original-width hay không
+            const hasOriginalDim = tempDiv.querySelector('[data-original-height][data-original-width]');
+
+            // Lấy danh sách tất cả các đường dẫn liên kết chứa blogger.googleusercontent.com từ trên xuống
             const gLinks = Array.from(tempDiv.querySelectorAll('a[href*="blogger.googleusercontent.com"]'));
-            const hasZeroImg = tempDiv.querySelector('img[height="0"], img[width="0"]');
 
             let mainImgUrl = '';
-            if (hasZeroImg && gLinks.length >= 2) {
-                // Trường hợp có ảnh ẩn size 0 -> Lấy ảnh thứ 2 từ trên xuống
+            if (hasOriginalDim && gLinks.length >= 2) {
+                // Nếu có data-original-height & width -> Lấy đường dẫn thứ 2 từ trên xuống
                 mainImgUrl = gLinks[1].href;
             } else if (gLinks.length > 0) {
-                // Trường hợp thông thường -> Lấy ảnh thứ 1 từ trên xuống
+                // Nếu không có -> Lấy đường dẫn thứ nhất từ trên xuống
                 mainImgUrl = gLinks[0].href;
             }
             document.getElementById('imgMain').value = mainImgUrl;
@@ -893,7 +895,7 @@
                 if(!parentA) return;
                 
                 const href = parentA.href;
-                // Bỏ qua ảnh chính đã dùng cho phần đầu bài viết
+                // Bỏ qua ảnh chính đã dùng cho phần đầu bài viết để tránh bị lặp vào tem trong bộ
                 if (href === mainImgUrl) return;
                 if (processedLinks.has(href)) return;
                 processedLinks.add(href);
