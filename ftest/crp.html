@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công Cụ Tạo Bài Viết Tem Blogger - Kèm API Trực Tiếp - V5</title>
+    <title>Công Cụ Tạo Bài Viết Tem Blogger - Kèm API Trực Tiếp - V6</title>
     <!-- Google Identity Services cho API v3 -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
@@ -40,63 +40,26 @@
         .btn-bulk { width: 100%; background: #c0392b; font-size: 16px; margin-top: 15px; }
         .btn-bulk:hover { background: #e74c3c; }
         .btn-reset-cache { background: #7f8c8d; margin-top: 10px; font-size: 14px; padding: 8px 12px; }
-        .btn-reset-cache:hover { background: #7f8c8d; }
+        .btn-reset-cache:hover { background: #636e72; }
+        .btn-export-cache { background: #2980b9; margin-top: 10px; font-size: 14px; padding: 8px 12px; margin-left: 5px;}
+        .btn-export-cache:hover { background: #1c5980; }
+        .btn-import-cache { background: #8e44ad; margin-top: 10px; font-size: 14px; padding: 8px 12px; margin-left: 5px;}
+        .btn-import-cache:hover { background: #732d91; }
         
         .output-group { margin-bottom: 20px; }
         .output-group input { background: #eef2f5; font-weight: bold; color: #c0392b; }
         textarea.code-output { height: 350px; font-family: monospace; font-size: 13px; background: #272822; color: #f8f8f2; white-space: pre; }
         .api-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
         
-        #bulkProgressContainer {
-            margin-top: 15px;
-            display: none;
-        }
-        #progressSummary {
-            font-weight: bold;
-            color: #1d6fa5;
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            background: #e8f4fd;
-            border: 1px solid #bbe1fa;
-            border-radius: 4px;
-        }
-        .progress-side-by-side {
-            display: flex;
-            gap: 15px;
-        }
-        .progress-col-box {
-            flex: 1;
-        }
-        .progress-table-title {
-            font-weight: bold;
-            margin-bottom: 6px;
-            font-size: 13px;
-        }
-        .progress-table-wrapper {
-            max-height: 220px;
-            overflow-y: auto;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background: #fff;
-        }
-        .prog-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-        .prog-table th, .prog-table td {
-            padding: 8px 10px;
-            border-bottom: 1px solid #eee;
-            text-align: left;
-            word-break: break-word;
-        }
-        .prog-table th {
-            background: #f1f8fe;
-            color: #2c3e50;
-            position: sticky;
-            top: 0;
-            z-index: 1;
-        }
+        #bulkProgressContainer { margin-top: 15px; display: none; }
+        #progressSummary { font-weight: bold; color: #1d6fa5; margin-bottom: 10px; padding: 8px 12px; background: #e8f4fd; border: 1px solid #bbe1fa; border-radius: 4px; }
+        .progress-side-by-side { display: flex; gap: 15px; }
+        .progress-col-box { flex: 1; }
+        .progress-table-title { font-weight: bold; margin-bottom: 6px; font-size: 13px; }
+        .progress-table-wrapper { max-height: 220px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
+        .prog-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .prog-table th, .prog-table td { padding: 8px 10px; border-bottom: 1px solid #eee; text-align: left; word-break: break-word; }
+        .prog-table th { background: #f1f8fe; color: #2c3e50; position: sticky; top: 0; z-index: 1; }
         .status-running { color: #e67e22; font-weight: bold; }
         .status-success { color: #27ae60; font-weight: bold; }
         .status-skipped { color: #c0392b; font-weight: bold; }
@@ -139,7 +102,11 @@
                     <button class="btn btn-bulk" onclick="autoBulkRepublish()">🚀 QUÉT VÀ CẬP NHẬT HTML HÀNG LOẠT (TỰ ĐỘNG LƯU TIẾN ĐỘ)</button>
                 </div>
                 <div>
-                    <button class="btn btn-reset-cache" onclick="resetBulkCache()">🗑️ Xóa bộ nhớ đệm tiến độ (Để quét lại từ đầu)</button>
+                    <button class="btn btn-reset-cache" onclick="resetBulkCache()">🗑️ Xóa bộ nhớ đệm</button>
+                    <button class="btn btn-export-cache" onclick="exportCache()">💾 Xuất Cache</button>
+                    <button class="btn btn-import-cache" onclick="triggerImportCache()">📂 Nhập Cache</button>
+                    <input type="file" id="importCacheFile" accept=".json" style="display: none;" onchange="handleImportCache(event)">
+                    
                     <span id="cacheStatusInfo" style="margin-left: 10px; font-size: 13px; color: #555;"></span>
                 </div>
                 
@@ -355,7 +322,7 @@
         const saved = JSON.parse(localStorage.getItem('blogger_processed_ids') || '[]');
         const infoEl = document.getElementById('cacheStatusInfo');
         if (saved.length > 0) {
-            infoEl.innerText = `(Đang lưu tiến độ: ${saved.length} bài đã được xử lý thành công)`;
+            infoEl.innerText = `(Đang lưu tiến độ: ${saved.length} bài đã được xử lý)`;
             infoEl.style.color = "#27ae60";
         } else {
             infoEl.innerText = "(Chưa có dữ liệu tiến độ lưu trữ)";
@@ -369,6 +336,63 @@
             updateCacheStatusInfo();
             alert("Đã xóa bộ nhớ đệm thành công!");
         }
+    }
+
+    // --- XUẤT / NHẬP CACHE ---
+    function exportCache() {
+        const data = localStorage.getItem('blogger_processed_ids') || '[]';
+        const parsed = JSON.parse(data);
+        if (parsed.length === 0) {
+            alert("Không có dữ liệu cache nào để xuất!");
+            return;
+        }
+        
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // Tạo tên file có ngày tháng
+        const today = new Date();
+        const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+        a.download = `Blogger_Cache_Progress_${dateStr}.json`;
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function triggerImportCache() {
+        document.getElementById('importCacheFile').click();
+    }
+
+    function handleImportCache(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (!Array.isArray(importedData)) {
+                    throw new Error("Cấu trúc file không hợp lệ (không phải là danh sách ID).");
+                }
+                
+                // Lấy dữ liệu cũ và gộp (merge) để không mất tiến độ đang có trên máy
+                const currentData = JSON.parse(localStorage.getItem('blogger_processed_ids') || '[]');
+                const mergedSet = new Set([...currentData, ...importedData]);
+                
+                localStorage.setItem('blogger_processed_ids', JSON.stringify([...mergedSet]));
+                updateCacheStatusInfo();
+                alert(`📂 Đã nhập thành công! Tổng cộng hệ thống đang ghi nhận ${mergedSet.size} bài viết đã được xử lý.`);
+            } catch (err) {
+                alert("⚠️ Lỗi khi đọc file cache: " + err.message);
+            }
+            // Xóa giá trị file input để có thể chọn lại cùng một file nếu cần
+            event.target.value = '';
+        };
+        reader.readAsText(file);
     }
 
     function handleAuthClick() {
