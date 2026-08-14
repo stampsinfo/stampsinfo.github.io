@@ -802,26 +802,19 @@
         tempDiv.innerHTML = oldHtml;
 
         try {
-            const anchorImageAnchor = tempDiv.querySelector('a[imageanchor="1"]');
-            if (anchorImageAnchor) {
-                document.getElementById('imgMain').value = anchorImageAnchor.href;
-            } else {
-                const zeroImg = tempDiv.querySelector('img[height="0"], img[width="0"]');
-                if (zeroImg) {
-                    const allAs = Array.from(tempDiv.querySelectorAll('a[href]'));
-                    const targetA = allAs.find(a => zeroImg.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING);
-                    if (targetA) {
-                        document.getElementById('imgMain').value = targetA.href;
-                    } else if (allAs.length > 0) {
-                        document.getElementById('imgMain').value = allAs[0].href;
-                    }
-                } else {
-                    const fallbackA = tempDiv.querySelector('a[href]');
-                    if (fallbackA) {
-                        document.getElementById('imgMain').value = fallbackA.href;
-                    }
-                }
+            // Lấy danh sách tất cả các đường dẫn ảnh blogger.googleusercontent.com từ trên xuống
+            const gLinks = Array.from(tempDiv.querySelectorAll('a[href*="blogger.googleusercontent.com"]'));
+            const hasZeroImg = tempDiv.querySelector('img[height="0"], img[width="0"]');
+
+            let mainImgUrl = '';
+            if (hasZeroImg && gLinks.length >= 2) {
+                // Trường hợp có ảnh ẩn size 0 -> Lấy ảnh thứ 2 từ trên xuống
+                mainImgUrl = gLinks[1].href;
+            } else if (gLinks.length > 0) {
+                // Trường hợp thông thường -> Lấy ảnh thứ 1 từ trên xuống
+                mainImgUrl = gLinks[0].href;
             }
+            document.getElementById('imgMain').value = mainImgUrl;
 
             const titleSpan = tempDiv.querySelector('span[style*="15pt"], span[style*="font-size: 15pt"]');
             if (titleSpan) {
@@ -895,13 +888,13 @@
             const allImages = tempDiv.querySelectorAll('a[href*="blogger.googleusercontent.com"] img');
             const processedLinks = new Set();
 
-            allImages.forEach((img, index) => {
-                if (index === 0) return; 
-
+            allImages.forEach((img) => {
                 const parentA = img.closest('a');
                 if(!parentA) return;
                 
                 const href = parentA.href;
+                // Bỏ qua ảnh chính đã dùng cho phần đầu bài viết
+                if (href === mainImgUrl) return;
                 if (processedLinks.has(href)) return;
                 processedLinks.add(href);
 
