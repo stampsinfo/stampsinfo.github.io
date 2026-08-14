@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blogger Auto Post Date Updater v3</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google GIS Library -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    .log-area { font-family: monospace; font-size: 13px; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 p-4 md:p-8 min-h-screen">
+
+  <div class="max-w-6xl mx-auto space-y-6">
+    <!-- Header -->
+    <header class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+        🚀 Blogger Auto Date Updater (Đã cố định API)
+      </h1>
+      <p class="text-sm text-slate-500 mt-1">
+        Cập nhật thời gian đăng bài Blogger theo Label VN + Số thứ tự. Client ID và Blog ID đã được cố định theo cấu hình của bạn.
+      </p>
+    </header>
+
+    <!-- Configuration Panel -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 md:col-span-2 space-y-4">
+        <h2 class="text-lg font-semibold text-slate-800 border-b pb-2">1. Cấu hình Blogger &amp; OAuth</h2>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">OAuth Client ID</label>
+            <input type="text" id="clientId" value="213657197881-pdt222eg02b8k404fa4ikrealtcdt71a.apps.googleusercontent.com" class="w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 text-slate-500 cursor-not-allowed outline-none" readonly>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Blog ID</label>
+            <input type="text" id="blogId" value="562661508258286882" class="w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 text-slate-500 cursor-not-allowed outline-none" readonly>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Access Token (Bấm Đăng nhập bên dưới)</label>
+          <input type="text" id="accessToken" placeholder="Access token sẽ tự động điền khi OAuth thành công" class="w-full px-3 py-2 border rounded-lg text-sm bg-slate-50 font-mono text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button onclick="handleAuth()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">
+            🔑 Đăng nhập Google OAuth
+          </button>
+        </div>
+      </div>
+
+      <!-- General Settings -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+        <h2 class="text-lg font-semibold text-slate-800 border-b pb-2">2. Cài đặt lọc</h2>
+        
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Label chính</label>
+          <input type="text" id="targetLabel" value="VN" class="w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 font-semibold text-slate-700 cursor-not-allowed" readonly>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Thời gian nghỉ (Delay - ms)</label>
+          <input type="number" id="delayMs" value="1000" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          <span class="text-[11px] text-slate-400">Thời gian nghỉ giữa các bài viết</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Lịch sử tiến trình</label>
+          <div class="flex items-center justify-between">
+            <span id="savedCount" class="text-sm font-bold text-emerald-600">0 bài / 0 label xong</span>
+            <button onclick="clearHistory()" class="text-xs text-red-600 hover:underline">Xóa bộ nhớ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions & Progress -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+        <h2 class="text-lg font-semibold text-slate-800">3. Điều khiển &amp; Tiến trình</h2>
+        
+        <div class="flex gap-2">
+          <button id="btnScan" onclick="scanPosts()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition">
+            🔍 Quét bài viết
+          </button>
+          <button id="btnStart" onclick="startUpdate()" disabled class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50">
+            ▶️ Bắt đầu chuyển ngày
+          </button>
+          <button id="btnPause" onclick="pauseUpdate()" disabled class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition disabled:opacity-50">
+            ⏸️ Tạm dừng
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="space-y-1">
+        <div class="flex justify-between text-xs text-slate-500">
+          <span id="progressText">Sẵn sàng</span>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+          <div id="progressBar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Log Output -->
+      <div>
+        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Nhật ký hoạt động (Logs)</label>
+        <div id="logConsole" class="log-area h-40 bg-slate-900 text-slate-200 p-3 rounded-lg overflow-y-auto space-y-1">
+          <div class="text-slate-400">> Chờ người dùng bắt đầu...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scanned Posts Table -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+      <h2 class="text-lg font-semibold text-slate-800 border-b pb-2">Danh sách bài viết gom nhóm theo Label Số</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-600">
+          <thead class="bg-slate-50 text-slate-700 font-medium border-b">
+            <tr>
+              <th class="p-3">Số TT (Nhóm)</th>
+              <th class="p-3">Label Quy ước</th>
+              <th class="p-3">Thứ tự trong nhóm</th>
+              <th class="p-3">Tiêu đề bài viết</th>
+              <th class="p-3">Post ID</th>
+              <th class="p-3">Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody id="postsTableBody" class="divide-y">
+            <tr>
+              <td colspan="6" class="p-4 text-center text-slate-400">Chưa có dữ liệu bài viết. Hãy bấm "Quét bài viết".</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let tokenClient;
+    let groupedPosts = []; 
+    let flatPosts = [];    
+    let isProcessing = false;
+    let shouldStop = false;
+
+    window.onload = () => {
+      // Đã loại bỏ code load localStorage cho clientID/blogID vì chúng đã được cố định
+      updateSavedCount();
+    };
+
+    function log(msg, type = 'info') {
+      const consoleEl = document.getElementById('logConsole');
+      const time = new Date().toLocaleTimeString();
+      let colorClass = 'text-slate-300';
+      if (type === 'success') colorClass = 'text-emerald-400';
+      if (type === 'error') colorClass = 'text-red-400';
+      if (type === 'warning') colorClass = 'text-amber-400';
+
+      const item = document.createElement('div');
+      item.className = colorClass;
+      item.innerText = `[${time}] ${msg}`;
+      consoleEl.appendChild(item);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function getSavedData() {
+      const blogId = document.getElementById('blogId').value.trim();
+      const posts = JSON.parse(localStorage.getItem(`processed_posts_${blogId}`) || '[]');
+      const labels = JSON.parse(localStorage.getItem(`processed_labels_${blogId}`) || '[]');
+      return { posts, labels };
+    }
+
+    function saveProcessedPost(postId, rawLabel) {
+      const blogId = document.getElementById('blogId').value.trim();
+      const data = getSavedData();
+      
+      if (!data.posts.includes(postId)) {
+        data.posts.push(postId);
+        localStorage.setItem(`processed_posts_${blogId}`, JSON.stringify(data.posts));
+      }
+      
+      const labelGroup = groupedPosts.find(g => g.rawLabel === rawLabel);
+      if (labelGroup) {
+        const allDone = labelGroup.posts.every(p => data.posts.includes(p.id) || p.isProcessed);
+        if (allDone && !data.labels.includes(rawLabel)) {
+          data.labels.push(rawLabel);
+          localStorage.setItem(`processed_labels_${blogId}`, JSON.stringify(data.labels));
+          log(`🎉 Đã hoàn thành toàn bộ bài viết của Label số [${rawLabel}]!`, "success");
+        }
+      }
+
+      updateSavedCount();
+    }
+
+    function updateSavedCount() {
+      const data = getSavedData();
+      document.getElementById('savedCount').innerText = `${data.posts.length} bài / ${data.labels.length} label xong`;
+    }
+
+    function clearHistory() {
+      const blogId = document.getElementById('blogId').value.trim();
+      if (confirm("Bạn có chắc muốn xóa lịch sử bài đã chuyển ngày cho Blog này?")) {
+        localStorage.removeItem(`processed_posts_${blogId}`);
+        localStorage.removeItem(`processed_labels_${blogId}`);
+        updateSavedCount();
+        log("Đã xóa lịch sử trong LocalStorage.", "warning");
+      }
+    }
+
+    // Google OAuth 2.0 Auth Flow
+    function handleAuth() {
+      const clientId = document.getElementById('clientId').value.trim();
+      
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/blogger',
+        callback: (response) => {
+          if (response.access_token) {
+            document.getElementById('accessToken').value = response.access_token;
+            log("Xác thực OAuth 2.0 thành công!", "success");
+          } else {
+            log("Xác thực thất bại!", "error");
+          }
+        },
+      });
+      tokenClient.requestAccessToken();
+    }
+
+    function parseNumberLabel(labels = []) {
+      for (let label of labels) {
+        const clean = label.trim();
+        if (/^\d+$/.test(clean)) {
+          const num = parseInt(clean, 10);
+          let formatted = clean;
+          
+          if (clean.length === 1) {
+            formatted = '0' + clean;
+          } else if (clean.length === 2) {
+            formatted = '0' + clean;
+          }
+          
+          return { num, raw: clean, formatted };
+        }
+      }
+      return null;
+    }
+
+    async function scanPosts() {
+      const blogId = document.getElementById('blogId').value.trim();
+      const token = document.getElementById('accessToken').value.trim();
+      
+      if (!token) {
+        return alert("Vui lòng bấm Đăng nhập Google OAuth để lấy Access Token!");
+      }
+
+      log("Đang tải danh sách bài viết từ Blogger...", "info");
+      
+      const rawPosts = [];
+      let pageToken = null;
+      const savedData = getSavedData();
+
+      try {
+        do {
+          let url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?labels=VN&maxResults=500`;
+          if (pageToken) url += `&pageToken=${pageToken}`;
+
+          const res = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+
+          if (data.error) {
+            throw new Error(data.error.message);
+          }
+
+          if (data.items) {
+            for (let item of data.items) {
+              const numInfo = parseNumberLabel(item.labels || []);
+              if (numInfo) {
+                const isProcessed = savedData.posts.includes(item.id);
+                rawPosts.push({
+                  id: item.id,
+                  title: item.title,
+                  num: numInfo.num,
+                  rawLabel: numInfo.raw,
+                  formattedLabel: numInfo.formatted,
+                  published: item.published,
+                  isProcessed: isProcessed,
+                  status: isProcessed ? 'Đã chuyển trước đó' : 'Chờ thực hiện'
+                });
+              }
+            }
+          }
+          pageToken = data.nextPageToken;
+        } while (pageToken);
+
+        const groupsMap = {};
+        for (let post of rawPosts) {
+          if (!groupsMap[post.num]) {
+            groupsMap[post.num] = {
+              num: post.num,
+              rawLabel: post.rawLabel,
+              formattedLabel: post.formattedLabel,
+              posts: []
+            };
+          }
+          groupsMap[post.num].posts.push(post);
+        }
+
+        groupedPosts = Object.values(groupsMap).sort((a, b) => a.num - b.num);
+
+        flatPosts = [];
+        groupedPosts.forEach(group => {
+          group.posts.sort((a, b) => new Date(a.published) - new Date(b.published));
+          
+          group.posts.forEach((post, idx) => {
+            post.subIndex = idx + 1;
+            post.totalInGroup = group.posts.length;
+            flatPosts.push(post);
+          });
+        });
+
+        log(`Đã quét tổng cộng ${flatPosts.length} bài viết thuộc ${groupedPosts.length} nhóm Label số.`, "success");
+        renderTable();
+
+        document.getElementById('btnStart').disabled = flatPosts.length === 0;
+
+      } catch (err) {
+        log(`Lỗi khi quét bài viết: ${err.message}`, "error");
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('postsTableBody');
+      tbody.innerHTML = '';
+
+      if (flatPosts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Không tìm thấy bài viết phù hợp.</td></tr>`;
+        return;
+      }
+
+      let currentNum = null;
+
+      flatPosts.forEach((p) => {
+        const tr = document.createElement('tr');
+        
+        const isNewGroup = currentNum !== p.num;
+        currentNum = p.num;
+
+        if (isNewGroup) {
+          tr.classList.add('border-t-2', 'border-slate-300');
+        }
+
+        tr.className += p.isProcessed ? ' bg-emerald-50/50' : ' hover:bg-slate-50';
+        
+        let statusBadge = `<span class="px-2 py-1 bg-amber-100 text-amber-800 rounded-md text-xs font-semibold">Chờ thực hiện</span>`;
+        if (p.isProcessed) {
+          statusBadge = `<span class="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-md text-xs font-semibold">Đã chuyển</span>`;
+        } else if (p.status === 'Đang xử lý...') {
+          statusBadge = `<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs font-semibold animate-pulse">Đang xử lý...</span>`;
+        } else if (p.status === 'Lỗi') {
+          statusBadge = `<span class="px-2 py-1 bg-red-100 text-red-800 rounded-md text-xs font-semibold">Lỗi</span>`;
+        }
+
+        const subInfo = p.totalInGroup > 1 
+          ? `<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-bold">Bài ${p.subIndex}/${p.totalInGroup}</span>`
+          : `<span class="text-xs text-slate-400">1 bài</span>`;
+
+        tr.innerHTML = `
+          <td class="p-3 font-mono font-bold text-slate-700">${p.num}</td>
+          <td class="p-3 font-mono text-indigo-600 font-semibold">${p.formattedLabel} <span class="text-xs text-slate-400">(Gốc: ${p.rawLabel})</span></td>
+          <td class="p-3">${subInfo}</td>
+          <td class="p-3 font-medium text-slate-800">${p.title}</td>
+          <td class="p-3 font-mono text-xs text-slate-400">${p.id}</td>
+          <td class="p-3">${statusBadge}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function startUpdate() {
+      const blogId = document.getElementById('blogId').value.trim();
+      const token = document.getElementById('accessToken').value.trim();
+      const delay = parseInt(document.getElementById('delayMs').value, 10) || 1000;
+
+      const pendingPosts = flatPosts.filter(p => !p.isProcessed);
+
+      if (pendingPosts.length === 0) {
+        return alert("Tất cả bài viết trong danh sách đều đã được xử lý!");
+      }
+
+      isProcessing = true;
+      shouldStop = false;
+
+      document.getElementById('btnStart').disabled = true;
+      document.getElementById('btnScan').disabled = true;
+      document.getElementById('btnPause').disabled = false;
+
+      log("🚀 Bắt đầu tiến trình cập nhật ngày giờ bài đăng theo thứ tự nhóm Label...", "info");
+
+      let count = 0;
+      const totalPending = pendingPosts.length;
+
+      for (let group of groupedPosts) {
+        if (shouldStop) break;
+
+        const groupPending = group.posts.filter(p => !p.isProcessed);
+        if (groupPending.length === 0) continue;
+
+        log(`📌 --- Đang xử lý nhóm Label [${group.formattedLabel}] (Tổng ${group.posts.length} bài) ---`, "warning");
+
+        for (let post of group.posts) {
+          if (shouldStop) {
+            log("Tiến trình đã được tạm dừng bởi người dùng.", "warning");
+            break;
+          }
+
+          if (post.isProcessed) continue;
+
+          post.status = 'Đang xử lý...';
+          renderTable();
+
+          const realTimeISO = new Date().toISOString();
+
+          try {
+            log(`Đang chuyển ngày bài [${group.formattedLabel}] (${post.subIndex}/${post.totalInGroup}) - "${post.title}"...`);
+            
+            const res = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${post.id}`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                published: realTimeISO
+              })
+            });
+
+            const data = await res.json();
+
+            if (data.error) {
+              throw new Error(data.error.message);
+            }
+
+            post.isProcessed = true;
+            post.status = 'Thành công';
+            post.published = realTimeISO;
+            
+            saveProcessedPost(post.id, post.rawLabel);
+            log(`✓ Thành công [${group.formattedLabel}] bài ${post.subIndex}/${post.totalInGroup} -> Đã đổi về ${realTimeISO}`, "success");
+
+          } catch (err) {
+            post.status = 'Lỗi';
+            log(`✗ Lỗi bài [${group.formattedLabel}]: ${err.message}`, "error");
+          }
+
+          count++;
+          const percent = Math.round((count / totalPending) * 100);
+          document.getElementById('progressBar').style.width = `${percent}%`;
+          document.getElementById('progressPercent').innerText = `${percent}%`;
+          document.getElementById('progressText').innerText = `Đã xử lý ${count}/${totalPending} bài`;
+
+          renderTable();
+
+          await new Promise(res => setTimeout(res, delay));
+        }
+      }
+
+      isProcessing = false;
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('btnScan').disabled = false;
+      document.getElementById('btnPause').disabled = true;
+
+      if (!shouldStop) {
+        log("🎉 Hoàn tất toàn bộ tiến trình cập nhật tất cả các bài viết!", "success");
+      }
+    }
+
+    function pauseUpdate() {
+      shouldStop = true;
+      document.getElementById('btnPause').disabled = true;
+      log("Đang dừng sau bài hiện tại...", "warning");
+    }
+  </script>
+</body>
+</html>
