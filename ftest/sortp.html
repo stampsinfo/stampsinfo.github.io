@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Blogger Auto Post Date Updater v4</title>
+  <title>Blogger Auto Post Date Updater v5</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google GIS Library -->
@@ -18,10 +18,10 @@
     <!-- Header -->
     <header class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
       <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-        🚀 Blogger Auto Date Updater v4
+        🚀 Blogger Auto Date Updater v5
       </h1>
       <p class="text-sm text-slate-500 mt-1">
-        Cập nhật thời gian đăng bài Blogger theo Label VN + Số thứ tự. Đã cố định Client ID và Blog ID. Tự động dừng khi có lỗi.
+        Cập nhật thời gian đăng bài Blogger theo Label VN + Số thứ tự. Đã cố định Client ID và Blog ID. Tự động tiếp tục từ Label hoàn tất lớn nhất và dừng ngay khi có lỗi.
       </p>
     </header>
 
@@ -64,10 +64,13 @@
           </div>
           <div>
             <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Label số bắt đầu</label>
-            <input type="number" id="startLabelNum" placeholder="Ví dụ: 5" class="w-full px-3 py-2 border rounded-lg text-sm font-semibold text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="number" id="startLabelNum" placeholder="Tự động điền khi quét" class="w-full px-3 py-2 border rounded-lg text-sm font-semibold text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none">
           </div>
         </div>
-        <p class="text-[11px] text-slate-400">- Để trống "Label số bắt đầu" nếu muốn chạy từ đầu.<br>- Nhập số (ví dụ: 5, 12) để bỏ qua các số nhỏ hơn và chạy từ số đó.</p>
+        <p class="text-[11px] text-slate-400">
+          - Hệ thống sẽ <b>tự động bỏ qua các Label số nhỏ hơn hoặc bằng</b> Label lớn nhất đã hoàn tất trước đó.<br>
+          - Bạn cũng có thể tự nhập số thủ công nếu muốn chỉ định Label bắt đầu.
+        </p>
 
         <div>
           <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Thời gian nghỉ (Delay - ms)</label>
@@ -182,6 +185,19 @@
       return { posts, labels };
     }
 
+    // Tìm Label số lớn nhất đã hoàn tất trong lịch sử
+    function getMaxCompletedLabelNum() {
+      const data = getSavedData();
+      if (!data.labels || data.labels.length === 0) return null;
+
+      const nums = data.labels
+        .map(l => parseInt(l.trim(), 10))
+        .filter(n => !isNaN(n));
+
+      if (nums.length === 0) return null;
+      return Math.max(...nums);
+    }
+
     function saveProcessedPost(postId, rawLabel) {
       const blogId = document.getElementById('blogId').value.trim();
       const data = getSavedData();
@@ -214,6 +230,7 @@
       if (confirm("Bạn có chắc muốn xóa lịch sử bài đã chuyển ngày cho Blog này?")) {
         localStorage.removeItem(`processed_posts_${blogId}`);
         localStorage.removeItem(`processed_labels_${blogId}`);
+        document.getElementById('startLabelNum').value = '';
         updateSavedCount();
         log("Đã xóa lịch sử trong LocalStorage.", "warning");
       }
@@ -333,8 +350,18 @@
         });
 
         log(`Đã quét tổng cộng ${flatPosts.length} bài viết thuộc ${groupedPosts.length} nhóm Label số.`, "success");
-        renderTable();
 
+        // TỰ ĐỘNG TÌM LABEL SỐ LỚN NHẤT ĐÃ HOÀN TẤT & ĐIỀU CHỈNH ĐIỂM BẮT ĐẦU
+        const maxCompleted = getMaxCompletedLabelNum();
+        const startInput = document.getElementById('startLabelNum');
+        
+        if (maxCompleted !== null) {
+          const nextStartNum = maxCompleted + 1;
+          startInput.value = nextStartNum;
+          log(`💡 Phát hiện Label số hoàn tất lớn nhất là [${maxCompleted}]. Tự động bỏ qua các Label ≤ ${maxCompleted} và đặt điểm bắt đầu tiếp theo là Label [${nextStartNum}].`, "warning");
+        }
+
+        renderTable();
         document.getElementById('btnStart').disabled = flatPosts.length === 0;
 
       } catch (err) {
@@ -352,6 +379,8 @@
       }
 
       let currentNum = null;
+      const startNumVal = document.getElementById('startLabelNum').value.trim();
+      const startNum = startNumVal !== '' ? parseInt(startNumVal, 10) : null;
 
       flatPosts.forEach((p) => {
         const tr = document.createElement('tr');
@@ -363,11 +392,21 @@
           tr.classList.add('border-t-2', 'border-slate-300');
         }
 
-        tr.className += p.isProcessed ? ' bg-emerald-50/50' : ' hover:bg-slate-50';
+        const isSkippedByStartNum = startNum !== null && p.num < startNum;
+
+        if (p.isProcessed) {
+          tr.className += ' bg-emerald-50/50';
+        } else if (isSkippedByStartNum) {
+          tr.className += ' bg-slate-100/70 opacity-60';
+        } else {
+          tr.className += ' hover:bg-slate-50';
+        }
         
         let statusBadge = `<span class="px-2 py-1 bg-amber-100 text-amber-800 rounded-md text-xs font-semibold">Chờ thực hiện</span>`;
         if (p.isProcessed) {
           statusBadge = `<span class="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-md text-xs font-semibold">Đã chuyển</span>`;
+        } else if (isSkippedByStartNum) {
+          statusBadge = `<span class="px-2 py-1 bg-slate-200 text-slate-600 rounded-md text-xs font-semibold">Bỏ qua (< ${startNum})</span>`;
         } else if (p.status === 'Đang xử lý...') {
           statusBadge = `<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs font-semibold animate-pulse">Đang xử lý...</span>`;
         } else if (p.status === 'Lỗi') {
@@ -394,10 +433,11 @@
       const blogId = document.getElementById('blogId').value.trim();
       const token = document.getElementById('accessToken').value.trim();
       const delay = parseInt(document.getElementById('delayMs').value, 10) || 1000;
+      
       const startNumVal = document.getElementById('startLabelNum').value.trim();
       const startNum = startNumVal !== '' ? parseInt(startNumVal, 10) : null;
 
-      // Lọc các nhóm theo label số bắt đầu nếu người dùng có nhập
+      // Lọc các nhóm theo label số bắt đầu
       let activeGroups = groupedPosts;
       if (startNum !== null && !isNaN(startNum)) {
         activeGroups = groupedPosts.filter(g => g.num >= startNum);
@@ -421,7 +461,7 @@
       document.getElementById('btnScan').disabled = true;
       document.getElementById('btnPause').disabled = false;
 
-      log(`🚀 Bắt đầu tiến trình cập nhật ngày giờ bài đăng${startNum !== null ? ` (từ Label số ${startNum} trở đi)` : ''}...`, "info");
+      log(`🚀 Bắt đầu tiến trình cập nhật ngày giờ bài đăng${startNum !== null ? ` (Bỏ qua các Label số < ${startNum}, bắt đầu từ ${startNum})` : ''}...`, "info");
 
       let count = 0;
       const totalPending = pendingPosts.length;
@@ -481,7 +521,7 @@
             post.status = 'Lỗi';
             log(`✗ Lỗi bài [${group.formattedLabel}]: ${err.message}`, "error");
             log(`⛔ DỪNG TIẾN TRÌNH: Phát hiện lỗi tại bài "${post.title}". Đã dừng ngay lập tức để bảo vệ dữ liệu!`, "error");
-            shouldStop = true; // Dừng ngay lập tức khi xảy ra lỗi
+            shouldStop = true;
           }
 
           renderTable();
