@@ -803,7 +803,7 @@
 
         try {
             // Kiểm tra xem trên đầu mã nguồn có thuộc tính data-original-height và data-original-width hay không
-            const hasOriginalDim = tempDiv.querySelector('[data-original-height][data-original-width]');
+            const hasOriginalDim = oldHtml.includes('data-original-height="3072" data-original-width="3072"');
 
             // Lấy danh sách tất cả các đường dẫn liên kết chứa blogger.googleusercontent.com từ trên xuống
             const gLinks = Array.from(tempDiv.querySelectorAll('a[href*="blogger.googleusercontent.com"]'));
