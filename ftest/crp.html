@@ -673,6 +673,10 @@
         const content = document.getElementById('outHtml').value.trim();
         const postStatus = document.getElementById('postStatus').value;
 
+        // Lấy thêm 2 trường này để làm điều kiện dò tìm
+        const code = document.getElementById('code').value.trim();
+        const countryCode = document.getElementById('countryCode').value.trim();
+
         if (!blogId) {
             alert("Vui lòng nhập Blogger Blog ID!");
             return;
@@ -681,59 +685,122 @@
             alert("Vui lòng bấm nút 'Đăng nhập / Cấp quyền Google' trước!");
             return;
         }
-        if (!realTitle || !content || !urlCode) {
-            alert("Chưa có đầy đủ thông tin để đăng bài!");
+        if (!realTitle || !content || !urlCode || !code || !countryCode) {
+            alert("Chưa có đầy đủ thông tin (Mã tem, Viết tắt quốc gia,...) để đăng bài!");
             return;
         }
 
         const labels = labelsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
-        
-        const postBodyStep1 = {
-            title: urlCode,
-            content: content,
-            labels: labels,
-            isDraft: (postStatus === 'private')
-        };
 
         try {
-            const response = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ` + accessToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(postBodyStep1)
+            // 1. DÒ TÌM BÀI VIẾT CÓ CHỨA NHÃN MÃ SỐ BỘ TEM
+            // fetchBodies=false để tăng tốc độ tìm kiếm vì không cần tải nội dung HTML
+            const searchUrl = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?labels=${encodeURIComponent(code)}&fetchBodies=false`;
+            const searchResp = await fetch(searchUrl, {
+                headers: { 'Authorization': `Bearer ` + accessToken }
             });
 
-            const data = await response.json();
-            if (response.ok) {
-                const postId = data.id;
+            let matchingPosts = [];
+            if (searchResp.ok) {
+                const searchData = await searchResp.json();
+                if (searchData.items && searchData.items.length > 0) {
+                    // Lọc chính xác những bài có CẢ 2 LABEL: code VÀ countryCode
+                    matchingPosts = searchData.items.filter(post => {
+                        const pLabels = post.labels || [];
+                        return pLabels.includes(code) && pLabels.includes(countryCode);
+                    });
+                }
+            }
 
-                const postBodyStep2 = {
-                    title: realTitle
-                };
+            // 2. NẾU CÓ BÀI VIẾT TRÙNG (1 HOẶC NHIỀU BÀI)
+            if (matchingPosts.length > 0) {
+                const targetPost = matchingPosts[0];
 
-                const updateResponse = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${postId}`, {
+                // Cập nhật bài viết đầu tiên
+                const updateResp = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${targetPost.id}`, {
                     method: 'PATCH',
                     headers: {
                         'Authorization': `Bearer ` + accessToken,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(postBodyStep2)
+                    body: JSON.stringify({
+                        title: realTitle,
+                        content: content,
+                        labels: labels,
+                        isDraft: (postStatus === 'private')
+                    })
                 });
 
-                if (updateResponse.ok) {
-                    alert("🎉 Đăng bài viết mới thành công! ID bài: " + postId);
+                if (updateResp.ok) {
+                    let deleteMsg = "";
+                    
+                    // Nếu có nhiều hơn 1 bài trùng -> Xóa tất cả các bài còn lại
+                    if (matchingPosts.length > 1) {
+                        let deletedCount = 0;
+                        for (let i = 1; i < matchingPosts.length; i++) {
+                            const delPost = matchingPosts[i];
+                            const delResp = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${delPost.id}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ` + accessToken }
+                            });
+                            if (delResp.ok) deletedCount++;
+                        }
+                        deleteMsg = `\n- Đã xóa ${deletedCount} bài viết trùng lặp dư thừa.`;
+                    }
+
+                    alert(`✏️ Đã CẬP NHẬT thành công bài viết cũ (ID: ${targetPost.id})!${deleteMsg}`);
                 } else {
-                    const updateData = await updateResponse.json();
-                    alert("⚠️ Bài đã đăng nhưng lỗi khi cập nhật tiêu đề: " + (updateData.error ? updateData.error.message : updateResponse.statusText));
+                    const errData = await updateResp.json();
+                    alert("⚠️ Lỗi khi cập nhật bài viết: " + (errData.error ? errData.error.message : updateResp.statusText));
                 }
+
             } else {
-                alert("Lỗi khi đăng bài: " + (data.error ? data.error.message : response.statusText));
+                // 3. NẾU KHÔNG CÓ BÀI NÀO TRÙNG -> TẠO BÀI VIẾT MỚI (Tạo 2 bước để có URL đẹp)
+                const postBodyStep1 = {
+                    title: urlCode,
+                    content: content,
+                    labels: labels,
+                    isDraft: (postStatus === 'private')
+                };
+
+                const response = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ` + accessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(postBodyStep1)
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    const postId = data.id;
+
+                    const postBodyStep2 = { title: realTitle };
+
+                    const updateResponse = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${postId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Authorization': `Bearer ` + accessToken,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(postBodyStep2)
+                    });
+
+                    if (updateResponse.ok) {
+                        alert("🎉 Đã ĐĂNG BÀI MỚI thành công! ID bài: " + postId);
+                    } else {
+                        const updateData = await updateResponse.json();
+                        alert("⚠️ Bài đã đăng nhưng lỗi khi cập nhật tiêu đề: " + (updateData.error ? updateData.error.message : updateResponse.statusText));
+                    }
+                } else {
+                    alert("Lỗi khi đăng bài mới: " + (data.error ? data.error.message : response.statusText));
+                }
             }
+
         } catch (err) {
             console.error(err);
-            alert("Đã xảy ra lỗi kết nối mạng khi gửi dữ liệu lên Blogger.");
+            alert("Đã xảy ra lỗi kết nối mạng hoặc API khi xử lý dữ liệu.");
         }
     }
 
