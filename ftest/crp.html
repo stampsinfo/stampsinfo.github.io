@@ -39,13 +39,14 @@
         .btn-login:hover { background: #3367D6; }
         .btn-bulk { width: 100%; background: #c0392b; font-size: 16px; margin-top: 15px; }
         .btn-bulk:hover { background: #e74c3c; }
+        .btn-reset-cache { background: #7f8c8d; margin-top: 10px; font-size: 14px; padding: 8px 12px; }
+        .btn-reset-cache:hover { background: #7f8c8d; }
         
         .output-group { margin-bottom: 20px; }
         .output-group input { background: #eef2f5; font-weight: bold; color: #c0392b; }
         textarea.code-output { height: 350px; font-family: monospace; font-size: 13px; background: #272822; color: #f8f8f2; white-space: pre; }
         .api-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
         
-        /* Khung hiển thị tiến độ song song 2 bảng */
         #bulkProgressContainer {
             margin-top: 15px;
             display: none;
@@ -98,6 +99,7 @@
         .status-running { color: #e67e22; font-weight: bold; }
         .status-success { color: #27ae60; font-weight: bold; }
         .status-skipped { color: #c0392b; font-weight: bold; }
+        .status-cached { color: #7f8c8d; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -133,7 +135,11 @@
                 </div>
                 <div class="row-2">
                     <button class="btn btn-import" onclick="importOldHTML()">TỰ ĐỘNG TRÍCH XUẤT DỮ LIỆU TỪ Ô TRÊN</button>
-                    <button class="btn btn-bulk" onclick="autoBulkRepublish()">🚀 QUÉT VÀ CẬP NHẬT HTML HÀNG LOẠT (TIẾT KIỆM TOKEN)</button>
+                    <button class="btn btn-bulk" onclick="autoBulkRepublish()">🚀 QUÉT VÀ CẬP NHẬT HTML HÀNG LOẠT (TỰ ĐỘNG LƯU TIẾN ĐỘ)</button>
+                </div>
+                <div>
+                    <button class="btn btn-reset-cache" onclick="resetBulkCache()">🗑️ Xóa bộ nhớ đệm tiến độ (Để quét lại từ đầu)</button>
+                    <span id="cacheStatusInfo" style="margin-left: 10px; font-size: 13px; color: #555;"></span>
                 </div>
                 
                 <!-- Bảng và dòng hiển thị tiến độ song song -->
@@ -149,7 +155,7 @@
                                         <tr>
                                             <th style="width: 40px;">STT</th>
                                             <th>Tên bài viết</th>
-                                            <th style="width: 100px; text-align: center;">Trạng thái</th>
+                                            <th style="width: 110px; text-align: center;">Trạng thái</th>
                                         </tr>
                                     </thead>
                                     <tbody id="progressTableBody">
@@ -332,6 +338,31 @@
     let accessToken = null;
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+    // Hiển thị trạng thái cache khi tải trang
+    window.addEventListener('DOMContentLoaded', () => {
+        updateCacheStatusInfo();
+    });
+
+    function updateCacheStatusInfo() {
+        const saved = JSON.parse(localStorage.getItem('blogger_processed_ids') || '[]');
+        const infoEl = document.getElementById('cacheStatusInfo');
+        if (saved.length > 0) {
+            infoEl.innerText = `(Đang lưu tiến độ: ${saved.length} bài đã được xử lý/bỏ qua trước đó)`;
+            infoEl.style.color = "#27ae60";
+        } else {
+            infoEl.innerText = "(Chưa có dữ liệu tiến độ lưu trữ)";
+            infoEl.style.color = "#7f8c8d";
+        }
+    }
+
+    function resetBulkCache() {
+        if(confirm("Bạn có chắc chắn muốn xóa bộ nhớ đệm tiến độ cũ không? Lần chạy tiếp theo sẽ quét lại từ đầu.")) {
+            localStorage.removeItem('blogger_processed_ids');
+            updateCacheStatusInfo();
+            alert("Đã xóa bộ nhớ đệm thành công!");
+        }
+    }
+
     function handleAuthClick() {
         const clientId = document.getElementById('clientId').value.trim();
         if (!clientId) {
@@ -356,7 +387,7 @@
         tokenClient.requestAccessToken({prompt: 'consent'});
     }
 
-    // --- HÀM TỰ ĐỘNG CẬP NHẬT HÀNG LOẠT (CÓ 2 BẢNG TIẾN ĐỘ SONG SONG) ---
+    // --- HÀM TỰ ĐỘNG CẬP NHẬT HÀNG LOẠT (CÓ LƯU TRỮ LOCALSTORAGE) ---
     async function autoBulkRepublish() {
         const blogId = document.getElementById('blogId').value.trim();
         if (!blogId || !accessToken) {
@@ -364,10 +395,9 @@
             return;
         }
 
-        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ và chỉ cập nhật lại mã HTML (Giữ nguyên tiêu đề và URL). Bạn có chắc chắn muốn chạy?");
+        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ và cập nhật lại mã HTML. Hệ thống sẽ tự động bỏ qua các bài đã xử lý từ các phiên trước. Bạn có muốn tiếp tục?");
         if(!confirmRun) return;
 
-        // Hiện vùng chứa tiến độ và làm sạch bảng cũ
         const container = document.getElementById('bulkProgressContainer');
         const summaryDiv = document.getElementById('progressSummary');
         const tableBody = document.getElementById('progressTableBody');
@@ -377,6 +407,10 @@
         summaryDiv.innerText = "⏳ Đang kết nối lấy danh sách bài viết từ Blogger...";
         tableBody.innerHTML = "";
         skippedTableBody.innerHTML = "";
+
+        // Tải danh sách ID đã xử lý từ localStorage
+        let processedIdsArray = JSON.parse(localStorage.getItem('blogger_processed_ids') || '[]');
+        let processedSet = new Set(processedIdsArray);
 
         let pageToken = '';
         let processedCount = 0;
@@ -396,13 +430,13 @@
                     });
                 } catch (fetchErr) {
                     summaryDiv.innerText = "⚠️ Mất kết nối mạng hoặc Token đã hết hạn!";
-                    alert("⚠️ Mất kết nối mạng hoặc Token đã hết hạn! Vui lòng tải lại trang và Đăng nhập Google lại.");
+                    alert("⚠️ Mất kết nối mạng hoặc Token đã hết hạn! Vui lòng Đăng nhập Google lại để tiếp tục.");
                     break; 
                 }
 
                 if (response.status === 401) {
                     summaryDiv.innerText = "⚠️ Access Token đã hết hạn!";
-                    alert("⚠️ Access Token đã hết hạn (sau 60 phút)! Vui lòng tải lại trang, bấm Đăng nhập lại để lấy Token mới rồi chạy tiếp.");
+                    alert("⚠️ Access Token đã hết hạn (sau 60 phút)! Vui lòng bấm Đăng nhập lại để lấy Token mới rồi bấm chạy tiếp.");
                     break;
                 }
 
@@ -412,10 +446,22 @@
                 for (const post of data.items) {
                     processedCount++;
                     
-                    // Thêm dòng mới vào bảng tiến độ tổng
                     const rowId = `prog-row-${processedCount}`;
                     const newRow = document.createElement('tr');
                     newRow.id = rowId;
+                    
+                    // Kiểm tra nếu bài này đã được xử lý ở phiên trước
+                    if (processedSet.has(post.id)) {
+                        newRow.innerHTML = `
+                            <td>${processedCount}</td>
+                            <td>${post.title || "(Không có tiêu đề)"}</td>
+                            <td style="text-align: center;" class="status-cached">Đã lưu trước ✓</td>
+                        `;
+                        tableBody.appendChild(newRow);
+                        continue; // Bỏ qua không gọi API xử lý lại bài này
+                    }
+
+                    // Nếu chưa xử lý, tiến hành chạy bình thường
                     newRow.innerHTML = `
                         <td>${processedCount}</td>
                         <td>${post.title || "(Không có tiêu đề)"}</td>
@@ -462,13 +508,11 @@
                             } else {
                                 statusCell.className = "status-skipped";
                                 statusCell.innerText = "Lỗi API ❌";
-                                console.error(`❌ Lỗi API khi cập nhật: ${post.title}`);
                             }
                         } catch (patchErr) {
                             statusCell.className = "status-skipped";
                             statusCell.innerText = "Lỗi mạng ❌";
-                            summaryDiv.innerText = `❌ Lỗi mạng khi cập nhật bài: "${post.title}"`;
-                            alert(`Lỗi mạng (Failed to fetch) khi đang cập nhật bài: "${post.title}".`);
+                            alert(`Lỗi mạng khi đang cập nhật bài: "${post.title}".`);
                             return; 
                         }
                     } else {
@@ -477,7 +521,6 @@
                         statusCell.className = "status-skipped";
                         statusCell.innerText = "Bỏ qua ⚠️";
 
-                        // Tự động thêm vào bảng danh sách bài bị bỏ qua bên cạnh
                         const skipRow = document.createElement('tr');
                         skipRow.innerHTML = `
                             <td>${skippedIndex}</td>
@@ -487,6 +530,11 @@
                         skipRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
 
+                    // Ghi nhận ID đã xử lý vào Set và lưu vào localStorage ngay lập tức
+                    processedSet.add(post.id);
+                    localStorage.setItem('blogger_processed_ids', JSON.stringify([...processedSet]));
+                    updateCacheStatusInfo();
+
                     await delay(2500); // Nghỉ 2.5s giữa các request
                 }
 
@@ -495,12 +543,11 @@
             } while (pageToken);
 
             summaryDiv.innerHTML = `🎉 Hoàn tất! Đã duyệt: <b>${processedCount}</b> bài | Cập nhật thành công: <span style="color:#27ae60"><b>${successCount}</b></span> bài | Bỏ qua: <span style="color:#c0392b"><b>${skippedCount}</b></span> bài.`;
-            alert(`🎉 Tiến trình đã hoàn tất!\n- Tổng đã duyệt: ${processedCount} bài.\n- Cập nhật HTML thành công: ${successCount} bài.\n- Bỏ qua: ${skippedCount} bài.`);
+            alert(`🎉 Tiến trình đã hoàn tất!\n- Cập nhật thành công: ${successCount} bài.\n- Bỏ qua: ${skippedCount} bài.`);
             
         } catch (error) {
             console.error("Lỗi tổng quát:", error);
             summaryDiv.innerText = `❌ Đã xảy ra lỗi trong quá trình quét!`;
-            alert("Đã xảy ra lỗi không xác định trong quá trình quét!");
         }
     }
 
