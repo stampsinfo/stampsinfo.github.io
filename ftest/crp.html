@@ -393,7 +393,7 @@
             return;
         }
 
-        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ. Các bài đạt chuẩn sẽ tự động bổ sung nhãn năm mà không sửa nội dung, các bài chưa đạt sẽ được xử lý lại HTML. Bạn có muốn tiếp tục?");
+        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ. Các bài đạt chuẩn sẽ tự động bổ sung nhãn năm mà không sửa nội dung, các bài chưa đạt sẽ được xử lý lại HTML và tự động thêm đầy đủ nhãn. Bạn có muốn tiếp tục?");
         if(!confirmRun) return;
 
         const container = document.getElementById('bulkProgressContainer');
@@ -535,7 +535,7 @@
                         }
 
                     } else {
-                        // VẬN HÀNH BÌNH THƯỜNG (Chưa đạt chuẩn)
+                        // VẬN HÀNH BÌNH THƯỜNG (Chưa đạt chuẩn) -> Xử lý lại HTML và thêm đầy đủ nhãn
                         document.getElementById('oldHtmlInput').value = postContent;
                         importOldHTML(); 
 
@@ -563,7 +563,7 @@
                                 if(updateResponse.ok) {
                                     successCount++;
                                     statusCell.className = "status-success";
-                                    statusCell.innerText = "Thành công ✅";
+                                    statusCell.innerText = "Chuẩn hóa & Gắn nhãn ✅";
                                 } else if (updateResponse.status === 429) {
                                     summaryDiv.innerText = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
                                     statusCell.className = "status-running";
