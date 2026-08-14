@@ -44,6 +44,18 @@
         .output-group input { background: #eef2f5; font-weight: bold; color: #c0392b; }
         textarea.code-output { height: 350px; font-family: monospace; font-size: 13px; background: #272822; color: #f8f8f2; white-space: pre; }
         .api-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        
+        /* Khung hiển thị tiến độ */
+        #bulkProgress {
+            margin-top: 12px;
+            padding: 12px;
+            background: #e8f4fd;
+            border: 1px solid #bbe1fa;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #1d6fa5;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -81,6 +93,8 @@
                     <button class="btn btn-import" onclick="importOldHTML()">TỰ ĐỘNG TRÍCH XUẤT DỮ LIỆU TỪ Ô TRÊN</button>
                     <button class="btn btn-bulk" onclick="autoBulkRepublish()">🚀 QUÉT VÀ CẬP NHẬT HTML HÀNG LOẠT (TIẾT KIỆM TOKEN)</button>
                 </div>
+                <!-- Vùng hiển thị tiến độ chạy -->
+                <div id="bulkProgress">Đang chuẩn bị tiến trình...</div>
             </div>
         </details>
     </div>
@@ -258,7 +272,7 @@
         tokenClient.requestAccessToken({prompt: 'consent'});
     }
 
-    // --- HÀM TỰ ĐỘNG CẬP NHẬT HÀNG LOẠT (CHỈ PATCH CONTENT ĐỂ TIẾT KIỆM TOKEN) ---
+    // --- HÀM TỰ ĐỘNG CẬP NHẬT HÀNG LOẠT CÓ HIỂN THỊ TIẾN ĐỘ ---
     async function autoBulkRepublish() {
         const blogId = document.getElementById('blogId').value.trim();
         if (!blogId || !accessToken) {
@@ -269,12 +283,14 @@
         const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ và chỉ cập nhật lại mã HTML (Giữ nguyên tiêu đề và URL). Bạn có chắc chắn muốn chạy?");
         if(!confirmRun) return;
 
+        const progressDiv = document.getElementById('bulkProgress');
+        progressDiv.style.display = 'block';
+        progressDiv.innerText = "⏳ Đang kết nối lấy danh sách bài viết...";
+
         let pageToken = '';
         let processedCount = 0;
         let successCount = 0;
         let skippedCount = 0;
-
-        console.log("🚀 Bắt đầu tiến trình cập nhật HTML hàng loạt...");
 
         try {
             do {
@@ -287,11 +303,13 @@
                         headers: { 'Authorization': `Bearer ` + accessToken }
                     });
                 } catch (fetchErr) {
+                    progressDiv.innerText = "⚠️ Mất kết nối mạng hoặc Token đã hết hạn!";
                     alert("⚠️ Mất kết nối mạng hoặc Token đã hết hạn! Vui lòng tải lại trang và Đăng nhập Google lại.");
                     break; 
                 }
 
                 if (response.status === 401) {
+                    progressDiv.innerText = "⚠️ Access Token đã hết hạn!";
                     alert("⚠️ Access Token đã hết hạn (sau 60 phút)! Vui lòng tải lại trang, bấm Đăng nhập lại để lấy Token mới rồi chạy tiếp.");
                     break;
                 }
@@ -301,7 +319,9 @@
 
                 for (const post of data.items) {
                     processedCount++;
-                    console.log(`Đang xử lý bài [${processedCount}]: ${post.title}`);
+                    
+                    // Cập nhật thông tin trực quan lên giao diện
+                    progressDiv.innerText = `⏳ Đang xử lý bài [${processedCount}]: "${post.title}"`;
 
                     document.getElementById('oldHtmlInput').value = post.content || "";
                     importOldHTML(); 
@@ -314,7 +334,6 @@
                         const newHtml = document.getElementById('outHtml').value.trim();
                         
                         try {
-                            // CHỈ CẬP NHẬT CONTENT - TIẾT KIỆM TOKEN VÀ GIỮ NGUYÊN URL GỐC
                             const updateResponse = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${post.id}`, {
                                 method: 'PATCH',
                                 headers: {
@@ -328,21 +347,19 @@
 
                             if(updateResponse.ok) {
                                 successCount++;
-                                console.log(`✅ Cập nhật HTML thành công cho bài: ${post.title}`);
                             } else if (updateResponse.status === 429) {
-                                console.warn(`⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`);
+                                progressDiv.innerText = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
                                 await delay(10000); 
                             } else {
-                                console.error(`❌ Lỗi API khi cập nhật: ${post.title} (Status: ${updateResponse.status})`);
+                                console.error(`❌ Lỗi API khi cập nhật: ${post.title}`);
                             }
                         } catch (patchErr) {
-                            console.error("Lỗi khi gửi bản cập nhật:", patchErr);
+                            progressDiv.innerText = `❌ Lỗi mạng khi cập nhật bài: "${post.title}"`;
                             alert(`Lỗi mạng (Failed to fetch) khi đang cập nhật bài: "${post.title}".`);
                             return; 
                         }
                     } else {
                         skippedCount++;
-                        console.warn(`⚠️ Bỏ qua bài không đủ điều kiện: ${post.title}`);
                     }
 
                     await delay(2500); // Nghỉ 2.5s giữa các request
@@ -352,10 +369,12 @@
 
             } while (pageToken);
 
+            progressDiv.innerText = `🎉 Hoàn tất! Đã duyệt: ${processedCount} bài | Cập nhật HTML thành công: ${successCount} bài | Bỏ qua: ${skippedCount} bài.`;
             alert(`🎉 Tiến trình đã hoàn tất!\n- Tổng đã duyệt: ${processedCount} bài.\n- Cập nhật HTML thành công: ${successCount} bài.\n- Bỏ qua: ${skippedCount} bài.`);
             
         } catch (error) {
             console.error("Lỗi tổng quát:", error);
+            progressDiv.innerText = `❌ Đã xảy ra lỗi trong quá trình quét!`;
             alert("Đã xảy ra lỗi không xác định trong quá trình quét!");
         }
     }
