@@ -56,6 +56,19 @@
             color: #1d6fa5;
             display: none;
         }
+        #bulkProgress ul {
+            margin: 8px 0 0 20px;
+            padding: 0;
+            max-height: 180px;
+            overflow-y: auto;
+            font-weight: normal;
+            font-size: 13px;
+            color: #c0392b;
+            background: #fff;
+            border: 1px solid #f5c6cb;
+            padding: 8px 8px 8px 25px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -272,7 +285,7 @@
         tokenClient.requestAccessToken({prompt: 'consent'});
     }
 
-    // --- HÀM TỰ ĐỘNG CẬP NHẬT HÀNG LOẠT CÓ HIỂN THỊ TIẾN ĐỘ ---
+    // --- HÀM TỰ ĐỘNG CẬP NHẬT HÀNG LOẠT (CÓ LƯU DANH SÁCH BỎ QUA) ---
     async function autoBulkRepublish() {
         const blogId = document.getElementById('blogId').value.trim();
         if (!blogId || !accessToken) {
@@ -285,12 +298,13 @@
 
         const progressDiv = document.getElementById('bulkProgress');
         progressDiv.style.display = 'block';
-        progressDiv.innerText = "⏳ Đang kết nối lấy danh sách bài viết...";
+        progressDiv.innerHTML = "⏳ Đang kết nối lấy danh sách bài viết...";
 
         let pageToken = '';
         let processedCount = 0;
         let successCount = 0;
         let skippedCount = 0;
+        let skippedPosts = []; // Mảng lưu tên bài viết bị bỏ qua
 
         try {
             do {
@@ -303,13 +317,13 @@
                         headers: { 'Authorization': `Bearer ` + accessToken }
                     });
                 } catch (fetchErr) {
-                    progressDiv.innerText = "⚠️ Mất kết nối mạng hoặc Token đã hết hạn!";
+                    progressDiv.innerHTML = "⚠️ Mất kết nối mạng hoặc Token đã hết hạn!";
                     alert("⚠️ Mất kết nối mạng hoặc Token đã hết hạn! Vui lòng tải lại trang và Đăng nhập Google lại.");
                     break; 
                 }
 
                 if (response.status === 401) {
-                    progressDiv.innerText = "⚠️ Access Token đã hết hạn!";
+                    progressDiv.innerHTML = "⚠️ Access Token đã hết hạn!";
                     alert("⚠️ Access Token đã hết hạn (sau 60 phút)! Vui lòng tải lại trang, bấm Đăng nhập lại để lấy Token mới rồi chạy tiếp.");
                     break;
                 }
@@ -320,8 +334,8 @@
                 for (const post of data.items) {
                     processedCount++;
                     
-                    // Cập nhật thông tin trực quan lên giao diện
-                    progressDiv.innerText = `⏳ Đang xử lý bài [${processedCount}]: "${post.title}"`;
+                    // Cập nhật tiến độ trực quan
+                    progressDiv.innerHTML = `⏳ Đang xử lý bài [${processedCount}]: "${post.title}"`;
 
                     document.getElementById('oldHtmlInput').value = post.content || "";
                     importOldHTML(); 
@@ -348,18 +362,19 @@
                             if(updateResponse.ok) {
                                 successCount++;
                             } else if (updateResponse.status === 429) {
-                                progressDiv.innerText = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
+                                progressDiv.innerHTML = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
                                 await delay(10000); 
                             } else {
                                 console.error(`❌ Lỗi API khi cập nhật: ${post.title}`);
                             }
                         } catch (patchErr) {
-                            progressDiv.innerText = `❌ Lỗi mạng khi cập nhật bài: "${post.title}"`;
+                            progressDiv.innerHTML = `❌ Lỗi mạng khi cập nhật bài: "${post.title}"`;
                             alert(`Lỗi mạng (Failed to fetch) khi đang cập nhật bài: "${post.title}".`);
                             return; 
                         }
                     } else {
                         skippedCount++;
+                        skippedPosts.push(post.title); // Lưu lại tên bài không đủ tiêu chuẩn
                     }
 
                     await delay(2500); // Nghỉ 2.5s giữa các request
@@ -369,12 +384,21 @@
 
             } while (pageToken);
 
-            progressDiv.innerText = `🎉 Hoàn tất! Đã duyệt: ${processedCount} bài | Cập nhật HTML thành công: ${successCount} bài | Bỏ qua: ${skippedCount} bài.`;
-            alert(`🎉 Tiến trình đã hoàn tất!\n- Tổng đã duyệt: ${processedCount} bài.\n- Cập nhật HTML thành công: ${successCount} bài.\n- Bỏ qua: ${skippedCount} bài.`);
+            // Tạo danh sách hiển thị HTML các bài bị bỏ qua
+            let skippedHtmlList = "";
+            if (skippedPosts.length > 0) {
+                skippedHtmlList = `<br><b>⚠️ Các bài viết không đủ tiêu chuẩn / bị bỏ qua (${skippedPosts.length}):</b><ul>`;
+                skippedPosts.forEach(title => {
+                    skippedHtmlList += `<li>${title}</li>`;
+                });
+                skippedHtmlList += `</ul>`;
+            }
+
+            progressDiv.innerHTML = `🎉 Hoàn tất!<br>- Tổng đã duyệt: ${processedCount} bài<br>- Cập nhật HTML thành công: ${successCount} bài<br>- Bỏ qua: ${skippedCount} bài.` + skippedHtmlList;
             
         } catch (error) {
             console.error("Lỗi tổng quát:", error);
-            progressDiv.innerText = `❌ Đã xảy ra lỗi trong quá trình quét!`;
+            progressDiv.innerHTML = `❌ Đã xảy ra lỗi trong quá trình quét!`;
             alert("Đã xảy ra lỗi không xác định trong quá trình quét!");
         }
     }
