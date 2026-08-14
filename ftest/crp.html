@@ -10,7 +10,7 @@
         body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; color: #333; }
         .container { display: flex; gap: 20px; max-width: 1400px; margin: auto; }
         .col { flex: 1; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-height: 95vh; overflow-y: auto; }
-        .col-full { width: 100%; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .col-full { width: 100%; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; box-sizing: border-box; }
         h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
         h3 { color: #34495e; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         .form-group { margin-bottom: 15px; }
@@ -88,6 +88,7 @@
             padding: 8px 10px;
             border-bottom: 1px solid #eee;
             text-align: left;
+            word-break: break-word;
         }
         .prog-table th {
             background: #f1f8fe;
@@ -165,19 +166,19 @@
                             </div>
                         </div>
 
-                        <!-- Bảng 2: Danh sách bài viết bị bỏ qua -->
+                        <!-- Bảng 2: Danh sách bài viết không hoàn thành / bị bỏ qua -->
                         <div class="progress-col-box">
-                            <div class="progress-table-title" style="color: #c0392b;">⚠️ Bảng bài viết bị bỏ qua (Không có ảnh chính)</div>
+                            <div class="progress-table-title" style="color: #c0392b;">⚠️ Bảng bài viết không hoàn thành / Bỏ qua</div>
                             <div class="progress-table-wrapper">
                                 <table class="prog-table">
                                     <thead>
                                         <tr>
                                             <th style="width: 40px;">STT</th>
-                                            <th>Tên bài viết bị bỏ qua</th>
+                                            <th>Tên bài viết & Nguyên nhân lỗi</th>
                                         </tr>
                                     </thead>
                                     <tbody id="skippedTableBody">
-                                        <!-- Dòng bài bị bỏ qua -->
+                                        <!-- Dòng bài bị bỏ qua kèm lý do -->
                                     </tbody>
                                 </table>
                             </div>
@@ -470,13 +471,11 @@
                     const statusCell = newRow.querySelector('td:last-child');
                     const postContent = post.content || "";
 
-                    // CÔNG CỤ NHẬN DIỆN MÃ NGUỒN TIÊU CHUẨN
                     const hasStandardTabs = postContent.includes('id="fTabs-1"') && 
                                            postContent.includes('id="fTabs-2"') && 
                                            postContent.includes('id="fTabs-3"');
 
                     if (hasStandardTabs) {
-                        // Đọc dữ liệu 4 số cuối của Ngày phát hành
                         const dateMatch = postContent.match(/<small>Ngày phát hành<\/small>\s*<span>(.*?)<\/span>/i);
                         let year = '';
                         if (dateMatch && dateMatch[1]) {
@@ -520,22 +519,38 @@
                                     statusCell.className = "status-success";
                                     statusCell.innerText = "Đã thêm nhãn năm ✅";
                                 } else {
+                                    skippedCount++;
+                                    skippedIndex++;
                                     statusCell.className = "status-skipped";
                                     statusCell.innerText = "Lỗi API ❌";
+
+                                    const skipRow = document.createElement('tr');
+                                    skipRow.innerHTML = `
+                                        <td>${skippedIndex}</td>
+                                        <td><b>${post.title || "(Không có tiêu đề)"}</b> <br><span style="color: #e74c3c; font-size: 11px;">Lý do: Lỗi API khi cập nhật nhãn chuẩn (Mã lỗi: ${updateResponse.status})</span></td>
+                                    `;
+                                    skippedTableBody.appendChild(skipRow);
                                 }
                             } else {
-                                // Đã đạt chuẩn và đã có nhãn năm sẵn
                                 successCount++;
                                 statusCell.className = "status-success";
                                 statusCell.innerText = "Đạt chuẩn (Đã có nhãn) ✓";
                             }
                         } catch (err) {
+                            skippedCount++;
+                            skippedIndex++;
                             statusCell.className = "status-skipped";
                             statusCell.innerText = "Lỗi mạng ❌";
+
+                            const skipRow = document.createElement('tr');
+                            skipRow.innerHTML = `
+                                <td>${skippedIndex}</td>
+                                <td><b>${post.title || "(Không có tiêu đề)"}</b> <br><span style="color: #e74c3c; font-size: 11px;">Lý do: Ngoại lệ kết nối mạng khi xử lý bài chuẩn</span></td>
+                            `;
+                            skippedTableBody.appendChild(skipRow);
                         }
 
                     } else {
-                        // VẬN HÀNH BÌNH THƯỜNG (Chưa đạt chuẩn): Xử lý lại HTML, giữ nguyên nhãn cũ + thêm nhãn năm
                         document.getElementById('oldHtmlInput').value = postContent;
                         importOldHTML(); 
 
@@ -545,11 +560,9 @@
                             generateCode();
                             const newHtml = document.getElementById('outHtml').value.trim();
                             
-                            // Lấy nhãn cũ từ bài viết trên Blogger
                             let currentLabels = post.labels || [];
                             let mergedLabels = [...currentLabels];
 
-                            // Trích xuất năm từ ngày phát hành (hoặc từ form)
                             const dateIssueVal = document.getElementById('dateIssue').value.trim();
                             const year = getYear(dateIssueVal);
                             if (year && /^\d{4}$/.test(year)) {
@@ -582,25 +595,41 @@
                                     statusCell.innerText = "Tạm nghỉ (429)";
                                     await delay(10000); 
                                 } else {
+                                    skippedCount++;
+                                    skippedIndex++;
                                     statusCell.className = "status-skipped";
                                     statusCell.innerText = "Lỗi API ❌";
+
+                                    const skipRow = document.createElement('tr');
+                                    skipRow.innerHTML = `
+                                        <td>${skippedIndex}</td>
+                                        <td><b>${post.title || "(Không có tiêu đề)"}</b> <br><span style="color: #e74c3c; font-size: 11px;">Lý do: Lỗi API khi gửi HTML chuẩn hóa (Mã lỗi: ${updateResponse.status})</span></td>
+                                    `;
+                                    skippedTableBody.appendChild(skipRow);
                                 }
                             } catch (patchErr) {
+                                skippedCount++;
+                                skippedIndex++;
                                 statusCell.className = "status-skipped";
                                 statusCell.innerText = "Lỗi mạng ❌";
-                                alert(`Lỗi mạng khi đang cập nhật bài: "${post.title}".`);
-                                return; 
+
+                                const skipRow = document.createElement('tr');
+                                skipRow.innerHTML = `
+                                    <td>${skippedIndex}</td>
+                                    <td><b>${post.title || "(Không có tiêu đề)"}</b> <br><span style="color: #e74c3c; font-size: 11px;">Lý do: Ngoại lệ kết nối mạng khi PATCH bài viết</span></td>
+                                `;
+                                skippedTableBody.appendChild(skipRow);
                             }
                         } else {
                             skippedCount++;
                             skippedIndex++;
                             statusCell.className = "status-skipped";
-                            statusCell.innerText = "Bỏ qua ⚠️";
+                            statusCell.innerText = "Không hoàn thành ⚠️";
 
                             const skipRow = document.createElement('tr');
                             skipRow.innerHTML = `
                                 <td>${skippedIndex}</td>
-                                <td>${post.title || "(Không có tiêu đề)"}</td>
+                                <td><b>${post.title || "(Không có tiêu đề)"}</b> <br><span style="color: #e74c3c; font-size: 11px;">Lý do: Không tìm thấy đường dẫn ảnh chính phù hợp trong mã nguồn cũ</span></td>
                             `;
                             skippedTableBody.appendChild(skipRow);
                             skipRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -618,8 +647,8 @@
 
             } while (pageToken);
 
-            summaryDiv.innerHTML = `🎉 Hoàn tất! Đã duyệt: <b>${processedCount}</b> bài | Xử lý/Cập nhật thành công: <span style="color:#27ae60"><b>${successCount}</b></span> bài | Bỏ qua: <span style="color:#c0392b"><b>${skippedCount}</b></span> bài.`;
-            alert(`🎉 Tiến trình đã hoàn tất!\n- Thành công: ${successCount} bài.\n- Bỏ qua: ${skippedCount} bài.`);
+            summaryDiv.innerHTML = `🎉 Hoàn tất! Đã duyệt: <b>${processedCount}</b> bài | Xử lý/Cập nhật thành công: <span style="color:#27ae60"><b>${successCount}</b></span> bài | Không hoàn thành/Bỏ qua: <span style="color:#c0392b"><b>${skippedCount}</b></span> bài.`;
+            alert(`🎉 Tiến trình đã hoàn tất!\n- Thành công: ${successCount} bài.\n- Không hoàn thành/Bỏ qua: ${skippedCount} bài.`);
             
         } catch (error) {
             console.error("Lỗi tổng quát:", error);
@@ -820,10 +849,10 @@
 
             let mainImgUrl = '';
             if (hasOriginalDim && topUrls.length >= 2) {
-                // Nếu có dòng data-original-height/width và có ít nhất 2 ảnh ở phần đầu -> lấy ảnh thứ 2 từ trên xuống
+                // Nếu có dòng kích thước và tồn tại từ 2 ảnh trở lên ở phần đầu -> lấy đường dẫn thứ 2 từ trên xuống
                 mainImgUrl = topUrls[1];
             } else if (topUrls.length > 0) {
-                // Ngược lại lấy ảnh đầu tiên từ trên xuống
+                // Ngược lại lấy đường dẫn đầu tiên từ trên xuống
                 mainImgUrl = topUrls[0];
             }
             document.getElementById('imgMain').value = mainImgUrl;
@@ -905,7 +934,6 @@
                 if(!parentA) return;
                 
                 const href = parentA.href;
-                // Bỏ qua ảnh chính đã dùng cho phần đầu bài viết
                 if (href === mainImgUrl) return;
                 if (processedLinks.has(href)) return;
                 processedLinks.add(href);
