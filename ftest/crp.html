@@ -45,30 +45,59 @@
         textarea.code-output { height: 350px; font-family: monospace; font-size: 13px; background: #272822; color: #f8f8f2; white-space: pre; }
         .api-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
         
-        /* Khung hiển thị tiến độ */
-        #bulkProgress {
-            margin-top: 12px;
-            padding: 12px;
+        /* Khung hiển thị tiến độ song song 2 bảng */
+        #bulkProgressContainer {
+            margin-top: 15px;
+            display: none;
+        }
+        #progressSummary {
+            font-weight: bold;
+            color: #1d6fa5;
+            margin-bottom: 10px;
+            padding: 8px 12px;
             background: #e8f4fd;
             border: 1px solid #bbe1fa;
             border-radius: 4px;
+        }
+        .progress-side-by-side {
+            display: flex;
+            gap: 15px;
+        }
+        .progress-col-box {
+            flex: 1;
+        }
+        .progress-table-title {
             font-weight: bold;
-            color: #1d6fa5;
-            display: none;
-        }
-        #bulkProgress ul {
-            margin: 8px 0 0 20px;
-            padding: 0;
-            max-height: 180px;
-            overflow-y: auto;
-            font-weight: normal;
+            margin-bottom: 6px;
             font-size: 13px;
-            color: #c0392b;
-            background: #fff;
-            border: 1px solid #f5c6cb;
-            padding: 8px 8px 8px 25px;
-            border-radius: 4px;
         }
+        .progress-table-wrapper {
+            max-height: 220px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #fff;
+        }
+        .prog-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .prog-table th, .prog-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+        .prog-table th {
+            background: #f1f8fe;
+            color: #2c3e50;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .status-running { color: #e67e22; font-weight: bold; }
+        .status-success { color: #27ae60; font-weight: bold; }
+        .status-skipped { color: #c0392b; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -106,8 +135,50 @@
                     <button class="btn btn-import" onclick="importOldHTML()">TỰ ĐỘNG TRÍCH XUẤT DỮ LIỆU TỪ Ô TRÊN</button>
                     <button class="btn btn-bulk" onclick="autoBulkRepublish()">🚀 QUÉT VÀ CẬP NHẬT HTML HÀNG LOẠT (TIẾT KIỆM TOKEN)</button>
                 </div>
-                <!-- Vùng hiển thị tiến độ chạy -->
-                <div id="bulkProgress">Đang chuẩn bị tiến trình...</div>
+                
+                <!-- Bảng và dòng hiển thị tiến độ song song -->
+                <div id="bulkProgressContainer">
+                    <div id="progressSummary">Đang chuẩn bị tiến trình...</div>
+                    <div class="progress-side-by-side">
+                        <!-- Bảng 1: Tiến độ toàn bộ bài quét -->
+                        <div class="progress-col-box">
+                            <div class="progress-table-title" style="color: #2980b9;">📊 Bảng tiến độ tổng quan</div>
+                            <div class="progress-table-wrapper">
+                                <table class="prog-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 40px;">STT</th>
+                                            <th>Tên bài viết</th>
+                                            <th style="width: 100px; text-align: center;">Trạng thái</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="progressTableBody">
+                                        <!-- Dòng tiến độ tổng -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Bảng 2: Danh sách bài viết bị bỏ qua -->
+                        <div class="progress-col-box">
+                            <div class="progress-table-title" style="color: #c0392b;">⚠️ Bảng bài viết bị bỏ qua (Chưa đủ tiêu chuẩn)</div>
+                            <div class="progress-table-wrapper">
+                                <table class="prog-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 40px;">STT</th>
+                                            <th>Tên bài viết bị bỏ qua</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="skippedTableBody">
+                                        <!-- Dòng bài bị bỏ qua -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </details>
     </div>
@@ -285,7 +356,7 @@
         tokenClient.requestAccessToken({prompt: 'consent'});
     }
 
-    // --- HÀM TỰ ĐỘNG CẬP NHẬT HÀNG LOẠT (CÓ LƯU DANH SÁCH BỎ QUA) ---
+    // --- HÀM TỰ ĐỘNG CẬP NHẬT HÀNG LOẠT (CÓ 2 BẢNG TIẾN ĐỘ SONG SONG) ---
     async function autoBulkRepublish() {
         const blogId = document.getElementById('blogId').value.trim();
         if (!blogId || !accessToken) {
@@ -296,15 +367,22 @@
         const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ và chỉ cập nhật lại mã HTML (Giữ nguyên tiêu đề và URL). Bạn có chắc chắn muốn chạy?");
         if(!confirmRun) return;
 
-        const progressDiv = document.getElementById('bulkProgress');
-        progressDiv.style.display = 'block';
-        progressDiv.innerHTML = "⏳ Đang kết nối lấy danh sách bài viết...";
+        // Hiện vùng chứa tiến độ và làm sạch bảng cũ
+        const container = document.getElementById('bulkProgressContainer');
+        const summaryDiv = document.getElementById('progressSummary');
+        const tableBody = document.getElementById('progressTableBody');
+        const skippedTableBody = document.getElementById('skippedTableBody');
+        
+        container.style.display = 'block';
+        summaryDiv.innerText = "⏳ Đang kết nối lấy danh sách bài viết từ Blogger...";
+        tableBody.innerHTML = "";
+        skippedTableBody.innerHTML = "";
 
         let pageToken = '';
         let processedCount = 0;
         let successCount = 0;
         let skippedCount = 0;
-        let skippedPosts = []; // Mảng lưu tên bài viết bị bỏ qua
+        let skippedIndex = 0;
 
         try {
             do {
@@ -317,13 +395,13 @@
                         headers: { 'Authorization': `Bearer ` + accessToken }
                     });
                 } catch (fetchErr) {
-                    progressDiv.innerHTML = "⚠️ Mất kết nối mạng hoặc Token đã hết hạn!";
+                    summaryDiv.innerText = "⚠️ Mất kết nối mạng hoặc Token đã hết hạn!";
                     alert("⚠️ Mất kết nối mạng hoặc Token đã hết hạn! Vui lòng tải lại trang và Đăng nhập Google lại.");
                     break; 
                 }
 
                 if (response.status === 401) {
-                    progressDiv.innerHTML = "⚠️ Access Token đã hết hạn!";
+                    summaryDiv.innerText = "⚠️ Access Token đã hết hạn!";
                     alert("⚠️ Access Token đã hết hạn (sau 60 phút)! Vui lòng tải lại trang, bấm Đăng nhập lại để lấy Token mới rồi chạy tiếp.");
                     break;
                 }
@@ -334,8 +412,19 @@
                 for (const post of data.items) {
                     processedCount++;
                     
-                    // Cập nhật tiến độ trực quan
-                    progressDiv.innerHTML = `⏳ Đang xử lý bài [${processedCount}]: "${post.title}"`;
+                    // Thêm dòng mới vào bảng tiến độ tổng
+                    const rowId = `prog-row-${processedCount}`;
+                    const newRow = document.createElement('tr');
+                    newRow.id = rowId;
+                    newRow.innerHTML = `
+                        <td>${processedCount}</td>
+                        <td>${post.title || "(Không có tiêu đề)"}</td>
+                        <td style="text-align: center;" class="status-running">Đang xử lý...</td>
+                    `;
+                    tableBody.appendChild(newRow);
+                    newRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                    summaryDiv.innerText = `⏳ Đang xử lý bài [${processedCount}]: "${post.title}"`;
 
                     document.getElementById('oldHtmlInput').value = post.content || "";
                     importOldHTML(); 
@@ -343,6 +432,8 @@
                     const imgMain = document.getElementById('imgMain').value.trim();
                     const qtyTem = parseInt(document.getElementById('qtyTem').value) || 0;
                     
+                    const statusCell = newRow.querySelector('td:last-child');
+
                     if (imgMain !== '' && temIndex >= qtyTem && qtyTem > 0) {
                         generateCode();
                         const newHtml = document.getElementById('outHtml').value.trim();
@@ -361,20 +452,39 @@
 
                             if(updateResponse.ok) {
                                 successCount++;
+                                statusCell.className = "status-success";
+                                statusCell.innerText = "Thành công ✅";
                             } else if (updateResponse.status === 429) {
-                                progressDiv.innerHTML = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
+                                summaryDiv.innerText = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
+                                statusCell.className = "status-running";
+                                statusCell.innerText = "Tạm nghỉ (429)";
                                 await delay(10000); 
                             } else {
+                                statusCell.className = "status-skipped";
+                                statusCell.innerText = "Lỗi API ❌";
                                 console.error(`❌ Lỗi API khi cập nhật: ${post.title}`);
                             }
                         } catch (patchErr) {
-                            progressDiv.innerHTML = `❌ Lỗi mạng khi cập nhật bài: "${post.title}"`;
+                            statusCell.className = "status-skipped";
+                            statusCell.innerText = "Lỗi mạng ❌";
+                            summaryDiv.innerText = `❌ Lỗi mạng khi cập nhật bài: "${post.title}"`;
                             alert(`Lỗi mạng (Failed to fetch) khi đang cập nhật bài: "${post.title}".`);
                             return; 
                         }
                     } else {
                         skippedCount++;
-                        skippedPosts.push(post.title); // Lưu lại tên bài không đủ tiêu chuẩn
+                        skippedIndex++;
+                        statusCell.className = "status-skipped";
+                        statusCell.innerText = "Bỏ qua ⚠️";
+
+                        // Tự động thêm vào bảng danh sách bài bị bỏ qua bên cạnh
+                        const skipRow = document.createElement('tr');
+                        skipRow.innerHTML = `
+                            <td>${skippedIndex}</td>
+                            <td>${post.title || "(Không có tiêu đề)"}</td>
+                        `;
+                        skippedTableBody.appendChild(skipRow);
+                        skipRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
 
                     await delay(2500); // Nghỉ 2.5s giữa các request
@@ -384,21 +494,12 @@
 
             } while (pageToken);
 
-            // Tạo danh sách hiển thị HTML các bài bị bỏ qua
-            let skippedHtmlList = "";
-            if (skippedPosts.length > 0) {
-                skippedHtmlList = `<br><b>⚠️ Các bài viết không đủ tiêu chuẩn / bị bỏ qua (${skippedPosts.length}):</b><ul>`;
-                skippedPosts.forEach(title => {
-                    skippedHtmlList += `<li>${title}</li>`;
-                });
-                skippedHtmlList += `</ul>`;
-            }
-
-            progressDiv.innerHTML = `🎉 Hoàn tất!<br>- Tổng đã duyệt: ${processedCount} bài<br>- Cập nhật HTML thành công: ${successCount} bài<br>- Bỏ qua: ${skippedCount} bài.` + skippedHtmlList;
+            summaryDiv.innerHTML = `🎉 Hoàn tất! Đã duyệt: <b>${processedCount}</b> bài | Cập nhật thành công: <span style="color:#27ae60"><b>${successCount}</b></span> bài | Bỏ qua: <span style="color:#c0392b"><b>${skippedCount}</b></span> bài.`;
+            alert(`🎉 Tiến trình đã hoàn tất!\n- Tổng đã duyệt: ${processedCount} bài.\n- Cập nhật HTML thành công: ${successCount} bài.\n- Bỏ qua: ${skippedCount} bài.`);
             
         } catch (error) {
             console.error("Lỗi tổng quát:", error);
-            progressDiv.innerHTML = `❌ Đã xảy ra lỗi trong quá trình quét!`;
+            summaryDiv.innerText = `❌ Đã xảy ra lỗi trong quá trình quét!`;
             alert("Đã xảy ra lỗi không xác định trong quá trình quét!");
         }
     }
