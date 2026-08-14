@@ -473,7 +473,6 @@
                     const imgMain = document.getElementById('imgMain').value.trim();
                     const statusCell = newRow.querySelector('td:last-child');
 
-                    // Điều kiện mới: Chỉ cần có imgMain khác rỗng là cho qua xử lý và cập nhật
                     if (imgMain !== '') {
                         generateCode();
                         const newHtml = document.getElementById('outHtml').value.trim();
@@ -719,9 +718,30 @@
         tempDiv.innerHTML = oldHtml;
 
         try {
-            const mainImgAnchor = tempDiv.querySelector('a[href] img[width="640"], a[href] img[height="480"]');
-            if (mainImgAnchor && mainImgAnchor.parentElement.tagName === 'A') {
-                document.getElementById('imgMain').value = mainImgAnchor.parentElement.href;
+            // ĐIỀU CHỈNH MỚI: Trích xuất ảnh chính theo 2 cấu trúc bạn cung cấp
+            const anchorImageAnchor = tempDiv.querySelector('a[imageanchor="1"]');
+            if (anchorImageAnchor) {
+                // Cấu trúc loại 2: Lấy ảnh vị trí thứ 1 (href của thẻ a có imageanchor="1")
+                document.getElementById('imgMain').value = anchorImageAnchor.href;
+            } else {
+                // Cấu trúc loại 1: Tìm ảnh placeholder có height="0" hoặc width="0"
+                const zeroImg = tempDiv.querySelector('img[height="0"], img[width="0"]');
+                if (zeroImg) {
+                    // Lấy thẻ a nằm ngay sau ảnh này (vị trí thứ 2)
+                    const allAs = Array.from(tempDiv.querySelectorAll('a[href]'));
+                    const targetA = allAs.find(a => zeroImg.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING);
+                    if (targetA) {
+                        document.getElementById('imgMain').value = targetA.href;
+                    } else if (allAs.length > 0) {
+                        document.getElementById('imgMain').value = allAs[0].href;
+                    }
+                } else {
+                    // Fallback tổng quát nếu cấu trúc khác
+                    const fallbackA = tempDiv.querySelector('a[href]');
+                    if (fallbackA) {
+                        document.getElementById('imgMain').value = fallbackA.href;
+                    }
+                }
             }
 
             const titleSpan = tempDiv.querySelector('span[style*="15pt"], span[style*="font-size: 15pt"]');
