@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Blogger Auto Post Date Updater v3</title>
+  <title>Blogger Auto Post Date Updater v4</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google GIS Library -->
@@ -18,10 +18,10 @@
     <!-- Header -->
     <header class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
       <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-        🚀 Blogger Auto Date Updater (Đã cố định API)
+        🚀 Blogger Auto Date Updater v4
       </h1>
       <p class="text-sm text-slate-500 mt-1">
-        Cập nhật thời gian đăng bài Blogger theo Label VN + Số thứ tự. Client ID và Blog ID đã được cố định theo cấu hình của bạn.
+        Cập nhật thời gian đăng bài Blogger theo Label VN + Số thứ tự. Đã cố định Client ID và Blog ID. Tự động dừng khi có lỗi.
       </p>
     </header>
 
@@ -55,12 +55,19 @@
 
       <!-- General Settings -->
       <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800 border-b pb-2">2. Cài đặt lọc</h2>
+        <h2 class="text-lg font-semibold text-slate-800 border-b pb-2">2. Cài đặt lọc &amp; Điểm bắt đầu</h2>
         
-        <div>
-          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Label chính</label>
-          <input type="text" id="targetLabel" value="VN" class="w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 font-semibold text-slate-700 cursor-not-allowed" readonly>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Label chính</label>
+            <input type="text" id="targetLabel" value="VN" class="w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 font-semibold text-slate-700 cursor-not-allowed" readonly>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Label số bắt đầu</label>
+            <input type="number" id="startLabelNum" placeholder="Ví dụ: 5" class="w-full px-3 py-2 border rounded-lg text-sm font-semibold text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
         </div>
+        <p class="text-[11px] text-slate-400">- Để trống "Label số bắt đầu" nếu muốn chạy từ đầu.<br>- Nhập số (ví dụ: 5, 12) để bỏ qua các số nhỏ hơn và chạy từ số đó.</p>
 
         <div>
           <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Thời gian nghỉ (Delay - ms)</label>
@@ -150,7 +157,6 @@
     let shouldStop = false;
 
     window.onload = () => {
-      // Đã loại bỏ code load localStorage cho clientID/blogID vì chúng đã được cố định
       updateSavedCount();
     };
 
@@ -365,7 +371,7 @@
         } else if (p.status === 'Đang xử lý...') {
           statusBadge = `<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs font-semibold animate-pulse">Đang xử lý...</span>`;
         } else if (p.status === 'Lỗi') {
-          statusBadge = `<span class="px-2 py-1 bg-red-100 text-red-800 rounded-md text-xs font-semibold">Lỗi</span>`;
+          statusBadge = `<span class="px-2 py-1 bg-red-100 text-red-800 rounded-md text-xs font-semibold">Lỗi (Đã dừng)</span>`;
         }
 
         const subInfo = p.totalInGroup > 1 
@@ -388,11 +394,24 @@
       const blogId = document.getElementById('blogId').value.trim();
       const token = document.getElementById('accessToken').value.trim();
       const delay = parseInt(document.getElementById('delayMs').value, 10) || 1000;
+      const startNumVal = document.getElementById('startLabelNum').value.trim();
+      const startNum = startNumVal !== '' ? parseInt(startNumVal, 10) : null;
 
-      const pendingPosts = flatPosts.filter(p => !p.isProcessed);
+      // Lọc các nhóm theo label số bắt đầu nếu người dùng có nhập
+      let activeGroups = groupedPosts;
+      if (startNum !== null && !isNaN(startNum)) {
+        activeGroups = groupedPosts.filter(g => g.num >= startNum);
+      }
+
+      const pendingPosts = [];
+      activeGroups.forEach(g => {
+        g.posts.forEach(p => {
+          if (!p.isProcessed) pendingPosts.push(p);
+        });
+      });
 
       if (pendingPosts.length === 0) {
-        return alert("Tất cả bài viết trong danh sách đều đã được xử lý!");
+        return alert("Không tìm thấy bài viết nào chưa xử lý phù hợp với Label số bắt đầu!");
       }
 
       isProcessing = true;
@@ -402,12 +421,12 @@
       document.getElementById('btnScan').disabled = true;
       document.getElementById('btnPause').disabled = false;
 
-      log("🚀 Bắt đầu tiến trình cập nhật ngày giờ bài đăng theo thứ tự nhóm Label...", "info");
+      log(`🚀 Bắt đầu tiến trình cập nhật ngày giờ bài đăng${startNum !== null ? ` (từ Label số ${startNum} trở đi)` : ''}...`, "info");
 
       let count = 0;
       const totalPending = pendingPosts.length;
 
-      for (let group of groupedPosts) {
+      for (let group of activeGroups) {
         if (shouldStop) break;
 
         const groupPending = group.posts.filter(p => !p.isProcessed);
@@ -416,10 +435,7 @@
         log(`📌 --- Đang xử lý nhóm Label [${group.formattedLabel}] (Tổng ${group.posts.length} bài) ---`, "warning");
 
         for (let post of group.posts) {
-          if (shouldStop) {
-            log("Tiến trình đã được tạm dừng bởi người dùng.", "warning");
-            break;
-          }
+          if (shouldStop) break;
 
           if (post.isProcessed) continue;
 
@@ -455,20 +471,24 @@
             saveProcessedPost(post.id, post.rawLabel);
             log(`✓ Thành công [${group.formattedLabel}] bài ${post.subIndex}/${post.totalInGroup} -> Đã đổi về ${realTimeISO}`, "success");
 
+            count++;
+            const percent = Math.round((count / totalPending) * 100);
+            document.getElementById('progressBar').style.width = `${percent}%`;
+            document.getElementById('progressPercent').innerText = `${percent}%`;
+            document.getElementById('progressText').innerText = `Đã xử lý ${count}/${totalPending} bài`;
+
           } catch (err) {
             post.status = 'Lỗi';
             log(`✗ Lỗi bài [${group.formattedLabel}]: ${err.message}`, "error");
+            log(`⛔ DỪNG TIẾN TRÌNH: Phát hiện lỗi tại bài "${post.title}". Đã dừng ngay lập tức để bảo vệ dữ liệu!`, "error");
+            shouldStop = true; // Dừng ngay lập tức khi xảy ra lỗi
           }
-
-          count++;
-          const percent = Math.round((count / totalPending) * 100);
-          document.getElementById('progressBar').style.width = `${percent}%`;
-          document.getElementById('progressPercent').innerText = `${percent}%`;
-          document.getElementById('progressText').innerText = `Đã xử lý ${count}/${totalPending} bài`;
 
           renderTable();
 
-          await new Promise(res => setTimeout(res, delay));
+          if (!shouldStop) {
+            await new Promise(res => setTimeout(res, delay));
+          }
         }
       }
 
@@ -479,6 +499,8 @@
 
       if (!shouldStop) {
         log("🎉 Hoàn tất toàn bộ tiến trình cập nhật tất cả các bài viết!", "success");
+      } else {
+        log("⚠️ Tiến trình đã dừng lại.", "warning");
       }
     }
 
