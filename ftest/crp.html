@@ -155,7 +155,7 @@
                                         <tr>
                                             <th style="width: 40px;">STT</th>
                                             <th>Tên bài viết</th>
-                                            <th style="width: 110px; text-align: center;">Trạng thái</th>
+                                            <th style="width: 130px; text-align: center;">Trạng thái</th>
                                         </tr>
                                     </thead>
                                     <tbody id="progressTableBody">
@@ -393,7 +393,7 @@
             return;
         }
 
-        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ và cập nhật lại mã HTML. Hệ thống sẽ tự động bỏ qua các bài đã xử lý từ các phiên trước. Bạn có muốn tiếp tục?");
+        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ. Các bài đạt chuẩn sẽ tự động bổ sung nhãn năm mà không sửa nội dung, các bài chưa đạt sẽ được xử lý lại HTML. Bạn có muốn tiếp tục?");
         if(!confirmRun) return;
 
         const container = document.getElementById('bulkProgressContainer');
@@ -467,75 +467,147 @@
 
                     summaryDiv.innerText = `⏳ Đang xử lý bài [${processedCount}]: "${post.title}"`;
 
-                    document.getElementById('oldHtmlInput').value = post.content || "";
-                    importOldHTML(); 
-
-                    const imgMain = document.getElementById('imgMain').value.trim();
                     const statusCell = newRow.querySelector('td:last-child');
+                    const postContent = post.content || "";
 
-                    if (imgMain !== '') {
-                        generateCode();
-                        const newHtml = document.getElementById('outHtml').value.trim();
-                        
+                    // CÔNG CỤ NHẬN DIỆN MÃ NGUỒN TIÊU CHUẨN
+                    const hasStandardTabs = postContent.includes('id="fTabs-1"') && 
+                                           postContent.includes('id="fTabs-2"') && 
+                                           postContent.includes('id="fTabs-3"');
+
+                    if (hasStandardTabs) {
+                        // Đọc dữ liệu 4 số cuối của Ngày phát hành
+                        const dateMatch = postContent.match(/<small>Ngày phát hành<\/small>\s*<span>(.*?)<\/span>/i);
+                        let year = '';
+                        if (dateMatch && dateMatch[1]) {
+                            const dateStr = dateMatch[1].trim();
+                            year = dateStr.slice(-4);
+                        }
+
+                        let currentLabels = post.labels || [];
+                        let updatedLabels = [...currentLabels];
+                        let labelAdded = false;
+
+                        if (year && /^\d{4}$/.test(year)) {
+                            const yearLabel = `year${year}`;
+                            if (!updatedLabels.includes(yearLabel)) {
+                                updatedLabels.push(yearLabel);
+                                labelAdded = true;
+                            }
+                        }
+
                         try {
-                            const updateResponse = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${post.id}`, {
-                                method: 'PATCH',
-                                headers: {
-                                    'Authorization': `Bearer ` + accessToken,
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    content: newHtml
-                                })
-                            });
+                            let updatePayload = {};
+                            let needApiCall = false;
 
-                            if(updateResponse.ok) {
+                            if (labelAdded) {
+                                updatePayload.labels = updatedLabels;
+                                needApiCall = true;
+                            }
+
+                            if (needApiCall) {
+                                const updateResponse = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${post.id}`, {
+                                    method: 'PATCH',
+                                    headers: {
+                                        'Authorization': `Bearer ` + accessToken,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify(updatePayload)
+                                });
+
+                                if (updateResponse.ok) {
+                                    successCount++;
+                                    statusCell.className = "status-success";
+                                    statusCell.innerText = "Đã thêm nhãn năm ✅";
+                                } else {
+                                    statusCell.className = "status-skipped";
+                                    statusCell.innerText = "Lỗi API ❌";
+                                }
+                            } else {
+                                // Đã đạt chuẩn và đã có nhãn năm sẵn
                                 successCount++;
                                 statusCell.className = "status-success";
-                                statusCell.innerText = "Thành công ✅";
-                            } else if (updateResponse.status === 429) {
-                                summaryDiv.innerText = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
-                                statusCell.className = "status-running";
-                                statusCell.innerText = "Tạm nghỉ (429)";
-                                await delay(10000); 
-                            } else {
-                                statusCell.className = "status-skipped";
-                                statusCell.innerText = "Lỗi API ❌";
+                                statusCell.innerText = "Đạt chuẩn (Đã có nhãn) ✓";
                             }
-                        } catch (patchErr) {
+                        } catch (err) {
                             statusCell.className = "status-skipped";
                             statusCell.innerText = "Lỗi mạng ❌";
-                            alert(`Lỗi mạng khi đang cập nhật bài: "${post.title}".`);
-                            return; 
                         }
-                    } else {
-                        skippedCount++;
-                        skippedIndex++;
-                        statusCell.className = "status-skipped";
-                        statusCell.innerText = "Bỏ qua ⚠️";
 
-                        const skipRow = document.createElement('tr');
-                        skipRow.innerHTML = `
-                            <td>${skippedIndex}</td>
-                            <td>${post.title || "(Không có tiêu đề)"}</td>
-                        `;
-                        skippedTableBody.appendChild(skipRow);
-                        skipRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } else {
+                        // VẬN HÀNH BÌNH THƯỜNG (Chưa đạt chuẩn)
+                        document.getElementById('oldHtmlInput').value = postContent;
+                        importOldHTML(); 
+
+                        const imgMain = document.getElementById('imgMain').value.trim();
+
+                        if (imgMain !== '') {
+                            generateCode();
+                            const newHtml = document.getElementById('outHtml').value.trim();
+                            const newLabelsStr = document.getElementById('outLabel').value.trim();
+                            const labelsArr = newLabelsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+                            try {
+                                const updateResponse = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${post.id}`, {
+                                    method: 'PATCH',
+                                    headers: {
+                                        'Authorization': `Bearer ` + accessToken,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        content: newHtml,
+                                        labels: labelsArr
+                                    })
+                                });
+
+                                if(updateResponse.ok) {
+                                    successCount++;
+                                    statusCell.className = "status-success";
+                                    statusCell.innerText = "Thành công ✅";
+                                } else if (updateResponse.status === 429) {
+                                    summaryDiv.innerText = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
+                                    statusCell.className = "status-running";
+                                    statusCell.innerText = "Tạm nghỉ (429)";
+                                    await delay(10000); 
+                                } else {
+                                    statusCell.className = "status-skipped";
+                                    statusCell.innerText = "Lỗi API ❌";
+                                }
+                            } catch (patchErr) {
+                                statusCell.className = "status-skipped";
+                                statusCell.innerText = "Lỗi mạng ❌";
+                                alert(`Lỗi mạng khi đang cập nhật bài: "${post.title}".`);
+                                return; 
+                            }
+                        } else {
+                            skippedCount++;
+                            skippedIndex++;
+                            statusCell.className = "status-skipped";
+                            statusCell.innerText = "Bỏ qua ⚠️";
+
+                            const skipRow = document.createElement('tr');
+                            skipRow.innerHTML = `
+                                <td>${skippedIndex}</td>
+                                <td>${post.title || "(Không có tiêu đề)"}</td>
+                            `;
+                            skippedTableBody.appendChild(skipRow);
+                            skipRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
                     }
 
                     processedSet.add(post.id);
                     localStorage.setItem('blogger_processed_ids', JSON.stringify([...processedSet]));
                     updateCacheStatusInfo();
 
-                    await delay(2500); 
+                    await delay(2000); 
                 }
 
                 pageToken = data.nextPageToken;
 
             } while (pageToken);
 
-            summaryDiv.innerHTML = `🎉 Hoàn tất! Đã duyệt: <b>${processedCount}</b> bài | Cập nhật thành công: <span style="color:#27ae60"><b>${successCount}</b></span> bài | Bỏ qua: <span style="color:#c0392b"><b>${skippedCount}</b></span> bài.`;
-            alert(`🎉 Tiến trình đã hoàn tất!\n- Cập nhật thành công: ${successCount} bài.\n- Bỏ qua: ${skippedCount} bài.`);
+            summaryDiv.innerHTML = `🎉 Hoàn tất! Đã duyệt: <b>${processedCount}</b> bài | Xử lý/Cập nhật thành công: <span style="color:#27ae60"><b>${successCount}</b></span> bài | Bỏ qua: <span style="color:#c0392b"><b>${skippedCount}</b></span> bài.`;
+            alert(`🎉 Tiến trình đã hoàn tất!\n- Thành công: ${successCount} bài.\n- Bỏ qua: ${skippedCount} bài.`);
             
         } catch (error) {
             console.error("Lỗi tổng quát:", error);
@@ -718,16 +790,12 @@
         tempDiv.innerHTML = oldHtml;
 
         try {
-            // ĐIỀU CHỈNH MỚI: Trích xuất ảnh chính theo 2 cấu trúc bạn cung cấp
             const anchorImageAnchor = tempDiv.querySelector('a[imageanchor="1"]');
             if (anchorImageAnchor) {
-                // Cấu trúc loại 2: Lấy ảnh vị trí thứ 1 (href của thẻ a có imageanchor="1")
                 document.getElementById('imgMain').value = anchorImageAnchor.href;
             } else {
-                // Cấu trúc loại 1: Tìm ảnh placeholder có height="0" hoặc width="0"
                 const zeroImg = tempDiv.querySelector('img[height="0"], img[width="0"]');
                 if (zeroImg) {
-                    // Lấy thẻ a nằm ngay sau ảnh này (vị trí thứ 2)
                     const allAs = Array.from(tempDiv.querySelectorAll('a[href]'));
                     const targetA = allAs.find(a => zeroImg.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING);
                     if (targetA) {
@@ -736,7 +804,6 @@
                         document.getElementById('imgMain').value = allAs[0].href;
                     }
                 } else {
-                    // Fallback tổng quát nếu cấu trúc khác
                     const fallbackA = tempDiv.querySelector('a[href]');
                     if (fallbackA) {
                         document.getElementById('imgMain').value = fallbackA.href;
@@ -868,7 +935,12 @@
         document.getElementById('outTitle').value = name;
 
         const year = getYear(dateIssue);
-        let labelVal = `${code}, ${countryCode}, stamp, year${year}`;
+        
+        let labelVal = `${code}, ${countryCode}, stamp`;
+        if (year) {
+            labelVal += `, year${year}`;
+        }
+        
         if (postStatus === 'private') {
             labelVal += ', nopub';
         }
