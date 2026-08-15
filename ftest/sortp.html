@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Blogger Auto Post Date Updater v5</title>
+  <title>Blogger Auto Post Date Updater v6</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google GIS Library -->
@@ -18,10 +18,10 @@
     <!-- Header -->
     <header class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
       <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-        🚀 Blogger Auto Date Updater v5
+        🚀 Blogger Auto Date Updater v6
       </h1>
       <p class="text-sm text-slate-500 mt-1">
-        Cập nhật thời gian đăng bài Blogger theo Label VN + Số thứ tự. Đã cố định Client ID và Blog ID. Tự động tiếp tục từ Label hoàn tất lớn nhất và dừng ngay khi có lỗi.
+        Cập nhật thời gian đăng bài Blogger theo Label tự chọn + Số thứ tự. Tuỳ chỉnh ngày đăng, giờ đăng luôn lấy theo giờ hiện tại GMT+7. Tự động tiếp tục từ Label hoàn tất lớn nhất và dừng ngay khi có lỗi.
       </p>
     </header>
 
@@ -55,30 +55,36 @@
 
       <!-- General Settings -->
       <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800 border-b pb-2">2. Cài đặt lọc &amp; Điểm bắt đầu</h2>
+        <h2 class="text-lg font-semibold text-slate-800 border-b pb-2">2. Cài đặt Quét &amp; Ngày giờ</h2>
         
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Label chính</label>
-            <input type="text" id="targetLabel" value="VN" class="w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 font-semibold text-slate-700 cursor-not-allowed" readonly>
+            <input type="text" id="targetLabel" value="VN" placeholder="Nhập Label chính (VD: VN)" class="w-full px-3 py-2 border rounded-lg text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none">
           </div>
           <div>
-            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Label số bắt đầu</label>
-            <input type="number" id="startLabelNum" placeholder="Tự động điền khi quét" class="w-full px-3 py-2 border rounded-lg text-sm font-semibold text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none">
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1" title="Để trống sẽ dùng ngày hôm nay">Ngày đổi (Trống = Hôm nay)</label>
+            <input type="date" id="targetDate" class="w-full px-3 py-2 border rounded-lg text-sm font-semibold text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none">
           </div>
         </div>
-        <p class="text-[11px] text-slate-400">
-          - Hệ thống sẽ <b>tự động bỏ qua các Label số nhỏ hơn hoặc bằng</b> Label lớn nhất đã hoàn tất trước đó.<br>
-          - Bạn cũng có thể tự nhập số thủ công nếu muốn chỉ định Label bắt đầu.
-        </p>
-
-        <div>
-          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Thời gian nghỉ (Delay - ms)</label>
-          <input type="number" id="delayMs" value="1000" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-          <span class="text-[11px] text-slate-400">Thời gian nghỉ giữa các bài viết</span>
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Label số bắt đầu</label>
+            <input type="number" id="startLabelNum" placeholder="Tự động" class="w-full px-3 py-2 border rounded-lg text-sm font-semibold text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Thời gian nghỉ (ms)</label>
+            <input type="number" id="delayMs" value="1000" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
         </div>
 
-        <div>
+        <p class="text-[11px] text-slate-500 leading-relaxed">
+          - <b>Giờ đăng:</b> Luôn lấy theo giờ hiện tại (múi giờ GMT+7).<br>
+          - Hệ thống <b>tự động bỏ qua các Label số ≤</b> Label lớn nhất đã hoàn tất trước đó.
+        </p>
+
+        <div class="pt-2 border-t border-slate-100">
           <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Lịch sử tiến trình</label>
           <div class="flex items-center justify-between">
             <span id="savedCount" class="text-sm font-bold text-emerald-600">0 bài / 0 label xong</span>
@@ -178,10 +184,16 @@
       consoleEl.scrollTop = consoleEl.scrollHeight;
     }
 
-    function getSavedData() {
+    // Storage keys based on blogId + targetLabel to avoid collision
+    function getStorageKey(type) {
       const blogId = document.getElementById('blogId').value.trim();
-      const posts = JSON.parse(localStorage.getItem(`processed_posts_${blogId}`) || '[]');
-      const labels = JSON.parse(localStorage.getItem(`processed_labels_${blogId}`) || '[]');
+      const targetLabel = document.getElementById('targetLabel').value.trim() || 'VN';
+      return `processed_${type}_${blogId}_${targetLabel}`;
+    }
+
+    function getSavedData() {
+      const posts = JSON.parse(localStorage.getItem(getStorageKey('posts')) || '[]');
+      const labels = JSON.parse(localStorage.getItem(getStorageKey('labels')) || '[]');
       return { posts, labels };
     }
 
@@ -199,12 +211,11 @@
     }
 
     function saveProcessedPost(postId, rawLabel) {
-      const blogId = document.getElementById('blogId').value.trim();
       const data = getSavedData();
       
       if (!data.posts.includes(postId)) {
         data.posts.push(postId);
-        localStorage.setItem(`processed_posts_${blogId}`, JSON.stringify(data.posts));
+        localStorage.setItem(getStorageKey('posts'), JSON.stringify(data.posts));
       }
       
       const labelGroup = groupedPosts.find(g => g.rawLabel === rawLabel);
@@ -212,7 +223,7 @@
         const allDone = labelGroup.posts.every(p => data.posts.includes(p.id) || p.isProcessed);
         if (allDone && !data.labels.includes(rawLabel)) {
           data.labels.push(rawLabel);
-          localStorage.setItem(`processed_labels_${blogId}`, JSON.stringify(data.labels));
+          localStorage.setItem(getStorageKey('labels'), JSON.stringify(data.labels));
           log(`🎉 Đã hoàn thành toàn bộ bài viết của Label số [${rawLabel}]!`, "success");
         }
       }
@@ -222,14 +233,14 @@
 
     function updateSavedCount() {
       const data = getSavedData();
-      document.getElementById('savedCount').innerText = `${data.posts.length} bài / ${data.labels.length} label xong`;
+      const labelValue = document.getElementById('targetLabel').value.trim() || 'VN';
+      document.getElementById('savedCount').innerText = `${data.posts.length} bài / ${data.labels.length} label xong (Nhóm: ${labelValue})`;
     }
 
     function clearHistory() {
-      const blogId = document.getElementById('blogId').value.trim();
-      if (confirm("Bạn có chắc muốn xóa lịch sử bài đã chuyển ngày cho Blog này?")) {
-        localStorage.removeItem(`processed_posts_${blogId}`);
-        localStorage.removeItem(`processed_labels_${blogId}`);
+      if (confirm("Bạn có chắc muốn xóa lịch sử đã lưu cho Blog và Label hiện tại?")) {
+        localStorage.removeItem(getStorageKey('posts'));
+        localStorage.removeItem(getStorageKey('labels'));
         document.getElementById('startLabelNum').value = '';
         updateSavedCount();
         log("Đã xóa lịch sử trong LocalStorage.", "warning");
@@ -277,12 +288,17 @@
     async function scanPosts() {
       const blogId = document.getElementById('blogId').value.trim();
       const token = document.getElementById('accessToken').value.trim();
+      const targetLabel = document.getElementById('targetLabel').value.trim();
       
       if (!token) {
         return alert("Vui lòng bấm Đăng nhập Google OAuth để lấy Access Token!");
       }
+      if (!targetLabel) {
+        return alert("Vui lòng nhập Label chính!");
+      }
 
-      log("Đang tải danh sách bài viết từ Blogger...", "info");
+      updateSavedCount(); // Cập nhật lại UI số đếm theo Label vừa nhập
+      log(`Đang tải danh sách bài viết từ Blogger (Lọc theo Label: ${targetLabel})...`, "info");
       
       const rawPosts = [];
       let pageToken = null;
@@ -290,7 +306,7 @@
 
       try {
         do {
-          let url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?labels=VN&maxResults=500`;
+          let url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?labels=${encodeURIComponent(targetLabel)}&maxResults=500`;
           if (pageToken) url += `&pageToken=${pageToken}`;
 
           const res = await fetch(url, {
@@ -359,6 +375,8 @@
           const nextStartNum = maxCompleted + 1;
           startInput.value = nextStartNum;
           log(`💡 Phát hiện Label số hoàn tất lớn nhất là [${maxCompleted}]. Tự động bỏ qua các Label ≤ ${maxCompleted} và đặt điểm bắt đầu tiếp theo là Label [${nextStartNum}].`, "warning");
+        } else {
+          startInput.value = ''; // Reset nếu chưa có lịch sử
         }
 
         renderTable();
@@ -429,6 +447,39 @@
       });
     }
 
+    // Hàm tạo chuỗi thời gian định dạng ISO 8601 theo chuẩn GMT+7
+    function getPublishTimeISO(dateInput) {
+      // Lấy thời điểm hiện tại của hệ thống (UTC)
+      const now = new Date();
+      const utcTimestamp = now.getTime() + (now.getTimezoneOffset() * 60000);
+      
+      // Tính toán thời gian ở múi giờ GMT+7
+      const gmt7 = new Date(utcTimestamp + (3600000 * 7));
+      
+      let year = gmt7.getFullYear();
+      let month = gmt7.getMonth() + 1; // getMonth trả về 0-11
+      let day = gmt7.getDate();
+      const hours = gmt7.getHours();
+      const minutes = gmt7.getMinutes();
+      const seconds = gmt7.getSeconds();
+      const ms = gmt7.getMilliseconds();
+
+      // Nếu người dùng chọn ngày từ Input (YYYY-MM-DD), thay thế ngày tháng năm
+      if (dateInput) {
+        const parts = dateInput.split('-');
+        if (parts.length === 3) {
+          year = parseInt(parts[0], 10);
+          month = parseInt(parts[1], 10);
+          day = parseInt(parts[2], 10);
+        }
+      }
+
+      const pad = (n, width = 2) => String(n).padStart(width, '0');
+      
+      // Chuẩn ISO 8601 Blogger chấp nhận kèm offset GMT+7: YYYY-MM-DDTHH:mm:ss.sss+07:00
+      return `${year}-${pad(month)}-${pad(day)}T${pad(hours)}:${pad(minutes)}:${pad(seconds)}.${pad(ms, 3)}+07:00`;
+    }
+
     async function startUpdate() {
       const blogId = document.getElementById('blogId').value.trim();
       const token = document.getElementById('accessToken').value.trim();
@@ -436,6 +487,8 @@
       
       const startNumVal = document.getElementById('startLabelNum').value.trim();
       const startNum = startNumVal !== '' ? parseInt(startNumVal, 10) : null;
+      
+      const targetDateVal = document.getElementById('targetDate').value;
 
       // Lọc các nhóm theo label số bắt đầu
       let activeGroups = groupedPosts;
@@ -461,7 +514,8 @@
       document.getElementById('btnScan').disabled = true;
       document.getElementById('btnPause').disabled = false;
 
-      log(`🚀 Bắt đầu tiến trình cập nhật ngày giờ bài đăng${startNum !== null ? ` (Bỏ qua các Label số < ${startNum}, bắt đầu từ ${startNum})` : ''}...`, "info");
+      const timeMsg = targetDateVal ? `Ngày chọn: ${targetDateVal}` : `Ngày hiện tại`;
+      log(`🚀 Bắt đầu tiến trình cập nhật (${timeMsg}, Giờ: GMT+7)${startNum !== null ? ` | Bỏ qua Label < ${startNum}` : ''}...`, "info");
 
       let count = 0;
       const totalPending = pendingPosts.length;
@@ -482,7 +536,8 @@
           post.status = 'Đang xử lý...';
           renderTable();
 
-          const realTimeISO = new Date().toISOString();
+          // Lấy Date ISO với Giờ GMT+7 và Ngày tuỳ chọn
+          const realTimeISO = getPublishTimeISO(targetDateVal);
 
           try {
             log(`Đang chuyển ngày bài [${group.formattedLabel}] (${post.subIndex}/${post.totalInGroup}) - "${post.title}"...`);
