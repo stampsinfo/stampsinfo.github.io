@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Blogger Auto Post Date Updater v7</title>
+  <title>Blogger Auto Post Date Updater v8</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google GIS Library -->
@@ -18,10 +18,10 @@
     <!-- Header -->
     <header class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
       <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-        🚀 Blogger Auto Date Updater v7 (Auto Time Loop)
+        🚀 Blogger Auto Date Updater v8 (Sync History Support)
       </h1>
       <p class="text-sm text-slate-500 mt-1">
-        Cập nhật thời gian đăng bài tự động tăng dần mỗi bài 1 phút từ 00:00 đến 23:59 (tự động sang ngày kế tiếp nếu hết ngày). Lưu tiến trình chi tiết theo Label, Ngày và Giờ:Phút.
+        Cập nhật thời gian đăng bài tự động tăng dần mỗi bài 1 phút từ 00:00 đến 23:59. Hỗ trợ xuất/nhập lịch sử tiến trình để đồng bộ qua thiết bị khác.
       </p>
     </header>
 
@@ -81,14 +81,24 @@
 
         <p class="text-[11px] text-slate-500 leading-relaxed">
           - <b>Thời gian:</b> Tự động phân bổ cách nhau 1 phút từ 00:00 đến 23:59.<br>
-          - <b>Lưu trữ:</b> Lưu theo Label, Ngày và Giờ:Phút để chạy tiếp ở phiên sau.
+          - <b>Đồng bộ:</b> Có thể xuất/nhập file lịch sử để chạy tiếp trên thiết bị khác.
         </p>
 
-        <div class="pt-2 border-t border-slate-100">
-          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Lịch sử tiến trình</label>
+        <div class="pt-2 border-t border-slate-100 space-y-2">
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Lịch sử tiến trình &amp; Đồng bộ</label>
           <div class="flex items-center justify-between">
             <span id="savedCount" class="text-sm font-bold text-emerald-600">0 bài / 0 label xong</span>
             <button onclick="clearHistory()" class="text-xs text-red-600 hover:underline">Xóa bộ nhớ</button>
+          </div>
+          <!-- Import / Export Buttons -->
+          <div class="flex gap-2 pt-1">
+            <button onclick="exportHistory()" class="flex-1 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-medium transition" title="Xuất lịch sử ra file JSON để sang thiết bị khác">
+              📤 Xuất lịch sử
+            </button>
+            <button onclick="document.getElementById('importFile').click()" class="flex-1 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-medium transition" title="Nhập lịch sử từ file JSON">
+              📥 Nhập lịch sử
+            </button>
+            <input type="file" id="importFile" accept=".json" class="hidden" onchange="importHistory(event)">
           </div>
         </div>
       </div>
@@ -263,6 +273,88 @@
         updateSavedCount();
         log("Đã xóa toàn bộ lịch sử và bộ nhớ tiến trình.", "warning");
       }
+    }
+
+    // XUẤT LỊCH SỬ RA FILE JSON
+    function exportHistory() {
+      const blogId = document.getElementById('blogId').value.trim();
+      const targetLabel = document.getElementById('targetLabel').value.trim() || 'VN';
+      
+      const dataPosts = JSON.parse(localStorage.getItem(getStorageKey('posts')) || '[]');
+      const dataLabels = JSON.parse(localStorage.getItem(getStorageKey('labels')) || '[]');
+      const detailedProgress = getDetailedProgress();
+
+      const exportObj = {
+        blogId: blogId,
+        targetLabel: targetLabel,
+        posts: dataPosts,
+        labels: dataLabels,
+        detailed: detailedProgress,
+        exportDate: new Date().toISOString()
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `blogger_history_${blogId}_${targetLabel}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      log("📤 Đã xuất file lịch sử thành công!", "success");
+    }
+
+    // NHẬP LỊCH SỬ TỪ FILE JSON
+    function importHistory(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importData = JSON.parse(e.target.result);
+          if (!importData.blogId || !importData.targetLabel) {
+            throw new Error("Cấu trúc file JSON không hợp lệ!");
+          }
+
+          const currentBlogId = document.getElementById('blogId').value.trim();
+          const currentTargetLabel = document.getElementById('targetLabel').value.trim() || 'VN';
+
+          if (importData.blogId !== currentBlogId || importData.targetLabel !== currentTargetLabel) {
+            const confirmMsg = `File này chứa dữ liệu cho Blog ID: ${importData.blogId} và Label: ${importData.targetLabel}, nhưng cấu hình hiện tại là Blog ID: ${currentBlogId} và Label: ${currentTargetLabel}. Bạn vẫn muốn ghi đè chứ?`;
+            if (!confirm(confirmMsg)) {
+              event.target.value = '';
+              return;
+            }
+          }
+
+          // Lưu vào localStorage tương ứng với cấu hình hiện tại
+          localStorage.setItem(getStorageKey('posts'), JSON.stringify(importData.posts || []));
+          localStorage.setItem(getStorageKey('labels'), JSON.stringify(importData.labels || []));
+          
+          if (importData.detailed) {
+            const detailedKey = `auto_schedule_detailed_${currentBlogId}_${currentTargetLabel}`;
+            localStorage.setItem(detailedKey, JSON.stringify(importData.detailed));
+          }
+
+          updateSavedCount();
+          
+          // Tự động cập nhật lại ô Label số bắt đầu nếu có dữ liệu mới
+          const maxCompleted = getMaxCompletedLabelNum();
+          if (maxCompleted !== null) {
+            document.getElementById('startLabelNum').value = maxCompleted + 1;
+          }
+
+          log("📥 Nhập lịch sử thành công! Hãy bấm 'Quét bài viết' để đồng bộ lại giao diện bảng.", "success");
+          alert("Nhập lịch sử thành công!");
+
+        } catch (err) {
+          alert("Lỗi đọc file lịch sử: " + err.message);
+          log("Lỗi khi nhập lịch sử: " + err.message, "error");
+        }
+        event.target.value = ''; // Reset file input
+      };
+      reader.readAsText(file);
     }
 
     // Google OAuth 2.0 Auth Flow
@@ -518,9 +610,8 @@
       document.getElementById('btnScan').disabled = true;
       document.getElementById('btnPause').disabled = false;
 
-      // XÁC ĐỊNH MỐC THỜI GIAN BẮT ĐẦU (Hoặc khôi phục từ tiến trình đã lưu gần nhất)
       let currentDate = targetDateVal;
-      let currentTime = "00:00"; // Mặc định bắt đầu từ 00:00 của ngày được chọn
+      let currentTime = "00:00";
 
       let savedProgress = getDetailedProgress();
       if (savedProgress && savedProgress.label === targetLabel) {
@@ -553,7 +644,6 @@
           post.status = 'Đang xử lý...';
           renderTable();
 
-          // Chuẩn hóa định dạng thời gian ISO 8601 theo ngày và giờ tính toán hiện tại
           const realTimeISO = `${currentDate}T${currentTime}:00.000+07:00`;
 
           try {
@@ -577,7 +667,6 @@
             post.status = 'Thành công';
             post.published = realTimeISO;
             
-            // Lưu trạng thái hoàn thành bài viết & lưu tiến trình chi tiết (Label, Ngày, Giờ:Phút)
             saveProcessedPost(post.id, post.rawLabel);
             saveDetailedProgress(targetLabel, currentDate, currentTime);
 
@@ -599,10 +688,8 @@
           renderTable();
 
           if (!shouldStop) {
-            // Chờ khoảng thời gian nghỉ giữa 2 bài viết (1 giây hoặc giá trị cấu hình)
             await new Promise(res => setTimeout(res, delay));
 
-            // Tự động tăng thời gian lên 1 phút cho bài tiếp theo
             let timeObj = addOneMinute(currentTime);
             currentTime = timeObj.time;
             if (timeObj.nextDay) {
