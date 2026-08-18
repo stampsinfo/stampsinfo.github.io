@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công Cụ Tạo Bài Viết Tem Blogger - Kèm API Trực Tiếp - V6</title>
+    <title>Công Cụ Tạo Bài Viết Tem Blogger - Kèm API Trực Tiếp - V6.1</title>
     <!-- Google Identity Services cho API v3 -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
@@ -88,7 +88,8 @@
 
     <!-- TOOL CHUYỂN ĐỔI BÀI CŨ -->
     <div class="col-full">
-        <details style="cursor: pointer;" open>
+        <!-- Đã bỏ thuộc tính "open" để thẻ details luôn đóng khi tải trang -->
+        <details style="cursor: pointer;">
             <summary style="font-size: 1.2em; font-weight: bold; color: #2c3e50; outline: none; padding-bottom: 10px; border-bottom: 2px solid #3498db;">
                 <h2 style="display: inline; border: none; padding: 0;">🔄 Nhập Bài Viết Cũ (Tự động điền thông tin) - Bấm để đóng/mở</h2>
             </summary>
@@ -161,7 +162,7 @@
 <div class="container">
     <!-- CỘT NHẬP DỮ LIỆU -->
     <div class="col">
-        <h2>Nhập Thông Tin Bộ Tem</h2>
+        <h2>Nhập Thông Điệp / Cấu Hình Tem</h2>
         
         <div class="form-group">
             <label>Đường dẫn hình ảnh chính <span class="req">(*)</span></label>
@@ -280,7 +281,9 @@
         <div id="listDiban" class="dynamic-list"></div>
 
         <button class="btn btn-generate" onclick="generateCode()">TẠO MÃ BÀI VIẾT</button>
-        <button class="btn btn-publish" onclick="publishToBlogger()">🚀 ĐĂNG BÀI MỚI TRỰC TIẾP</button>
+        <button class="btn btn-publish" onclick="publishToBlogger()">🚀 ĐĂNG / CẬP NHẬT BÀI VIẾT LÊN BLOGGER</button>
+        <!-- Nút xoá toàn bộ dữ liệu form -->
+        <button class="btn btn-danger" style="width: 100%; font-size: 16px; margin-top: 15px; padding: 12px;" onclick="resetAll()">🧹 XOÁ TOÀN BỘ NỘI DUNG FORM</button>
     </div>
 
     <!-- CỘT KẾT QUẢ -->
@@ -335,6 +338,13 @@
             localStorage.removeItem('blogger_processed_ids');
             updateCacheStatusInfo();
             alert("Đã xóa bộ nhớ đệm thành công!");
+        }
+    }
+
+    function resetAll() {
+        if(confirm("Bạn có chắc chắn muốn xóa toàn bộ nội dung đang nhập không?")) {
+            document.getElementById('oldHtmlInput').value = '';
+            resetFormFields();
         }
     }
 
@@ -426,7 +436,7 @@
             return;
         }
 
-        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ. Các bài đạt chuẩn sẽ tự động bổ sung nhãn năm mà không sửa nội dung, các bài chưa đạt sẽ được xử lý lại HTML, giữ nguyên nhãn cũ và tự động thêm nhãn năm. Các bài lỗi API sẽ được ghi nhận và tự động chạy lại ở phiên sau. Bạn có muốn tiếp tục?");
+        const confirmRun = confirm("Quá trình này sẽ quét toàn bộ bài viết cũ. Các bài đạt chuẩn sẽ tự động bổ sung nhãn năm mà không sửa nội dung, các bài chưa đạt sẽ được xử lý lại HTML, cập nhật lại TIÊU ĐỀ, giữ nguyên nhãn cũ và tự động thêm nhãn năm. Các bài lỗi API sẽ được ghi nhận và tự động chạy lại ở phiên sau. Bạn có muốn tiếp tục?");
         if(!confirmRun) return;
 
         const container = document.getElementById('bulkProgressContainer');
@@ -594,6 +604,7 @@
                         if (imgMain !== '') {
                             generateCode();
                             const newHtml = document.getElementById('outHtml').value.trim();
+                            const newTitle = document.getElementById('outTitle').value.trim(); // Bổ sung lấy tiêu đề mới
                             
                             let currentLabels = post.labels || [];
                             let mergedLabels = [...currentLabels];
@@ -615,6 +626,7 @@
                                         'Content-Type': 'application/json'
                                     },
                                     body: JSON.stringify({
+                                        title: newTitle ? newTitle : post.title, // Cập nhật lại Tiêu đề bài viết cũ
                                         content: newHtml,
                                         labels: mergedLabels
                                     })
@@ -623,7 +635,7 @@
                                 if(updateResponse.ok) {
                                     successCount++;
                                     statusCell.className = "status-success";
-                                    statusCell.innerText = "Chuẩn hóa & Giữ nhãn ✅";
+                                    statusCell.innerText = "Chuẩn hóa Tiêu đề & Giữ nhãn ✅";
                                     isSuccess = true;
                                 } else if (updateResponse.status === 429) {
                                     summaryDiv.innerText = `⚠️ Bị Google giới hạn tốc độ (429), tạm nghỉ 10 giây...`;
@@ -704,7 +716,7 @@
         const content = document.getElementById('outHtml').value.trim();
         const postStatus = document.getElementById('postStatus').value;
 
-        // Lấy thêm 2 trường này để làm điều kiện dò tìm
+        // Lấy thêm 2 trường này để làm điều kiện dò tìm trùng lặp
         const code = document.getElementById('code').value.trim();
         const countryCode = document.getElementById('countryCode').value.trim();
 
@@ -746,6 +758,7 @@
                 if (searchData.items && searchData.items.length > 0) {
                     matchingPosts = searchData.items.filter(post => {
                         const pLabels = post.labels || [];
+                        // Điều kiện: Chứa đồng thời 2 nhãn (Mã tem + Mã quốc gia)
                         return pLabels.includes(code) && pLabels.includes(countryCode);
                     });
                 }
@@ -757,9 +770,9 @@
 
                 // Cập nhật bài viết đầu tiên: KHÔNG truyền "published" để giữ nguyên ngày giờ cũ của bài viết đã đăng
                 const patchBody = {
-                    title: realTitle,
-                    content: content,
-                    labels: labels,
+                    title: realTitle, // <--- Cập nhật Tiêu đề bài viết cũ
+                    content: content, // <--- Cập nhật HTML
+                    labels: labels,   // <--- Cập nhật Nhãn
                     isDraft: (postStatus === 'private')
                 };
 
@@ -775,6 +788,7 @@
                 if (updateResp.ok) {
                     let deleteMsg = "";
                     
+                    // NẾU CÓ HƠN 1 BÀI TRÙNG LẶP -> XOÁ CÁC BÀI THỪA
                     if (matchingPosts.length > 1) {
                         let deletedCount = 0;
                         for (let i = 1; i < matchingPosts.length; i++) {
@@ -785,10 +799,10 @@
                             });
                             if (delResp.ok) deletedCount++;
                         }
-                        deleteMsg = `\n- Đã xóa ${deletedCount} bài viết trùng lặp dư thừa.`;
+                        deleteMsg = `\n- Đã tự động xoá ${deletedCount} bài viết TRÙNG LẶP (Có cùng nhãn [${code}] và [${countryCode}]).`;
                     }
 
-                    alert(`✏️ Đã CẬP NHẬT thành công bài viết cũ (ID: ${targetPost.id}) và giữ nguyên ngày đăng bài gốc!${deleteMsg}`);
+                    alert(`✏️ Đã CẬP NHẬT LẠI TIÊU ĐỀ VÀ NỘI DUNG cho bài cũ (ID: ${targetPost.id}) thành công!${deleteMsg}`);
                 } else {
                     const errData = await updateResp.json();
                     alert("⚠️ Lỗi khi cập nhật bài viết: " + (errData.error ? errData.error.message : updateResp.statusText));
