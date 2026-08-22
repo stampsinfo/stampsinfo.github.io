@@ -93,13 +93,13 @@
     <div class="maintenance-card">
         <div class="icon">🛠️</div>
         <h1>Hệ Thống Đang Bảo Trì</h1>
-        <p>Chúng tôi đang nâng cấp hệ thống để cải thiện trải nghiệm của bạn. Vui lòng quay lại sau ít phút.</p>
+        <p>Chúng tôi đang nâng cấp hệ thống để cải thiện trải nghiệm của bạn. Vui lòng quay lại sau.</p>
         
         <div class="status-box" id="statusBox">
-            Đang tiến hành dọn dẹp bộ nhớ đệm thiết bị...
+            Đang tiến hành dọn dẹp dữ liệu AI cũ trên thiết bị...
         </div>
 
-        <button class="btn-clear" onclick="clearAllClientCache(true)">Xóa Cache & Tải Lại Trang</button>
+        <button class="btn-clear" onclick="clearAllClientCache(true)" hidden>Xóa Cache & Tải Lại Trang</button>
 
         <div class="footer-note">Cảm ơn sự kiên nhẫn của bạn!</div>
     </div>
@@ -143,12 +143,12 @@
                 }
 
                 if (userTriggered) {
-                    statusBox.innerText = "Đã dọn dẹp cache hoàn tất! Đang tải lại...";
+                    statusBox.innerText = "Đã dọn dẹp hoàn tất! Đang tải lại...";
                     setTimeout(() => {
                         window.location.reload(true);
                     }, 1000);
                 } else {
-                    statusBox.innerText = "Đã tự động xóa dữ liệu cache cũ trên thiết bị.";
+                    statusBox.innerText = "Đã tự động xóa dữ liệu AI cũ trên thiết bị.";
                 }
 
             } catch (error) {
