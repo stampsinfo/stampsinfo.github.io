@@ -163,6 +163,12 @@
                 <input type="range" id="threshold-slider" min="0.55" max="0.95" step="0.01" value="0.60" class="flex-1 accent-blue-600" hidden>
                 <span id="threshold-value" class="text-sm font-bold text-blue-600 w-12 text-right">60%</span>
             </div>
+
+            <!-- Ô nhập mật khẩu bổ sung -->
+            <div class="mt-4 pt-4 border-t">
+                <label class="text-xs sm:text-sm font-medium text-gray-700 mb-2 block">Mật khẩu tìm kiếm ảnh cao cấp (Tùy chọn):</label>
+                <input type="password" id="search-password" placeholder="Nhập mật khẩu để so sánh toàn bộ ảnh..." class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
         </div>
 
         <!-- BƯỚC 2: Kết quả hiển thị -->
@@ -223,6 +229,7 @@
             
             thresholdSlider: document.getElementById('threshold-slider'),
             thresholdValue: document.getElementById('threshold-value'),
+            searchPassword: document.getElementById('search-password'),
             
             resultsSection: document.getElementById('results-section'),
             queryPreview: document.getElementById('query-preview'),
@@ -624,9 +631,15 @@
                     const html = entry.content ? entry.content.$t : (entry.summary ? entry.summary.$t : "");
                     
                     const doc = parser.parseFromString(html, 'text/html');
-                    const imgElements = Array.from(doc.querySelectorAll('img[stat="search"]')).map(img => img.src).filter(Boolean);
+                    // TÌM CẢ ẢNH CÓ STAT SEARCH VÀ SEARCHP
+                    const imgNodes = Array.from(doc.querySelectorAll('img[stat="search"], img[stat="searchp"]'));
+                    const imgElements = imgNodes.map(img => ({ 
+                        url: img.src, 
+                        stat: img.getAttribute('stat') || 'search'
+                    })).filter(img => img.url);
+
                     if (imgElements.length > 0) {
-                    postsToProcess.push({ postId, title, link, images: imgElements, embeddings: [] });
+                        postsToProcess.push({ postId, title, link, images: imgElements, embeddings: [] });
                     }
                 });
 
@@ -644,11 +657,14 @@
                     const totalPostImgs = post.images.length;
 
                     for (let j = 0; j < totalPostImgs; j++) {
-                        const rawImgUrl = post.images[j];
+                        const imgObj = post.images[j];
+                        const rawImgUrl = imgObj.url;
+                        const imgStat = imgObj.stat;
                         const cleanUrl = normalizeBloggerUrl(rawImgUrl);
                         const cached = cachedPost?.embeddings?.find(e => e.url === cleanUrl || e.rawUrl === rawImgUrl);
                         
                         if (cached) {
+                            cached.stat = imgStat; // Cập nhật lại stat cho chắc chắn
                             updatedEmbeddings.push(cached);
                             currentImgIndex++;
                             updateProgress(currentImgIndex, totalImgs);
@@ -669,6 +685,7 @@
                             updatedEmbeddings.push({
                                 url: cleanUrl,
                                 rawUrl: rawImgUrl,
+                                stat: imgStat, // Lưu thêm thuộc tính stat vào DB
                                 vector: Array.from(image_embeds.data)
                             });
 
@@ -772,11 +789,20 @@
             const minThreshold = parseFloat(ui.thresholdSlider.value);
             const matches = [];
 
+            // KIỂM TRA MẬT KHẨU (Sửa "123456" thành mật khẩu bạn muốn)
+            const passInput = ui.searchPassword ? ui.searchPassword.value.trim() : "";
+            const isUnlocked = (passInput === "123456");
+
             for (const post of posts) {
                 let maxScore = -1;
                 let bestImg = "";
 
                 for (const imgItem of (post.embeddings || [])) {
+                    // Nếu nhập sai mật khẩu và ảnh thuộc loại searchp thì bỏ qua
+                    if (!isUnlocked && imgItem.stat === 'searchp') {
+                        continue; 
+                    }
+
                     const score = cosineSimilarity(queryVector, imgItem.vector);
                     if (score > maxScore) {
                         maxScore = score;
