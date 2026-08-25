@@ -1095,7 +1095,7 @@ function formatSizeNumber(val) {
         const name = document.getElementById('name').value.trim() || 'Bài viết';
         const code = document.getElementById('code').value.trim() || '000';
         const countryCode = document.getElementById('countryCode').value.trim() || 'VN';
-		const country = document.getElementById('country').value.trim() || 'Việt Nam';
+        const country = document.getElementById('country').value.trim() || 'Việt Nam';
         const postStatus = document.getElementById('postStatus').value;
         const designer = document.getElementById('designer').value.trim() || '-';
         const printer = document.getElementById('printer').value.trim() || '-';
@@ -1103,7 +1103,7 @@ function formatSizeNumber(val) {
         const dateExpire = document.getElementById('dateExpire').value.trim() || '-';
         const printType = document.getElementById('printType').value;
         const sizeL = formatSizeNumber(document.getElementById('sizeL').value);
-		const sizeH = formatSizeNumber(document.getElementById('sizeH').value);
+        const sizeH = formatSizeNumber(document.getElementById('sizeH').value);
         const qtyTem = document.getElementById('qtyTem').value || '0';
         const qtyBloc = document.getElementById('qtyBloc').value;
         const contentRaw = document.getElementById('content').value;
@@ -1112,6 +1112,9 @@ function formatSizeNumber(val) {
             alert("Vui lòng nhập đường dẫn hình ảnh chính!");
             return;
         }
+
+        // Tạo giá trị stat động dựa theo trạng thái bài viết
+        const statVal = (postStatus === 'private') ? 'searchp' : 'search';
 
         document.getElementById('outTitle').value = name;
 
@@ -1172,7 +1175,7 @@ function formatSizeNumber(val) {
                     <details>
                     <summary class='n'><span class='c flex center'></span></summary>
                     </details>
-                    <img class='lazy full' stat='search' data-src='${rawImg}' src='${imgS1080}'/>
+                    <img class='lazy full' stat='${statVal}' data-src='${rawImg}' src='${imgS1080}'/>
                     <noscript><img alt='image_title' src='${rawImg}'/></noscript>
                 </div>
              </td>
@@ -1205,7 +1208,7 @@ function formatSizeNumber(val) {
                     <details>
                     <summary class='n'><span class='c flex center'></span></summary>
                     </details>
-                    <img class='lazy full' data-src='${rawImg}' src='${imgS1080}'/>
+                    <img class='lazy full' stat='${statVal}' data-src='${rawImg}' src='${imgS1080}'/>
                     <noscript><img alt='image_title' src='${rawImg}'/></noscript>
                 </div>
              </td>
@@ -1217,8 +1220,7 @@ function formatSizeNumber(val) {
 
         const hasContent = contentRaw.trim().length > 0;
         const hasTem = temRows.length > 0;
-        const hasDiban = dibanRows.length > 0;
-        const mainImgStatAttribute = !hasTem ? ' stat="search"' : '';
+        const mainImgStatAttribute = !hasTem ? ` stat="${statVal}"` : '';
 
         let tabHeaders = '';
         let tabsContentHtml = '';
