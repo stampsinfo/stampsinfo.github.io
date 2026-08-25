@@ -333,6 +333,11 @@
         if(confirm("Bạn có chắc chắn muốn xóa toàn bộ nội dung đang nhập không?")) {
             document.getElementById('oldHtmlInput').value = '';
             resetFormFields();
+
+		// Đoạn lệnh bổ sung: Tự động cuộn mượt mà lên đầu khối form
+        const formContainer = document.getElementById('mainFormContainer');
+        if (formContainer) {
+            formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }
 
