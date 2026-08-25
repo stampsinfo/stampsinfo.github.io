@@ -185,9 +185,20 @@
                 </select>
             </div>
             <div>
+                <label>Loại bài viết</label>
+                <select id="postType">
+                    <option value=""></option>
+                    <option value="aerogramme">aerogramme</option>
+                    <option value="dacbiet">đặc biệt</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row-2 form-group">
+            <div>
                 <label>Kiểu in</label>
                 <select id="printType">
-					<option value="-"></option>
+                    <option value="-"></option>
                     <option value="Offset">Offset</option>
                     <option value="Thạch bản">Thạch bản</option>
                     <option value="Tinh khắc">Tinh khắc</option>
@@ -195,14 +206,11 @@
                     <option value="Nhiệt nổi">Nhiệt nổi</option>
                 </select>
             </div>
-        </div>
-
-        <div class="row-2 form-group">
             <div>
                 <label>Lịch đăng bài (Bỏ trống = Lấy thời gian hiện tại)</label>
                 <input type="date" id="publishDate">
             </div>
-            <div></div> </div>
+        </div>
 
         <div class="row-2 form-group">
             <div>
@@ -306,20 +314,17 @@
             if (formContainer) {
                 formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
-        }, 500); // Trì hoãn 500ms để trình duyệt vẽ xong giao diện trước khi cuộn
+        }, 500);
     });
 
 function formatSizeNumber(val) {
     if (!val || val.trim() === '') return '';
     const strVal = val.toString().trim();
     
-    // Nếu người dùng có nhập dấu chấm thập phân
     if (strVal.includes('.')) {
-        // Làm tròn tối đa 2 chữ số thập phân
         return Number(parseFloat(strVal).toFixed(2)).toString();
     }
     
-    // Nếu là số nguyên (không chứa dấu .)
     return Math.round(parseFloat(strVal)).toString();
 }
 	
@@ -348,17 +353,13 @@ function formatSizeNumber(val) {
             document.getElementById('oldHtmlInput').value = '';
             resetFormFields();
 
-		// Tìm cột đầu tiên (cột Nhập thông điệp) bên trong mainFormContainer
-        const formColumn = document.querySelector('#mainFormContainer .col');
-        
-        // Cuộn thanh cuộn bên trong cột này lên vị trí trên cùng (top: 0)
-        if (formColumn) {
-            formColumn.scrollTo({ top: 0, behavior: 'smooth' });
-		}
+            const formColumn = document.querySelector('#mainFormContainer .col');
+            if (formColumn) {
+                formColumn.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         }
     }
 
-    // --- XUẤT / NHẬP CACHE ---
     function exportCache() {
         const data = localStorage.getItem('blogger_processed_ids') || '[]';
         const parsed = JSON.parse(data);
@@ -372,7 +373,6 @@ function formatSizeNumber(val) {
         const a = document.createElement('a');
         a.href = url;
         
-        // Tạo tên file có ngày tháng
         const today = new Date();
         const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
         a.download = `Blogger_Cache_Progress_${dateStr}.json`;
@@ -399,7 +399,6 @@ function formatSizeNumber(val) {
                     throw new Error("Cấu trúc file không hợp lệ (không phải là danh sách ID).");
                 }
                 
-                // Lấy dữ liệu cũ và gộp (merge) để không mất tiến độ đang có trên máy
                 const currentData = JSON.parse(localStorage.getItem('blogger_processed_ids') || '[]');
                 const mergedSet = new Set([...currentData, ...importedData]);
                 
@@ -409,7 +408,6 @@ function formatSizeNumber(val) {
             } catch (err) {
                 alert("⚠️ Lỗi khi đọc file cache: " + err.message);
             }
-            // Xóa giá trị file input để có thể chọn lại cùng một file nếu cần
             event.target.value = '';
         };
         reader.readAsText(file);
@@ -614,7 +612,7 @@ function formatSizeNumber(val) {
                         if (imgMain !== '') {
                             generateCode();
                             const newHtml = document.getElementById('outHtml').value.trim();
-                            const newTitle = document.getElementById('outTitle').value.trim(); // Bổ sung lấy tiêu đề mới
+                            const newTitle = document.getElementById('outTitle').value.trim();
                             
                             let currentLabels = post.labels || [];
                             let mergedLabels = [...currentLabels];
@@ -636,7 +634,7 @@ function formatSizeNumber(val) {
                                         'Content-Type': 'application/json'
                                     },
                                     body: JSON.stringify({
-                                        title: newTitle ? newTitle : post.title, // Cập nhật lại Tiêu đề bài viết cũ
+                                        title: newTitle ? newTitle : post.title,
                                         content: newHtml,
                                         labels: mergedLabels
                                     })
@@ -725,8 +723,8 @@ function formatSizeNumber(val) {
         const labelsStr = document.getElementById('outLabel').value.trim();
         const content = document.getElementById('outHtml').value.trim();
         const postStatus = document.getElementById('postStatus').value;
+        const postType = document.getElementById('postType').value;
 
-        // Lấy thêm 2 trường này để làm điều kiện dò tìm trùng lặp
         const code = document.getElementById('code').value.trim();
         const countryCode = document.getElementById('countryCode').value.trim();
 
@@ -745,18 +743,16 @@ function formatSizeNumber(val) {
 
         const labels = labelsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
-        // --- XỬ LÝ LỊCH ĐĂNG BÀI ---
         const publishDateInput = document.getElementById('publishDate').value;
         const now = new Date();
         if (publishDateInput) {
             const [y, m, d] = publishDateInput.split('-');
             now.setFullYear(parseInt(y), parseInt(m) - 1, parseInt(d));
         }
-        // Luôn tạo chuỗi ISO chuẩn cho ngày giờ được tính toán
         const publishedIso = now.toISOString();
 
         try {
-            // 1. DÒ TÌM BÀI VIẾT CÓ CHỨA NHÃN MÃ SỐ BỘ TEM
+            // 1. DÒ TÌM BÀI VIẾT CÓ CHỨA NHÃN MÃ SỐ BỘ TEM VÀ MÃ QUỐC GIA
             const searchUrl = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?labels=${encodeURIComponent(code)}&fetchBodies=false`;
             const searchResp = await fetch(searchUrl, {
                 headers: { 'Authorization': `Bearer ` + accessToken }
@@ -768,8 +764,18 @@ function formatSizeNumber(val) {
                 if (searchData.items && searchData.items.length > 0) {
                     matchingPosts = searchData.items.filter(post => {
                         const pLabels = post.labels || [];
-                        // Điều kiện: Chứa đồng thời 2 nhãn (Mã tem + Mã quốc gia)
-                        return pLabels.includes(code) && pLabels.includes(countryCode);
+                        const hasBasic = pLabels.includes(code) && pLabels.includes(countryCode);
+                        if (!hasBasic) return false;
+
+                        // Lọc khớp theo Loại bài viết (dựa trên nhãn aero / speci)
+                        if (postType === 'aerogramme') {
+                            return pLabels.includes('aero');
+                        } else if (postType === 'dacbiet') {
+                            return pLabels.includes('speci');
+                        } else {
+                            // Mặc định (bỏ trống): Lọc các bài KHÔNG có nhãn aero và KHÔNG có nhãn speci
+                            return !pLabels.includes('aero') && !pLabels.includes('speci');
+                        }
                     });
                 }
             }
@@ -778,11 +784,10 @@ function formatSizeNumber(val) {
             if (matchingPosts.length > 0) {
                 const targetPost = matchingPosts[0];
 
-                // Cập nhật bài viết đầu tiên: KHÔNG truyền "published" để giữ nguyên ngày giờ cũ của bài viết đã đăng
                 const patchBody = {
-                    title: realTitle, // <--- Cập nhật Tiêu đề bài viết cũ
-                    content: content, // <--- Cập nhật HTML
-                    labels: labels,   // <--- Cập nhật Nhãn
+                    title: realTitle,
+                    content: content,
+                    labels: labels,
                     isDraft: (postStatus === 'private')
                 };
 
@@ -798,18 +803,27 @@ function formatSizeNumber(val) {
                 if (updateResp.ok) {
                     let deleteMsg = "";
                     
-                    // NẾU CÓ HƠN 1 BÀI TRÙNG LẶP -> XOÁ CÁC BÀI THỪA
+                    // NẾU CÓ HƠN 1 BÀI TRÙNG LẶP KHỚP LABEL
                     if (matchingPosts.length > 1) {
                         let deletedCount = 0;
                         for (let i = 1; i < matchingPosts.length; i++) {
                             const delPost = matchingPosts[i];
+                            const delLabels = delPost.labels || [];
+
+                            // QUY TẮC: Bài viết trùng có label 'aero' hoặc 'speci' KHÔNG ĐƯỢC XOÁ
+                            if (delLabels.includes('aero') || delLabels.includes('speci')) {
+                                continue;
+                            }
+
                             const delResp = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${delPost.id}`, {
                                 method: 'DELETE',
                                 headers: { 'Authorization': `Bearer ` + accessToken }
                             });
                             if (delResp.ok) deletedCount++;
                         }
-                        deleteMsg = `\n- Đã tự động xoá ${deletedCount} bài viết TRÙNG LẶP (Có cùng nhãn [${code}] và [${countryCode}]).`;
+                        if (deletedCount > 0) {
+                            deleteMsg = `\n- Đã tự động xoá ${deletedCount} bài viết TRÙNG LẶP.`;
+                        }
                     }
 
                     alert(`✏️ Đã CẬP NHẬT LẠI TIÊU ĐỀ VÀ NỘI DUNG cho bài cũ (ID: ${targetPost.id}) thành công!${deleteMsg}`);
@@ -820,7 +834,6 @@ function formatSizeNumber(val) {
 
             } else {
                 // 3. NẾU KHÔNG CÓ BÀI NÀO TRÙNG -> TẠO BÀI VIẾT MỚI
-                // Lúc này mới áp dụng ngày giờ đăng bài (publishedIso)
                 const postBodyStep1 = {
                     title: urlCode,
                     content: content,
@@ -935,6 +948,7 @@ function formatSizeNumber(val) {
         document.getElementById('country').value = '';
         document.getElementById('countryCode').value = '';
         document.getElementById('postStatus').value = 'public';
+        document.getElementById('postType').value = '';
         document.getElementById('printType').value = '-';
         document.getElementById('publishDate').value = '';
         document.getElementById('designer').value = '';
@@ -1095,15 +1109,16 @@ function formatSizeNumber(val) {
         const name = document.getElementById('name').value.trim() || 'Bài viết';
         const code = document.getElementById('code').value.trim() || '000';
         const countryCode = document.getElementById('countryCode').value.trim() || 'VN';
-		const country = document.getElementById('country').value.trim() || 'Việt Nam';
+        const country = document.getElementById('country').value.trim() || 'Việt Nam';
         const postStatus = document.getElementById('postStatus').value;
+        const postType = document.getElementById('postType').value;
         const designer = document.getElementById('designer').value.trim() || '-';
         const printer = document.getElementById('printer').value.trim() || '-';
         const dateIssue = document.getElementById('dateIssue').value.trim() || '-';
         const dateExpire = document.getElementById('dateExpire').value.trim() || '-';
         const printType = document.getElementById('printType').value;
         const sizeL = formatSizeNumber(document.getElementById('sizeL').value);
-		const sizeH = formatSizeNumber(document.getElementById('sizeH').value);
+        const sizeH = formatSizeNumber(document.getElementById('sizeH').value);
         const qtyTem = document.getElementById('qtyTem').value || '0';
         const qtyBloc = document.getElementById('qtyBloc').value;
         const contentRaw = document.getElementById('content').value;
@@ -1113,11 +1128,21 @@ function formatSizeNumber(val) {
             return;
         }
 
+        const statVal = (postStatus === 'private') ? 'searchp' : 'search';
+
         document.getElementById('outTitle').value = name;
 
         const year = getYear(dateIssue);
         
         let labelVal = `${code}, ${countryCode}, stamp`;
+
+        // Thêm nhãn theo Loại bài viết
+        if (postType === 'aerogramme') {
+            labelVal += `, aero`;
+        } else if (postType === 'dacbiet') {
+            labelVal += `, speci`;
+        }
+
         if (year) {
             labelVal += `, year${year}`;
         }
@@ -1172,7 +1197,7 @@ function formatSizeNumber(val) {
                     <details>
                     <summary class='n'><span class='c flex center'></span></summary>
                     </details>
-                    <img class='lazy full' stat='search' data-src='${rawImg}' src='${imgS1080}'/>
+                    <img class='lazy full' stat='${statVal}' data-src='${rawImg}' src='${imgS1080}'/>
                     <noscript><img alt='image_title' src='${rawImg}'/></noscript>
                 </div>
              </td>
@@ -1205,7 +1230,7 @@ function formatSizeNumber(val) {
                     <details>
                     <summary class='n'><span class='c flex center'></span></summary>
                     </details>
-                    <img class='lazy full' data-src='${rawImg}' src='${imgS1080}'/>
+                    <img class='lazy full' stat='${statVal}' data-src='${rawImg}' src='${imgS1080}'/>
                     <noscript><img alt='image_title' src='${rawImg}'/></noscript>
                 </div>
              </td>
@@ -1218,7 +1243,7 @@ function formatSizeNumber(val) {
         const hasContent = contentRaw.trim().length > 0;
         const hasTem = temRows.length > 0;
         const hasDiban = dibanRows.length > 0;
-        const mainImgStatAttribute = !hasTem ? ' stat="search"' : '';
+        const mainImgStatAttribute = !hasTem ? ` stat="${statVal}"` : '';
 
         let tabHeaders = '';
         let tabsContentHtml = '';
