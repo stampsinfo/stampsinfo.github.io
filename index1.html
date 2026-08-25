@@ -86,7 +86,7 @@
         </div>
 
         <!-- Dropdown: Cấu hình & Quản lý Cache -->
-        <details class="group bg-white rounded-xl shadow-sm border border-gray-200 mb-6" hidden>
+        <details class="group bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
             <summary class="font-bold text-gray-800 p-4 cursor-pointer flex items-center justify-between hover:bg-gray-50 transition-colors rounded-xl">
                 <div class="flex items-center gap-2">
                     <span class="bg-gray-700 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs group-open:bg-blue-600 transition-colors">⚙️</span>
@@ -366,7 +366,7 @@
                 ui.syncLogBox.classList.remove('hidden');
                 appendLog("🔄 Đang kiểm tra bản cập nhật dữ liệu từ trang chủ...");
 
-                const res = await fetch('./cache.zip?t=' + Date.now());
+                const res = await fetch('./cachenew.zip?t=' + Date.now());
                 if (!res.ok) {
                     appendLog("⚠️ Không tìm thấy dữ liệu trên trang chủ.");
                     return;
