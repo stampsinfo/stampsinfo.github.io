@@ -334,10 +334,12 @@
             document.getElementById('oldHtmlInput').value = '';
             resetFormFields();
 
-		// Đoạn lệnh bổ sung: Tự động cuộn mượt mà lên đầu khối form
-        const formContainer = document.getElementById('mainFormContainer');
-        if (formContainer) {
-            formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		// Tìm cột đầu tiên (cột Nhập thông điệp) bên trong mainFormContainer
+        const formColumn = document.querySelector('#mainFormContainer .col');
+        
+        // Cuộn thanh cuộn bên trong cột này lên vị trí trên cùng (top: 0)
+        if (formColumn) {
+            formColumn.scrollTo({ top: 0, behavior: 'smooth' });
 		}
         }
     }
