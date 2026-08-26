@@ -18,7 +18,7 @@
         .form-group { margin-bottom: 15px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
         .req { color: red; }
-        input[type="text"], input[type="number"], select, textarea, input[type="date"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        input[type="text"], input[type="number"], input[type="password"], select, textarea, input[type="date"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         input[readonly] { background-color: #e9ecef; cursor: not-allowed; color: #555; font-weight: bold; }
         .row-2 { display: flex; gap: 10px; }
         .row-2 > div { flex: 1; }
@@ -37,7 +37,7 @@
         .btn-import:hover { background: #8e44ad; }
         .btn-publish { width: 100%; background: #27ae60; font-size: 18px; margin-top: 10px; }
         .btn-publish:hover { background: #219653; }
-        .btn-login { background: #4285F4; margin-top: 5px; font-size: 16px; padding: 12px 20px; }
+        .btn-login { background: #4285F4; font-size: 16px; padding: 10px 18px; }
         .btn-login:hover { background: #3367D6; }
         .btn-bulk { width: 100%; background: #c0392b; font-size: 16px; margin-top: 15px; }
         .btn-bulk:hover { background: #e74c3c; }
@@ -51,8 +51,12 @@
         .output-group { margin-bottom: 20px; }
         .output-group input { background: #eef2f5; font-weight: bold; color: #c0392b; }
         textarea.code-output { height: 350px; font-family: monospace; font-size: 13px; background: #272822; color: #f8f8f2; white-space: pre; }
-        .api-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; }
+        .api-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; }
         
+        /* Style cho phần nhập mật khẩu & chấm tròn */
+        .password-box { display: flex; align-items: center; gap: 8px; }
+        .status-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background-color: #f1c40f; transition: background-color 0.3s ease; box-shadow: 0 0 4px rgba(0,0,0,0.2); }
+
         #bulkProgressContainer { margin-top: 15px; display: none; }
         #progressSummary { font-weight: bold; color: #1d6fa5; margin-bottom: 10px; padding: 8px 12px; background: #e8f4fd; border: 1px solid #bbe1fa; border-radius: 4px; }
         .progress-side-by-side { display: flex; gap: 15px; }
@@ -140,8 +144,16 @@
         <input type="hidden" id="clientId" value="213657197881-pdt222eg02b8k404fa4ikrealtcdt71a.apps.googleusercontent.com">
         <input type="hidden" id="blogId" value="562661508258286882">
         
-        <button class="btn btn-login" style="margin-top: 0;" onclick="handleAuthClick()">🔑 Đăng nhập / Cấp quyền Google</button>
-        <span id="authStatus" style="margin-left: 15px; font-weight: bold; color: #e74c3c; font-size: 15px;">Chưa đăng nhập</span>
+        <div class="password-box">
+            <label style="margin: 0; white-space: nowrap;">Mật khẩu:</label>
+            <input type="password" id="appPassword" placeholder="Nhập mật khẩu..." style="width: 180px;" oninput="checkPassword()">
+            <span id="passStatusDot" class="status-dot" title="Chưa nhập mật khẩu"></span>
+        </div>
+
+        <div style="display: flex; align-items: center;">
+            <button class="btn btn-login" style="margin-top: 0;" onclick="handleAuthClick()">🔑 Đăng nhập / Cấp quyền Google</button>
+            <span id="authStatus" style="margin-left: 15px; font-weight: bold; color: #e74c3c; font-size: 15px;">Chưa đăng nhập</span>
+        </div>
     </div>
 </div>
 
@@ -301,12 +313,52 @@
 </div>
 
 <script>
+    // Mật khẩu cố định để kiểm tra (Bạn có thể thay đổi mật khẩu tại đây)
+    const CORRECT_PASSWORD = "123456";
+
     let tokenClient;
     let accessToken = null;
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+    // Xử lý kiểm tra mật khẩu & hiển thị trạng thái chấm tròn
+    function checkPassword() {
+        const passInput = document.getElementById('appPassword');
+        const statusDot = document.getElementById('passStatusDot');
+        const val = passInput.value;
+
+        if (val === '') {
+            // Vàng nếu không có mật khẩu
+            statusDot.style.backgroundColor = '#f1c40f';
+            statusDot.title = 'Chưa nhập mật khẩu';
+            localStorage.removeItem('saved_app_password');
+        } else if (val === CORRECT_PASSWORD) {
+            // Xanh nếu đúng
+            statusDot.style.backgroundColor = '#2ecc71';
+            statusDot.title = 'Mật khẩu chính xác';
+            // Lưu mật khẩu cho các lần vào kế tiếp
+            localStorage.setItem('saved_app_password', val);
+        } else {
+            // Đỏ nếu sai
+            statusDot.style.backgroundColor = '#e74c3c';
+            statusDot.title = 'Mật khẩu sai';
+            localStorage.removeItem('saved_app_password');
+        }
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
         updateCacheStatusInfo();
+        
+        // Tự động khôi phục mật khẩu đã lưu từ trước
+        const savedPass = localStorage.getItem('saved_app_password');
+        if (savedPass) {
+            const passInput = document.getElementById('appPassword');
+            if (passInput) {
+                passInput.value = savedPass;
+                checkPassword();
+            }
+        } else {
+            checkPassword();
+        }
         
         // Tự động cuộn xuống phần form nhập liệu khi tải trang
         setTimeout(() => {
