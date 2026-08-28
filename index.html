@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Thông Báo Cập Nhật Hệ Thống</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        .icon {
+            font-size: 50px;
+            margin-bottom: 20px;
+            color: #2563eb;
+        }
+        h1 {
+            color: #1e293b;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+        p {
+            color: #64748b;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #2563eb;
+            color: #ffffff;
+            padding: 12px 28px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+        .btn:hover {
+            background-color: #1d4ed8;
+        }
+        .status {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #10b981;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="icon">⚙️</div>
+        <h1>Hệ Thống Đang Cập Nhật</h1>
+        <p>Tính năng đang được nâng cấp và hoàn thiện để mang lại trải nghiệm tốt nhất. Sau khi hoàn tất, hệ thống sẽ hoạt động bình thường trở lại.</p>
+        
+        <a href="https://www.stamp.io.vn/p/stampsearch.html" class="btn">Chuyển Đến Trang Stamp Search</a>
+        
+        <div id="cache-status" class="status">Đang xóa dữ liệu đệm cũ...</div>
+    </div>
+
+    <script>
+        // Hàm vô hiệu hóa và làm sạch toàn bộ Cache trên trang
+        async function clearAllDataAndCache() {
+            try {
+                // 1. Xóa LocalStorage và SessionStorage
+                localStorage.clear();
+                sessionStorage.clear();
+
+                // 2. Xóa tất cả Cookie
+                document.cookie.split(";").forEach(function(c) {
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                });
+
+                // 3. Xóa Cache Storage (Cache API)
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                }
+
+                // 4. Hủy đăng ký Service Workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                    }
+                }
+
+                document.getElementById('cache-status').innerText = "✓ Đã làm sạch dữ liệu đệm thành công.";
+            } catch (error) {
+                console.error("Lỗi khi xóa cache:", error);
+                document.getElementById('cache-status').innerText = "";
+            }
+        }
+
+        // Tự động chạy khi trang load
+        window.addEventListener('DOMContentLoaded', clearAllDataAndCache);
+    </script>
+
+</body>
+</html>
