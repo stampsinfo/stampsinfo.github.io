@@ -900,44 +900,49 @@
             });
         }
 
-                // --- CÁC HÀM XỬ LÝ CẮT ẢNH (ĐÃ KHẮC PHỤC GIẬT TRANG) ---
+                        // --- CÁC HÀM XỬ LÝ CẮT ẢNH (TỐI ƯU HÓA CHỐNG GIẬT) ---
         function openCropperModal(file) {
             if (!file) return;
             
-            // Hủy instance cũ nếu có
+            // Hủy instance cũ ngay lập tức nếu có
             if (cropperInstance) {
                 cropperInstance.destroy();
                 cropperInstance = null;
             }
 
             ui.cropperImage.classList.remove('loaded');
-            const imageUrl = URL.createObjectURL(file);
-            ui.cropperImage.src = imageUrl;
-            
-            // Hiển thị modal
+            ui.cropperImage.src = '';
+
+            // Hiển thị modal trước để trình duyệt định hình layout
             ui.cropperModal.classList.remove('hidden');
             ui.cropperModal.classList.add('flex');
 
-            // Đợi khung modal hiển thị ổn định và ảnh load kích thước xong mới khởi tạo Cropper
-            ui.cropperImage.onload = () => {
+            const imageUrl = URL.createObjectURL(file);
+            
+            // Dùng requestAnimationFrame kết hợp setTimeout để chờ DOM phân bổ không gian xong hẳn
+            requestAnimationFrame(() => {
                 setTimeout(() => {
-                    ui.cropperImage.classList.add('loaded');
+                    ui.cropperImage.src = imageUrl;
                     
-                    cropperInstance = new Cropper(ui.cropperImage, {
-                        viewMode: 1, // Không cho kéo khung ra ngoài ảnh
-                        dragMode: 'crop',
-                        autoCropArea: 0.9, // Khung cắt chiếm 90% ban đầu
-                        responsive: true,
-                        restore: false,
-                        guides: true,
-                        center: true,
-                        highlight: false,
-                        cropBoxMovable: true,
-                        cropBoxResizable: true,
-                        toggleDragModeOnDblclick: false,
-                    });
-                }, 50); // Độ trễ ngắn giúp DOM render hoàn tất khung chứa, triệt tiêu giật hình
-            };
+                    ui.cropperImage.onload = () => {
+                        ui.cropperImage.classList.add('loaded');
+                        
+                        cropperInstance = new Cropper(ui.cropperImage, {
+                            viewMode: 1,
+                            dragMode: 'crop',
+                            autoCropArea: 0.85,
+                            responsive: false, // Tắt tự động resize liên tục để chống giật khung hình
+                            restore: false,
+                            guides: true,
+                            center: true,
+                            highlight: false,
+                            cropBoxMovable: true,
+                            cropBoxResizable: true,
+                            toggleDragModeOnDblclick: false,
+                        });
+                    };
+                }, 50);
+            });
         }
 
         function closeCropperModal() {
