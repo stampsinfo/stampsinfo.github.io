@@ -420,7 +420,7 @@
                 ui.syncLogBox.classList.remove('hidden');
                 appendLog("🔄 Đang kiểm tra bản cập nhật dữ liệu từ trang chủ...");
 
-                const res = await fetch('./cache.zip?t=' + Date.now());
+                const res = await fetch('./cachenew.zip?t=' + Date.now());
                 if (!res.ok) {
                     appendLog("⚠️ Không tìm thấy dữ liệu trên trang chủ.");
                     return;
