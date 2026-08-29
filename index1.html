@@ -914,7 +914,7 @@
             });
         }
 
-                        // --- CÁC HÀM XỬ LÝ CẮT ẢNH (TỐI ƯU HÓA CHỐNG GIẬT) ---
+                                // --- CÁC HÀM XỬ LÝ CẮT ẢNH (TẢI TRƯỚC AN TOÀN - KHÔNG GIẬT) ---
         function openCropperModal(file) {
             if (!file) return;
             
@@ -927,36 +927,35 @@
             ui.cropperImage.classList.remove('loaded');
             ui.cropperImage.src = '';
 
-            // Hiển thị modal trước để trình duyệt định hình layout
+            // Hiển thị modal ngay lập tức để khung nền xuất hiện ổn định
             ui.cropperModal.classList.remove('hidden');
             ui.cropperModal.classList.add('flex');
 
             const imageUrl = URL.createObjectURL(file);
             
-            // Dùng requestAnimationFrame kết hợp setTimeout để chờ DOM phân bổ không gian xong hẳn
-            requestAnimationFrame(() => {
-                setTimeout(() => {
-                    ui.cropperImage.src = imageUrl;
-                    
-                    ui.cropperImage.onload = () => {
-                        ui.cropperImage.classList.add('loaded');
-                        
-                        cropperInstance = new Cropper(ui.cropperImage, {
-                            viewMode: 1,
-                            dragMode: 'crop',
-                            autoCropArea: 0.85,
-                            responsive: false, // Tắt tự động resize liên tục để chống giật khung hình
-                            restore: false,
-                            guides: true,
-                            center: true,
-                            highlight: false,
-                            cropBoxMovable: true,
-                            cropBoxResizable: true,
-                            toggleDragModeOnDblclick: false,
-                        });
-                    };
-                }, 50);
-            });
+            // Dùng một đối tượng Image ẩn để load sẵn kích thước và dữ liệu ngầm
+            const preloader = new Image();
+            preloader.onload = () => {
+                // Khi ảnh đã tải xong hoàn toàn trong bộ nhớ, mới gán vào khung hiển thị chính
+                ui.cropperImage.src = imageUrl;
+                ui.cropperImage.classList.add('loaded');
+
+                // Khởi tạo Cropper an toàn không bị giật nhịp
+                cropperInstance = new Cropper(ui.cropperImage, {
+                    viewMode: 1,
+                    dragMode: 'crop',
+                    autoCropArea: 0.85,
+                    responsive: false, // Giữ nguyên false để cố định khung hình tuyệt đối
+                    restore: false,
+                    guides: true,
+                    center: true,
+                    highlight: false,
+                    cropBoxMovable: true,
+                    cropBoxResizable: true,
+                    toggleDragModeOnDblclick: false,
+                });
+            };
+            preloader.src = imageUrl;
         }
 
         function closeCropperModal() {
