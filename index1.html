@@ -11,13 +11,17 @@
     <!-- Thư viện JSZip để nén và giải nén file ZIP ngay trên trình duyệt -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-    <style>
+        <style>
         .drag-over { border-color: #2563eb; background-color: #eff6ff; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         details > summary { list-style: none; }
         details > summary::-webkit-details-marker { display: none; }
+        /* Ẩn ảnh lúc đầu để tránh hiện tượng nháy layout/giật trang */
+        #cropper-image { display: block; max-width: 100%; opacity: 0; transition: opacity 0.2s ease-in-out; }
+        #cropper-image.loaded { opacity: 1; }
     </style>
+
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 min-h-screen">
 <!-- MODAL CẮT ẢNH -->
@@ -896,9 +900,17 @@
             });
         }
 
-        // --- CÁC HÀM XỬ LÝ CẮT ẢNH ---
+                // --- CÁC HÀM XỬ LÝ CẮT ẢNH (ĐÃ KHẮC PHỤC GIẬT TRANG) ---
         function openCropperModal(file) {
             if (!file) return;
+            
+            // Hủy instance cũ nếu có
+            if (cropperInstance) {
+                cropperInstance.destroy();
+                cropperInstance = null;
+            }
+
+            ui.cropperImage.classList.remove('loaded');
             const imageUrl = URL.createObjectURL(file);
             ui.cropperImage.src = imageUrl;
             
@@ -906,22 +918,25 @@
             ui.cropperModal.classList.remove('hidden');
             ui.cropperModal.classList.add('flex');
 
-            // Đợi ảnh tải xong mới khởi tạo Cropper
+            // Đợi khung modal hiển thị ổn định và ảnh load kích thước xong mới khởi tạo Cropper
             ui.cropperImage.onload = () => {
-                if (cropperInstance) cropperInstance.destroy();
-                
-                cropperInstance = new Cropper(ui.cropperImage, {
-                    viewMode: 1, // Không cho kéo khung ra ngoài ảnh
-                    dragMode: 'crop',
-                    autoCropArea: 0.9, // Khung cắt chiếm 90% ban đầu
-                    restore: false,
-                    guides: true,
-                    center: true,
-                    highlight: false,
-                    cropBoxMovable: true,
-                    cropBoxResizable: true,
-                    toggleDragModeOnDblclick: false,
-                });
+                setTimeout(() => {
+                    ui.cropperImage.classList.add('loaded');
+                    
+                    cropperInstance = new Cropper(ui.cropperImage, {
+                        viewMode: 1, // Không cho kéo khung ra ngoài ảnh
+                        dragMode: 'crop',
+                        autoCropArea: 0.9, // Khung cắt chiếm 90% ban đầu
+                        responsive: true,
+                        restore: false,
+                        guides: true,
+                        center: true,
+                        highlight: false,
+                        cropBoxMovable: true,
+                        cropBoxResizable: true,
+                        toggleDragModeOnDblclick: false,
+                    });
+                }, 50); // Độ trễ ngắn giúp DOM render hoàn tất khung chứa, triệt tiêu giật hình
             };
         }
 
