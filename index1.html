@@ -11,16 +11,30 @@
     <!-- Thư viện JSZip để nén và giải nén file ZIP ngay trên trình duyệt -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-        <style>
+            <style>
         .drag-over { border-color: #2563eb; background-color: #eff6ff; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         details > summary { list-style: none; }
         details > summary::-webkit-details-marker { display: none; }
-        /* Ẩn ảnh lúc đầu để tránh hiện tượng nháy layout/giật trang */
-        #cropper-image { display: block; max-width: 100%; opacity: 0; transition: opacity 0.2s ease-in-out; }
+        
+        /* Cố định khung chứa ảnh cắt để tránh layout bị nhảy/giật */
+        #cropper-container-box {
+            width: 100%;
+            height: 50vh;
+            max-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+        #cropper-image {
+            display: block;
+            max-width: 100%;
+            opacity: 0;
+            transition: opacity 0.15s ease-in;
+        }
         #cropper-image.loaded { opacity: 1; }
     </style>
+
 
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 min-h-screen">
@@ -32,8 +46,8 @@
                 <h3 class="font-bold text-gray-800">Cắt ảnh (Khoanh vùng chỉ lấy con tem)</h3>
                 <button id="btn-close-cropper" class="text-gray-500 hover:text-red-500 font-bold text-2xl leading-none">&times;</button>
             </div>
-            <!-- Khu vực chứa ảnh để cắt -->
-            <div class="p-4 flex-1 h-[50vh] min-h-[300px] bg-gray-900 flex items-center justify-center">
+                        <!-- Khu vực chứa ảnh để cắt -->
+            <div id="cropper-container-box" class="p-4 bg-gray-900 flex items-center justify-center">
                 <img id="cropper-image" class="max-w-full max-h-full block" src="" alt="Cắt ảnh">
             </div>
             <!-- Footer Buttons -->
