@@ -1,0 +1,2 @@
+posts=125
+images=480
