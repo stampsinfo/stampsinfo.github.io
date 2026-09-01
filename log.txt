@@ -1,2 +1,2 @@
-posts=0
-images=0
+posts=1
+images=1
