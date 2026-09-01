@@ -144,76 +144,84 @@
         }
 
         // --- 1. HÀM QUÉT BLOGGER VỚI BÁO CÁO TRẠNG THÁI CHI TIẾT ---
-        async function handleScanBlog() {
-            setBusy(true);
-            setProgress(0, "Đang quét...");
-            addLog("🚀 Bắt đầu quá trình quét danh sách bài viết từ Blogger Feed...", "step");
+// Khai báo domain Blogger của bạn
+const BLOG_URL = 'https://stamp.io.vn'; 
 
-            try {
-                let startIndex = 1;
-                const maxResults = 50;
-                let totalFetched = 0;
-                let totalSaved = 0;
-                let hasMore = true;
-                const BLOG_URL = 'https://stamp.io.vn';
+// Dùng CORS Proxy để tránh lỗi Failed to fetch khi chạy local/GitHub Pages
+const PROXY_URL = 'https://api.allorigins.win/raw?url=';
 
-                while (hasMore) {
-                    addLog(`🌐 Đang tải bài viết từ chỉ mục ${startIndex}...`);
-                    const feedUrl = `${BLOG_URL}/feeds/posts/default?alt=json&start-index=${startIndex}&max-results=${maxResults}`;
-                    const res = await fetch(feedUrl);
-                    if (!res.ok) throw new Error(`Lỗi kết nối Feed (Mã: ${res.status})`);
-                    
-                    const data = await res.json();
-                    const entries = data.feed.entry || [];
-                    
-                    if (entries.length === 0) {
-                        hasMore = false;
-                        break;
-                    }
+async function handleScanBlog() {
+    setBusy(true);
+    setProgress(0, "Đang quét...");
+    addLog("🚀 Bắt đầu quá trình quét danh sách bài viết...", "step");
 
-                    for (const entry of entries) {
-                        totalFetched++;
-                        const postId = entry.id.$t.split('post-')[1] || entry.id.$t;
-                        const title = entry.title.$t;
-                        const linkObj = entry.link.find(l => l.rel === 'alternate');
-                        const link = linkObj ? linkObj.href : '';
-                        const content = entry.content ? entry.content.$t : '';
+    try {
+        let startIndex = 1;
+        const maxResults = 50;
+        let totalFetched = 0;
+        let totalSaved = 0;
+        let hasMore = true;
 
-                        // Trích xuất hình ảnh từ nội dung HTML
-                        const doc = new DOMParser().parseFromString(content, 'text/html');
-                        const imgEls = Array.from(doc.querySelectorAll('img'));
-                        const images = imgEls.map(img => ({
-                            url: img.src,
-                            stat: img.getAttribute('data-stat') || 'public'
-                        })).filter(img => img.url && img.url.startsWith('http'));
-
-                        const postRecord = {
-                            postId,
-                            title,
-                            link,
-                            rawImages: images,
-                            embeddings: [] // Sẽ được sinh bởi AI
-                        };
-
-                        await dbSavePost(postRecord);
-                        totalSaved++;
-                        addLog(`  [Bài #${totalFetched}] ${title} (${images.length} ảnh)`);
-                    }
-
-                    startIndex += entries.length;
-                    setProgress(30, `Đã quét ${totalFetched} bài`);
-                    if (entries.length < maxResults) hasMore = false;
-                }
-
-                setProgress(100, "Hoàn tất quét");
-                addLog(`✅ ĐÃ HOÀN THÀNH QUÉT BLOG! Tổng số bài tìm thấy: ${totalFetched}, Đã lưu vào DB: ${totalSaved}`, "step");
-            } catch (err) {
-                addLog(`❌ Quá trình quét thất bại: ${err.message}`, "error");
-                setProgress(0, "Lỗi quét");
-            } finally {
-                setBusy(false);
+        while (hasMore) {
+            addLog(`🌐 Đang tải bài viết từ chỉ mục ${startIndex}...`);
+            
+            // 🔴 ĐÃ THÊM PROXY_URL VÀO ĐẦU LINK FEED
+            const targetFeed = `${BLOG_URL}/feeds/posts/default?alt=json&start-index=${startIndex}&max-results=${maxResults}`;
+            const feedUrl = `${PROXY_URL}${encodeURIComponent(targetFeed)}`;
+            
+            const res = await fetch(feedUrl);
+            if (!res.ok) throw new Error(`Lỗi kết nối Feed (Mã: ${res.status})`);
+            
+            const data = await res.json();
+            const entries = data.feed.entry || [];
+            
+            if (entries.length === 0) {
+                hasMore = false;
+                break;
             }
+
+            for (const entry of entries) {
+                totalFetched++;
+                const postId = entry.id.$t.split('post-')[1] || entry.id.$t;
+                const title = entry.title.$t;
+                const linkObj = entry.link.find(l => l.rel === 'alternate');
+                const link = linkObj ? linkObj.href : '';
+                const content = entry.content ? entry.content.$t : '';
+
+                const doc = new DOMParser().parseFromString(content, 'text/html');
+                const imgEls = Array.from(doc.querySelectorAll('img'));
+                const images = imgEls.map(img => ({
+                    url: img.src,
+                    stat: img.getAttribute('data-stat') || 'public'
+                })).filter(img => img.url && img.url.startsWith('http'));
+
+                const postRecord = {
+                    postId,
+                    title,
+                    link,
+                    rawImages: images,
+                    embeddings: []
+                };
+
+                await dbSavePost(postRecord);
+                totalSaved++;
+                addLog(`  [Bài #${totalFetched}] ${title} (${images.length} ảnh)`);
+            }
+
+            startIndex += entries.length;
+            setProgress(30, `Đã quét ${totalFetched} bài`);
+            if (entries.length < maxResults) hasMore = false;
         }
+
+        setProgress(100, "Hoàn tất quét");
+        addLog(`✅ ĐÃ HOÀN THÀNH QUÉT BLOG! Tìm thấy: ${totalFetched} bài, Đã lưu: ${totalSaved} bài`, "step");
+    } catch (err) {
+        addLog(`❌ Quá trình quét thất bại: ${err.message}`, "error");
+        setProgress(0, "Lỗi quét");
+    } finally {
+        setBusy(false);
+    }
+}
 
         // --- 2. HÀM CHẠY VECTOR AI VỚI TRẠNG THÁI TIẾN TRÌNH ẢNH CHI TIẾT ---
         async function handleProcessAI() {
