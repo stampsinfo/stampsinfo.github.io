@@ -3,119 +3,379 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>Thông Báo Cập Nhật Hệ Thống</title>
+    <title>Tìm kiếm tem thư theo hình ảnh</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        body {
-            background-color: #f4f7f6;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .card {
-            background: #ffffff;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-            text-align: center;
-            max-width: 500px;
-            width: 100%;
-        }
-        .icon {
-            font-size: 50px;
-            margin-bottom: 20px;
-            color: #2563eb;
-        }
-        h1 {
-            color: #1e293b;
-            font-size: 24px;
-            margin-bottom: 15px;
-        }
-        p {
-            color: #64748b;
-            font-size: 16px;
-            line-height: 1.6;
-            margin-bottom: 25px;
-        }
-        .btn {
-            display: inline-block;
-            background-color: #2563eb;
-            color: #ffffff;
-            padding: 12px 28px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: background-color 0.2s ease;
-        }
-        .btn:hover {
-            background-color: #1d4ed8;
-        }
-        .status {
-            margin-top: 15px;
-            font-size: 13px;
-            color: #10b981;
-        }
+        #cropper-container-box { width: 100%; height: 50vh; max-height: 400px; position: relative; overflow: hidden; }
+        #cropper-image { display: block; max-width: 100%; opacity: 0; transition: opacity 0.15s ease-in; }
+        #cropper-image.loaded { opacity: 1; }
     </style>
 </head>
-<body>
-
-    <div class="card">
-        <div class="icon">⚙️</div>
-        <h1>Hệ Thống Cập Nhật & Chuyển Đổi</h1>
-        <p>Tính năng đang được cập nhật và sẽ được vận hành trên trang mới theo đường dẫn bên dưới.</p>
-        
-        <a href="https://www.stamp.io.vn/p/stampsearch.html" class="btn">Chuyển Đến Trang Tìm kiếm mới</a>
-        
-        <div id="cache-status" class="status">Đang xóa dữ liệu đệm cũ...</div>
+<body class="bg-gray-100 font-sans text-gray-800 min-h-screen">
+    <!-- MODAL CẮT ẢNH -->
+    <div id="cropper-modal" class="fixed inset-0 bg-black/75 z-50 hidden flex-col items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-screen">
+            <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+                <h3 class="font-bold text-gray-800">Cắt ảnh chọn con tem</h3>
+                <button id="btn-close-cropper" class="text-gray-500 hover:text-red-500 font-bold text-2xl">&times;</button>
+            </div>
+            <div id="cropper-container-box" class="p-4 bg-gray-900 flex items-center justify-center">
+                <img id="cropper-image" src="" alt="Cắt ảnh">
+            </div>
+            <div class="p-4 border-t flex justify-end gap-3 bg-gray-50">
+                <button id="btn-cancel-crop" class="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold">Hủy</button>
+                <button id="btn-confirm-crop" class="px-5 py-2 bg-blue-600 text-white rounded-lg font-semibold flex items-center gap-2">✂️ Tìm kiếm</button>
+            </div>
+        </div>
     </div>
 
-    <script>
-        // Hàm vô hiệu hóa và làm sạch toàn bộ Cache trên trang
-        async function clearAllDataAndCache() {
+    <div class="max-w-4xl mx-auto p-4 sm:p-6">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-extrabold text-gray-900">Tìm kiếm tem thư AI</h1>
+            <p class="text-sm text-gray-600 mt-1">Tra cứu Vector hình ảnh clip-vit-base-patch32</p>
+        </header>
+
+        <!-- Trạng thái Hệ thống & Nút Quản lý Cache -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border mb-6">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="flex items-center gap-3">
+                    <span id="model-badge" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
+                    <span id="model-status" class="text-sm font-medium">Đang kiểm tra Cache & Khởi tạo AI...</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full font-semibold">Cache: 0 bài</span>
+                    <!-- 🔴 NÚT XÓA CACHE ĐÃ ĐƯỢC THÊM VÀO ĐÂY -->
+                    <button id="btn-clear-cache" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1 rounded-lg text-xs font-semibold transition-all">
+                        🗑️ Xóa Cache
+                    </button>
+                </div>
+            </div>
+            <div id="sync-log" class="text-xs text-blue-600 mt-2 font-mono"></div>
+        </div>
+
+        <!-- BƯỚC TẢI ẢNH -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border mb-6">
+            <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50/50 min-h-[140px]">
+                <svg class="w-9 h-9 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                <span class="text-sm font-medium text-gray-700">Kéo thả ảnh hoặc chọn tải lên</span>
+                <input type="file" id="file-input" class="hidden" accept="image/*">
+            </div>
+
+            <!-- Cấu hình mật khẩu & Độ tương đồng -->
+            <div class="mt-4 pt-4 border-t space-y-3">
+                <div class="flex items-center gap-4">
+                    <label class="text-xs sm:text-sm font-medium text-gray-700">Độ tương đồng:</label>
+                    <input type="range" id="threshold-slider" min="0.55" max="0.95" step="0.01" value="0.60" class="flex-1 accent-blue-600">
+                    <span id="threshold-value" class="text-sm font-bold text-blue-600">60%</span>
+                </div>
+                <div class="relative flex items-center">
+                    <input type="password" id="search-password" placeholder="Mật khẩu xem ảnh ẩn (Nâng cao)..." class="w-full border rounded-lg pl-4 pr-10 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    <span id="password-status-dot" class="absolute right-3.5 w-3 h-3 rounded-full bg-yellow-500"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- BƯỚC KẾT QUẢ -->
+        <div id="results-section" class="hidden bg-white p-5 rounded-xl shadow-sm border">
+            <div class="flex items-center gap-4 mb-6">
+                <img id="query-preview" class="w-24 h-24 object-cover rounded-lg border" src="" alt="Preview">
+                <div>
+                    <div id="search-status" class="text-sm font-semibold text-blue-600">Đang phân tích...</div>
+                </div>
+            </div>
+            <h3 class="text-md font-bold mb-3 pb-2 border-b flex justify-between">
+                <span>Kết quả tìm kiếm</span>
+                <span id="match-count-badge" class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">0</span>
+            </h3>
+            <div id="results-list" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { AutoProcessor, CLIPVisionModelWithProjection, RawImage, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
+
+        env.allowLocalModels = false;
+        const MODEL_ID = 'Xenova/clip-vit-base-patch32';
+        const CORRECT_PASSWORD = "123456";
+        let processor = null, model = null, db = null, cropperInstance = null;
+
+        const ui = {
+            modelBadge: document.getElementById('model-badge'),
+            modelStatus: document.getElementById('model-status'),
+            cacheCount: document.getElementById('cache-count'),
+            btnClearCache: document.getElementById('btn-clear-cache'),
+            syncLog: document.getElementById('sync-log'),
+            dropZone: document.getElementById('drop-zone'),
+            fileInput: document.getElementById('file-input'),
+            thresholdSlider: document.getElementById('threshold-slider'),
+            thresholdValue: document.getElementById('threshold-value'),
+            searchPassword: document.getElementById('search-password'),
+            passwordStatusDot: document.getElementById('password-status-dot'),
+            resultsSection: document.getElementById('results-section'),
+            queryPreview: document.getElementById('query-preview'),
+            searchStatus: document.getElementById('search-status'),
+            resultsList: document.getElementById('results-list'),
+            matchCountBadge: document.getElementById('match-count-badge'),
+            cropperModal: document.getElementById('cropper-modal'),
+            cropperImage: document.getElementById('cropper-image'),
+            btnCancelCrop: document.getElementById('btn-cancel-crop'),
+            btnConfirmCrop: document.getElementById('btn-confirm-crop'),
+            btnCloseCropper: document.getElementById('btn-close-cropper')
+        };
+
+        async function init() {
+            await initDB();
+            
+            // ĐỒNG BỘ THÔNG MINH
+            await autoSyncSmartCache();
+
             try {
-                // 1. Xóa LocalStorage và SessionStorage
-                localStorage.clear();
-                sessionStorage.clear();
+                processor = await AutoProcessor.from_pretrained(MODEL_ID);
+                model = await CLIPVisionModelWithProjection.from_pretrained(MODEL_ID);
+                ui.modelBadge.className = "w-3 h-3 rounded-full bg-green-500";
+                ui.modelStatus.textContent = "AI sẵn sàng!";
+            } catch (err) {
+                ui.modelBadge.className = "w-3 h-3 rounded-full bg-red-500";
+                ui.modelStatus.textContent = "Lỗi nạp AI: " + err.message;
+            }
 
-                // 2. Xóa tất cả Cookie
-                document.cookie.split(";").forEach(function(c) {
-                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-                });
+            setupEventListeners();
+        }
 
-                // 3. Xóa Cache Storage (Cache API)
-                if ('caches' in window) {
-                    const cacheNames = await caches.keys();
-                    await Promise.all(cacheNames.map(name => caches.delete(name)));
-                }
-
-                // 4. Hủy đăng ký Service Workers
-                if ('serviceWorker' in navigator) {
-                    const registrations = await navigator.serviceWorker.getRegistrations();
-                    for (let registration of registrations) {
-                        await registration.unregister();
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('BloggerImageSearchV2', 1);
+                req.onupgradeneeded = (e) => {
+                    const database = e.target.result;
+                    if (!database.objectStoreNames.contains('posts')) {
+                        database.createObjectStore('posts', { keyPath: 'postId' });
                     }
-                }
+                };
+                req.onsuccess = (e) => { db = e.target.result; resolve(); };
+                req.onerror = (e) => reject(e.target.error);
+            });
+        }
 
-                document.getElementById('cache-status').innerText = "✓ Đã làm sạch dữ liệu đệm thành công.";
-            } catch (error) {
-                console.error("Lỗi khi xóa cache:", error);
-                document.getElementById('cache-status').innerText = "";
+        function dbGetAllPosts() {
+            return new Promise((resolve) => {
+                const tx = db.transaction('posts', 'readonly');
+                const req = tx.objectStore('posts').getAll();
+                req.onsuccess = () => resolve(req.result || []);
+            });
+        }
+
+        function dbSavePost(post) {
+            return new Promise((resolve) => {
+                const tx = db.transaction('posts', 'readwrite');
+                tx.objectStore('posts').put(post);
+                tx.oncomplete = resolve;
+            });
+        }
+
+        async function updateCacheBadge() {
+            const posts = await dbGetAllPosts();
+            let totalImg = 0;
+            posts.forEach(p => totalImg += (p.embeddings || []).length);
+            ui.cacheCount.textContent = `Cache: ${posts.length} bài (${totalImg} ảnh)`;
+        }
+
+        // TỰ ĐỘNG XÓA CACHE TRÊN TRÌNH DUYỆT
+        async function handleClearCache() {
+            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ Cache khỏi thiết bị này?")) return;
+            try {
+                ui.btnClearCache.disabled = true;
+                const tx = db.transaction('posts', 'readwrite');
+                await tx.objectStore('posts').clear();
+                await updateCacheBadge();
+                ui.syncLog.textContent = "🗑️ Đã xóa toàn bộ dữ liệu Cache khỏi trình duyệt!";
+                ui.resultsList.innerHTML = "";
+                ui.matchCountBadge.textContent = "0";
+            } catch (err) {
+                alert("Lỗi khi xóa Cache: " + err.message);
+            } finally {
+                ui.btnClearCache.disabled = false;
             }
         }
 
-        // Tự động chạy khi trang load
-        window.addEventListener('DOMContentLoaded', clearAllDataAndCache);
-    </script>
+        // THUẬT TOÁN ĐỒNG BỘ THÔNG MINH
+        async function autoSyncSmartCache() {
+            const localPosts = await dbGetAllPosts();
 
+            if (localPosts.length === 0) {
+                // TRƯỜNG HỢP 1: CHƯA CÓ CACHE TRÊN MÁY -> TẢI cache.zip
+                ui.syncLog.textContent = "📦 Máy chưa có Cache. Đang tải gói full (cache.zip)...";
+                try {
+                    const res = await fetch('./cache.zip?t=' + Date.now());
+                    if (!res.ok) throw new Error("Không tìm thấy cache.zip!");
+                    const blob = await res.blob();
+                    const jszip = new JSZip();
+                    const zip = await jszip.loadAsync(blob);
+                    const jsonFile = zip.file("cache.json");
+                    if (jsonFile) {
+                        const repoPosts = JSON.parse(await jsonFile.async("string"));
+                        for (let p of repoPosts) await dbSavePost(p);
+                        ui.syncLog.textContent = `✅ Khởi tạo thành công ${repoPosts.length} bài từ cache.zip!`;
+                    }
+                } catch (e) {
+                    ui.syncLog.textContent = "⚠️ Chưa có file cache.zip trên server.";
+                }
+            } else {
+                // TRƯỜNG HỢP 2: ĐÃ CÓ CACHE -> TẢI update.json ĐỂ BỔ SUNG
+                ui.syncLog.textContent = "🔄 Đang kiểm tra bản cập nhật (update.json)...";
+                try {
+                    const res = await fetch('./update.json?t=' + Date.now());
+                    if (!res.ok) {
+                        ui.syncLog.textContent = "✨ Dữ liệu hiện tại đã mới nhất.";
+                        await updateCacheBadge();
+                        return;
+                    }
+                    const updatePosts = await res.json();
+                    if (Array.isArray(updatePosts) && updatePosts.length > 0) {
+                        const localMap = new Map(localPosts.map(p => [p.postId, p]));
+                        let addedCount = 0;
+
+                        for (let upPost of updatePosts) {
+                            const localPost = localMap.get(upPost.postId);
+                            if (!localPost) {
+                                await dbSavePost(upPost);
+                                addedCount++;
+                            } else {
+                                const existingUrls = new Set((localPost.embeddings || []).map(e => e.url));
+                                let hasNew = false;
+                                for (let newEmb of (upPost.embeddings || [])) {
+                                    if (!existingUrls.has(newEmb.url)) {
+                                        localPost.embeddings.push(newEmb);
+                                        hasNew = true;
+                                    }
+                                }
+                                if (hasNew) {
+                                    await dbSavePost(localPost);
+                                    addedCount++;
+                                }
+                            }
+                        }
+                        ui.syncLog.textContent = addedCount > 0 ? `🎉 Đã bổ sung ${addedCount} bài viết từ update.json!` : "✨ Dữ liệu đã đầy đủ.";
+                    }
+                } catch (e) {
+                    ui.syncLog.textContent = "✨ Dữ liệu hiện tại đã mới nhất.";
+                }
+            }
+            await updateCacheBadge();
+        }
+
+        // TÌM KIẾM VÀ PHÂN TÍCH
+        async function processAndSearch(fileOrBlob) {
+            if (!processor || !model) return alert("AI chưa sẵn sàng!");
+            ui.resultsSection.classList.remove('hidden');
+            ui.searchStatus.textContent = "Đang sinh AI Vector...";
+            ui.resultsList.innerHTML = "";
+
+            ui.queryPreview.src = URL.createObjectURL(fileOrBlob);
+            try {
+                const rawImage = await RawImage.fromURL(URL.createObjectURL(fileOrBlob));
+                const inputs = await processor(rawImage);
+                const { image_embeds } = await model(inputs);
+                await runVectorSearch(image_embeds.data);
+            } catch (err) { ui.searchStatus.textContent = "❌ Lỗi: " + err.message; }
+        }
+
+        async function runVectorSearch(queryVector) {
+            const posts = await dbGetAllPosts();
+            const minThreshold = parseFloat(ui.thresholdSlider.value);
+            const isUnlocked = (ui.searchPassword.value.trim() === CORRECT_PASSWORD);
+            const matches = [];
+
+            for (const post of posts) {
+                let maxScore = -1, bestImg = "";
+                for (const imgItem of (post.embeddings || [])) {
+                    if (!isUnlocked && imgItem.stat === 'searchp') continue;
+                    const score = cosineSimilarity(queryVector, imgItem.vector);
+                    if (score > maxScore) {
+                        maxScore = score;
+                        bestImg = imgItem.url;
+                    }
+                }
+                if (maxScore >= minThreshold) {
+                    matches.push({ title: post.title, link: post.link, score: maxScore, thumb: bestImg });
+                }
+            }
+
+            matches.sort((a, b) => b.score - a.score);
+            renderResults(matches.slice(0, 10));
+        }
+
+        function cosineSimilarity(vecA, vecB) {
+            let dot = 0, normA = 0, normB = 0;
+            for (let i = 0; i < vecA.length; i++) {
+                dot += vecA[i] * vecB[i];
+                normA += vecA[i] * vecA[i];
+                normB += vecB[i] * vecB[i];
+            }
+            return (normA === 0 || normB === 0) ? 0 : dot / (Math.sqrt(normA) * Math.sqrt(normB));
+        }
+
+        function renderResults(matches) {
+            ui.searchStatus.textContent = "Tìm kiếm xong!";
+            ui.matchCountBadge.textContent = matches.length;
+            ui.resultsList.innerHTML = matches.length ? "" : `<div class="text-gray-500 italic text-sm">Không tìm thấy kết quả phù hợp.</div>`;
+
+            matches.forEach(item => {
+                const pct = Math.round(item.score * 100);
+                const el = document.createElement('div');
+                el.className = "flex items-center gap-4 p-3 bg-gray-50 border rounded-lg";
+                el.innerHTML = `
+                    <img src="${item.thumb}" class="w-16 h-16 object-cover rounded border">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-sm font-bold truncate">${item.title}</h4>
+                        <span class="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700 mt-1 inline-block">${pct}%</span>
+                    </div>
+                    <a href="${item.link}" target="_blank" class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-semibold">Xem bài</a>
+                `;
+                ui.resultsList.appendChild(el);
+            });
+        }
+
+        function openCropperModal(file) {
+            if (cropperInstance) cropperInstance.destroy();
+            ui.cropperModal.classList.remove('hidden');
+            ui.cropperModal.classList.add('flex');
+            ui.cropperImage.src = URL.createObjectURL(file);
+            cropperInstance = new Cropper(ui.cropperImage, { viewMode: 1, autoCropArea: 0.85 });
+        }
+
+        function closeCropperModal() {
+            ui.cropperModal.classList.add('hidden');
+            if (cropperInstance) cropperInstance.destroy();
+        }
+
+        function setupEventListeners() {
+            // Sự kiện Xóa Cache
+            ui.btnClearCache.addEventListener('click', handleClearCache);
+
+            ui.dropZone.addEventListener('click', () => ui.fileInput.click());
+            ui.fileInput.addEventListener('change', (e) => e.target.files[0] && openCropperModal(e.target.files[0]));
+            ui.btnCancelCrop.addEventListener('click', closeCropperModal);
+            ui.btnCloseCropper.addEventListener('click', closeCropperModal);
+            ui.btnConfirmCrop.addEventListener('click', () => {
+                if (!cropperInstance) return;
+                cropperInstance.getCroppedCanvas({ maxWidth: 1024, maxHeight: 1024 }).toBlob((blob) => {
+                    closeCropperModal();
+                    processAndSearch(blob);
+                }, 'image/jpeg', 0.9);
+            });
+            ui.thresholdSlider.addEventListener('input', (e) => {
+                ui.thresholdValue.textContent = Math.round(e.target.value * 100) + '%';
+            });
+            ui.searchPassword.addEventListener('input', () => {
+                const isCorrect = ui.searchPassword.value.trim() === CORRECT_PASSWORD;
+                ui.passwordStatusDot.className = `absolute right-3.5 w-3 h-3 rounded-full ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`;
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
 </body>
 </html>
