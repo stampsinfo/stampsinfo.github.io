@@ -38,14 +38,20 @@
             <p class="text-sm text-gray-600 mt-1">Tra cứu Vector hình ảnh clip-vit-base-patch32</p>
         </header>
 
-        <!-- Trạng thái Hệ thống -->
+        <!-- Trạng thái Hệ thống & Nút Quản lý Cache -->
         <div class="bg-white p-4 rounded-xl shadow-sm border mb-6">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between flex-wrap gap-2">
                 <div class="flex items-center gap-3">
                     <span id="model-badge" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
                     <span id="model-status" class="text-sm font-medium">Đang kiểm tra Cache & Khởi tạo AI...</span>
                 </div>
-                <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-semibold">Cache: 0 bài</span>
+                <div class="flex items-center gap-2">
+                    <span id="cache-count" class="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full font-semibold">Cache: 0 bài</span>
+                    <!-- 🔴 NÚT XÓA CACHE ĐÃ ĐƯỢC THÊM VÀO ĐÂY -->
+                    <button id="btn-clear-cache" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1 rounded-lg text-xs font-semibold transition-all">
+                        🗑️ Xóa Cache
+                    </button>
+                </div>
             </div>
             <div id="sync-log" class="text-xs text-blue-600 mt-2 font-mono"></div>
         </div>
@@ -100,6 +106,7 @@
             modelBadge: document.getElementById('model-badge'),
             modelStatus: document.getElementById('model-status'),
             cacheCount: document.getElementById('cache-count'),
+            btnClearCache: document.getElementById('btn-clear-cache'),
             syncLog: document.getElementById('sync-log'),
             dropZone: document.getElementById('drop-zone'),
             fileInput: document.getElementById('file-input'),
@@ -122,7 +129,7 @@
         async function init() {
             await initDB();
             
-            // 🔍 THỰC HIỆN KIỂM TRA ĐỒNG BỘ CACHE TỰ ĐỘNG THEO YÊU CẦU
+            // ĐỒNG BỘ THÔNG MINH
             await autoSyncSmartCache();
 
             try {
@@ -172,19 +179,37 @@
             const posts = await dbGetAllPosts();
             let totalImg = 0;
             posts.forEach(p => totalImg += (p.embeddings || []).length);
-            ui.cacheCount.textContent = `Data: ${posts.length} bài (${totalImg} ảnh)`;
+            ui.cacheCount.textContent = `Cache: ${posts.length} bài (${totalImg} ảnh)`;
         }
 
-        // 🧠 THUẬT TOÁN ĐỒNG BỘ THÔNG MINH
+        // TỰ ĐỘNG XÓA CACHE TRÊN TRÌNH DUYỆT
+        async function handleClearCache() {
+            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ Cache khỏi thiết bị này?")) return;
+            try {
+                ui.btnClearCache.disabled = true;
+                const tx = db.transaction('posts', 'readwrite');
+                await tx.objectStore('posts').clear();
+                await updateCacheBadge();
+                ui.syncLog.textContent = "🗑️ Đã xóa toàn bộ dữ liệu Cache khỏi trình duyệt!";
+                ui.resultsList.innerHTML = "";
+                ui.matchCountBadge.textContent = "0";
+            } catch (err) {
+                alert("Lỗi khi xóa Cache: " + err.message);
+            } finally {
+                ui.btnClearCache.disabled = false;
+            }
+        }
+
+        // THUẬT TOÁN ĐỒNG BỘ THÔNG MINH
         async function autoSyncSmartCache() {
             const localPosts = await dbGetAllPosts();
 
             if (localPosts.length === 0) {
-                // TRƯỜNG HỢP 1: CHƯA CÓ CACHE TRÊN MÁY -> TẢI FILE cache.zip
+                // TRƯỜNG HỢP 1: CHƯA CÓ CACHE TRÊN MÁY -> TẢI cache.zip
                 ui.syncLog.textContent = "📦 Máy chưa có Cache. Đang tải gói full (cache.zip)...";
                 try {
                     const res = await fetch('./cache.zip?t=' + Date.now());
-                    if (!res.ok) throw new Error("Không tìm thấy cache.zip trên server!");
+                    if (!res.ok) throw new Error("Không tìm thấy cache.zip!");
                     const blob = await res.blob();
                     const jszip = new JSZip();
                     const zip = await jszip.loadAsync(blob);
@@ -192,18 +217,18 @@
                     if (jsonFile) {
                         const repoPosts = JSON.parse(await jsonFile.async("string"));
                         for (let p of repoPosts) await dbSavePost(p);
-                        ui.syncLog.textContent = `✅ Đã tải và khởi tạo thành công ${repoPosts.length} bài từ cache.zip!`;
+                        ui.syncLog.textContent = `✅ Khởi tạo thành công ${repoPosts.length} bài từ cache.zip!`;
                     }
                 } catch (e) {
-                    ui.syncLog.textContent = "⚠️ Không thể tự động tải full cache.zip: " + e.message;
+                    ui.syncLog.textContent = "⚠️ Chưa có file cache.zip trên server.";
                 }
             } else {
-                // TRƯỜNG HỢP 2: ĐÃ CÓ CACHE TRÊN MÁY -> TẢI FILE update.json ĐỂ BỔ SUNG & KIỂM TRA
-                ui.syncLog.textContent = "🔄 Máy đã có Cache. Đang kiểm tra dữ liệu bổ sung (update.json)...";
+                // TRƯỜNG HỢP 2: ĐÃ CÓ CACHE -> TẢI update.json ĐỂ BỔ SUNG
+                ui.syncLog.textContent = "🔄 Đang kiểm tra bản cập nhật (update.json)...";
                 try {
                     const res = await fetch('./update.json?t=' + Date.now());
                     if (!res.ok) {
-                        ui.syncLog.textContent = "✨ Dữ liệu hiện tại trên máy đã mới nhất.";
+                        ui.syncLog.textContent = "✨ Dữ liệu hiện tại đã mới nhất.";
                         await updateCacheBadge();
                         return;
                     }
@@ -218,7 +243,6 @@
                                 await dbSavePost(upPost);
                                 addedCount++;
                             } else {
-                                // Kiểm tra và bổ sung các Vector ảnh chưa tồn tại
                                 const existingUrls = new Set((localPost.embeddings || []).map(e => e.url));
                                 let hasNew = false;
                                 for (let newEmb of (upPost.embeddings || [])) {
@@ -233,20 +257,20 @@
                                 }
                             }
                         }
-                        ui.syncLog.textContent = addedCount > 0 ? `🎉 Đã bổ sung thành công ${addedCount} bài viết mới từ update.json!` : "✨ Dữ liệu đã đầy đủ và trùng khớp.";
+                        ui.syncLog.textContent = addedCount > 0 ? `🎉 Đã bổ sung ${addedCount} bài viết từ update.json!` : "✨ Dữ liệu đã đầy đủ.";
                     }
                 } catch (e) {
-                    ui.syncLog.textContent = "✨ Không có bản cập nhật mới (update.json).";
+                    ui.syncLog.textContent = "✨ Dữ liệu hiện tại đã mới nhất.";
                 }
             }
             await updateCacheBadge();
         }
 
-        // --- XỬ LÝ PHÂN TÍCH VÀ TÌM KIẾM ---
+        // TÌM KIẾM VÀ PHÂN TÍCH
         async function processAndSearch(fileOrBlob) {
-            if (!processor || !model) return alert("Mô hình AI chưa chuẩn bị xong!");
+            if (!processor || !model) return alert("AI chưa sẵn sàng!");
             ui.resultsSection.classList.remove('hidden');
-            ui.searchStatus.textContent = "Đang sinh Embedding AI Vector...";
+            ui.searchStatus.textContent = "Đang sinh AI Vector...";
             ui.resultsList.innerHTML = "";
 
             ui.queryPreview.src = URL.createObjectURL(fileOrBlob);
@@ -314,13 +338,11 @@
             });
         }
 
-        // --- SỰ KIỆN CẮT ẢNH ---
         function openCropperModal(file) {
             if (cropperInstance) cropperInstance.destroy();
             ui.cropperModal.classList.remove('hidden');
             ui.cropperModal.classList.add('flex');
-            const url = URL.createObjectURL(file);
-            ui.cropperImage.src = url;
+            ui.cropperImage.src = URL.createObjectURL(file);
             cropperInstance = new Cropper(ui.cropperImage, { viewMode: 1, autoCropArea: 0.85 });
         }
 
@@ -330,6 +352,9 @@
         }
 
         function setupEventListeners() {
+            // Sự kiện Xóa Cache
+            ui.btnClearCache.addEventListener('click', handleClearCache);
+
             ui.dropZone.addEventListener('click', () => ui.fileInput.click());
             ui.fileInput.addEventListener('change', (e) => e.target.files[0] && openCropperModal(e.target.files[0]));
             ui.btnCancelCrop.addEventListener('click', closeCropperModal);
