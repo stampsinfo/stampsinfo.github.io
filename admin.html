@@ -155,10 +155,11 @@
                 let totalFetched = 0;
                 let totalSaved = 0;
                 let hasMore = true;
+                const BLOG_URL = 'https://stamp.io.vn';
 
                 while (hasMore) {
                     addLog(`🌐 Đang tải bài viết từ chỉ mục ${startIndex}...`);
-                    const feedUrl = `/feeds/posts/default?alt=json&start-index=${startIndex}&max-results=${maxResults}`;
+                    const feedUrl = `${BLOG_URL}/feeds/posts/default?alt=json&start-index=${startIndex}&max-results=${maxResults}`;
                     const res = await fetch(feedUrl);
                     if (!res.ok) throw new Error(`Lỗi kết nối Feed (Mã: ${res.status})`);
                     
