@@ -467,7 +467,7 @@
                 if (localPostCount < serverLog.posts || localImageCount < serverLog.images) {
                     appendLog("⚡ Dữ liệu local nhỏ hơn server log.txt. Đang tải update.json để cập nhật...");
                     
-                    const res = await fetch('./update.json?t=' + Date.now());
+                    const res = await fetch('./update1.json?t=' + Date.now());
                     if (!res.ok) {
                         appendLog("⚠️ Không tìm thấy file update.json. Đang thử đồng bộ từ cache.zip...");
                         await syncFromRepoCacheZip();
@@ -508,9 +508,9 @@
 
         async function syncFromRepoCacheZip() {
             try {
-                let res = await fetch('./cache.zip?t=' + Date.now());
+                let res = await fetch('./cache1.zip?t=' + Date.now());
                 if (!res.ok) {
-                    res = await fetch('./cachenew.zip?t=' + Date.now());
+                    res = await fetch('./cachenew1.zip?t=' + Date.now());
                 }
 
                 if (!res.ok) {
