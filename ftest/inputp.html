@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Công cụ bổ sung nội dung bài viết Blog</title>
+    <title>Công cụ cập nhật bài viết theo nhóm nhãn VN & Số</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; color: #333; }
         .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="container">
-    <h2>Trình bổ sung nội dung bài viết Blog</h2>
+    <h2>Trình cập nhật nội dung bài viết theo nhóm nhãn (VN + Số)</h2>
     <div class="config-box">
         <p><strong>Blog ID:</strong> 562661508258286882</p>
         <p><strong>OAuth Client ID:</strong> 213657197881-pdt222eg02b8k404fa4ikrealtcdt71a.apps.googleusercontent.com</p>
@@ -81,7 +81,7 @@
                 throw (resp);
             }
             document.getElementById('authButton').style.display = 'none';
-            logMessage('Đăng nhập thành công! Bắt đầu quét bài viết...');
+            logMessage('Đăng nhập thành công! Đang tải toàn bộ bài viết từ blog...');
             await processBlogPosts();
         };
 
@@ -92,64 +92,93 @@
         }
     }
 
-    // Định dạng số nhãn theo yêu cầu (1 chữ số -> thêm 00 hoặc 0 tùy ý, đề bài yêu cầu: 1 ký tự như 1 là 01, 2 ký tự 11 là 011, từ 3 ký tự giữ nguyên)
+    // Định dạng số nhãn theo yêu cầu:
+    // 1 ký tự -> thêm 0 phía trước (ví dụ: 1 -> 01)
+    // 2 ký tự -> thêm 0 phía trước (ví dụ: 11 -> 011)
+    // Từ 3 ký tự trở lên -> giữ nguyên (ví dụ: 100 -> 100)
     function formatLabelNumber(numStr) {
         if (numStr.length === 1) return '0' + numStr;
-        if (numStr.length === 2) return '0' + numStr; // Ví dụ: 11 thành 011
-        return numStr; // Từ 3 ký tự trở lên giữ nguyên
+        if (numStr.length === 2) return '0' + numStr;
+        return numStr; 
     }
 
     async function processBlogPosts() {
         try {
             let pageToken = null;
-            let postsProcessed = 0;
-            let postsUpdated = 0;
+            let allPosts = [];
 
+            // Bước 1: Tải toàn bộ bài viết từ blog để tiến hành phân nhóm chính xác
+            logMessage('Đang lấy danh sách bài viết...');
             do {
                 let requestParams = {
                     blogId: BLOG_ID,
-                    maxResults: 50,
+                    maxResults: 500,
                     fetchBodies: true
                 };
                 if (pageToken) requestParams.pageToken = pageToken;
 
                 let response = await gapi.client.blogger.posts.list(requestParams);
                 let posts = response.result.items;
-
-                if (!posts || posts.length === 0) {
-                    logMessage('Không tìm thấy bài viết nào.');
-                    break;
+                if (posts && posts.length > 0) {
+                    allPosts = allPosts.concat(posts);
                 }
+                pageToken = response.result.nextPageToken;
+            } while (pageToken);
 
-                for (let post of posts) {
-                    postsProcessed++;
-                    let labels = post.labels || [];
-                    
-                    // Kiểm tra xem bài viết có chứa nhãn "VN" và nhãn số đồng thời không
-                    let hasVN = labels.includes('VN');
-                    let numberLabel = labels.find(l => /^\d+$/.test(l));
+            logMessage(`Đã tải tổng cộng ${allPosts.length} bài viết. Đang phân tích nhóm nhãn...`);
 
-                    if (hasVN && numberLabel) {
-                        let formattedNum = formatLabelNumber(numberLabel);
-                        
-                        // Chuẩn bị nội dung chèn dựa theo nhãn số đã được định dạng
-                        let snippetToInsert = `<small>Tem cùng bộ</small><span><a href="/search/label/${formattedNum}" rel="nofollow">Xem thêm</a></span>`;
+            // Bước 2: Gom nhóm bài viết theo key là nhãn số đã được chuẩn hóa (chỉ xét các bài có chứa đồng thời "VN" và nhãn số)
+            let groups = {}; // Key: formattedNumber, Value: Array of posts
+
+            for (let post of allPosts) {
+                let labels = post.labels || [];
+                let hasVN = labels.includes('VN');
+                let numberLabel = labels.find(l => /^\d+$/.test(l));
+
+                if (hasVN && numberLabel) {
+                    let formattedNum = formatLabelNumber(numberLabel);
+                    if (!groups[formattedNum]) {
+                        groups[formattedNum] = [];
+                    }
+                    groups[formattedNum].push({
+                        post: post,
+                        originalNumberLabel: numberLabel
+                    });
+                }
+            }
+
+            let postsUpdated = 0;
+            let groupsProcessed = 0;
+
+            // Bước 3: Duyệt qua từng nhóm nhãn số
+            for (let numKey in groups) {
+                let groupList = groups[numKey];
+                
+                // Kiểm tra điều kiện: Nếu số lượng bài viết thuộc nhóm này >= 2 thì mới áp dụng
+                if (groupList.length >= 2) {
+                    groupsProcessed++;
+                    logMessage(`Nhóm nhãn [VN + ${numKey}] có ${groupList.length} bài viết (Đạt điều kiện >= 2 bài). Tiến hành cập nhật...`);
+
+                    for (let item of groupList) {
+                        let post = item.post;
                         let content = post.content || '';
-
-                        // Vị trí cần tìm để chèn ngay phía sau
-                        let targetPattern = /<small>Số lượng<\/small><span>[^<]*<\/span>/i;
                         
-                        // Kiểm tra xem vị trí đích tồn tại và nội dung chưa được chèn trước đó
+                        // Nội dung chèn với đúng số thứ tự label số đã định dạng
+                        let snippetToInsert = `<small>Tem cùng bộ</small><span><a href="/search/label/${numKey}" rel="nofollow">Xem thêm</a></span>`;
+                        let targetPattern = /<small>Số lượng<\/small><span>[^<]*<\/span>/i;
+
+                        // Kiểm tra xem bài viết có chứa vị trí cần chèn và chưa được chèn trước đó
                         if (targetPattern.test(content) && !content.includes(snippetToInsert)) {
                             let updatedContent = content.replace(targetPattern, (match) => {
                                 return match + snippetToInsert;
                             });
 
-                            // GIỮ NGUYÊN HOÀN TOÀN danh sách nhãn gốc của bài viết (bao gồm cả các nhãn bị lặp nếu có)
+                            // Gửi yêu cầu cập nhật: GIỮ NGUYÊN TIÊU ĐỀ (title) và GIỮ NGUYÊN NHÃN GỐC (labels)
                             let updateBody = {
                                 id: post.id,
+                                title: post.title,     // Bắt buộc giữ nguyên tiêu đề gốc
                                 content: updatedContent,
-                                labels: labels 
+                                labels: post.labels    // Giữ nguyên nhãn gốc hoàn toàn
                             };
 
                             await gapi.client.blogger.posts.update({
@@ -159,15 +188,15 @@
                             });
 
                             postsUpdated++;
-                            logMessage(`Đã cập nhật bài viết: "${post.title}" (ID: ${post.id}) với nhãn số [${formattedNum}]`);
+                            logMessage(`- Đã cập nhật bài: "${post.title}"`);
                         }
                     }
+                } else {
+                    logMessage(`Nhóm nhãn [VN + ${numKey}] chỉ có ${groupList.length} bài viết (Bỏ qua vì < 2 bài).`);
                 }
+            }
 
-                pageToken = response.result.nextPageToken;
-            } while (pageToken);
-
-            logMessage(`Hoàn tất! Đã quét ${postsProcessed} bài, cập nhật thành công nội dung cho ${postsUpdated} bài viết (giữ nguyên nhãn gốc).`);
+            logMessage(`Hoàn tất! Đã xử lý ${groupsProcessed} nhóm thỏa mãn điều kiện và cập nhật nội dung cho tổng số ${postsUpdated} bài viết. Tiêu đề và nhãn gốc được giữ nguyên hoàn toàn.`);
 
         } catch (err) {
             logMessage(`Lỗi xảy ra: ${err.message || JSON.stringify(err)}`);
