@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Công cụ bổ sung nội dung bài viết Blog</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; color: #333; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        button { background: #1a73e8; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1557b0; }
+        #log { background: #222; color: #0f0; padding: 15px; border-radius: 4px; height: 350px; overflow-y: auto; font-family: monospace; margin-top: 20px; font-size: 13px; }
+        .config-box { margin-bottom: 15px; font-size: 14px; }
+    </style>
+    <!-- Thư viện Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h2>Trình bổ sung nội dung bài viết Blog</h2>
+    <div class="config-box">
+        <p><strong>Blog ID:</strong> 562661508258286882</p>
+        <p><strong>OAuth Client ID:</strong> 213657197881-pdt222eg02b8k404fa4ikrealtcdt71a.apps.googleusercontent.com</p>
+    </div>
+    <button id="authButton" onclick="handleAuthClick()">Đăng nhập & Bắt đầu quét</button>
+    <div id="log">Nhấn nút trên để bắt đầu quá trình xác thực và xử lý...</div>
+</div>
+
+<script>
+    const CLIENT_ID = '213657197881-pdt222eg02b8k404fa4ikrealtcdt71a.apps.googleusercontent.com';
+    const BLOG_ID = '562661508258286882';
+    const SCOPES = 'https://www.googleapis.com/auth/blogger';
+
+    let tokenClient;
+    let gapiInited = false;
+    let gsiInited = false;
+
+    function logMessage(message) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${message}</div>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function gapiLoaded() {
+        gapi.load('client', initializeGapiClient);
+    }
+
+    async function initializeGapiClient() {
+        await gapi.client.init({
+            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/blogger/v3/rest'],
+        });
+        gapiInited = true;
+        maybeEnableButton();
+    }
+
+    function gisLoaded() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: '',
+        });
+        gsiInited = true;
+        maybeEnableButton();
+    }
+
+    window.onload = function() {
+        gapiLoaded();
+        gisLoaded();
+    };
+
+    function maybeEnableButton() {
+        if (gapiInited && gsiInited) {
+            logMessage('Hệ thống sẵn sàng. Vui lòng bấm nút đăng nhập.');
+        }
+    }
+
+    function handleAuthClick() {
+        tokenClient.callback = async (resp) => {
+            if (resp.error !== undefined) {
+                throw (resp);
+            }
+            document.getElementById('authButton').style.display = 'none';
+            logMessage('Đăng nhập thành công! Bắt đầu quét bài viết...');
+            await processBlogPosts();
+        };
+
+        if (gapi.client.getToken() === null) {
+            tokenClient.requestAccessToken({prompt: 'consent'});
+        } else {
+            tokenClient.requestAccessToken({prompt: ''});
+        }
+    }
+
+    // Định dạng số nhãn theo yêu cầu (1 chữ số -> thêm 00 hoặc 0 tùy ý, đề bài yêu cầu: 1 ký tự như 1 là 01, 2 ký tự 11 là 011, từ 3 ký tự giữ nguyên)
+    function formatLabelNumber(numStr) {
+        if (numStr.length === 1) return '0' + numStr;
+        if (numStr.length === 2) return '0' + numStr; // Ví dụ: 11 thành 011
+        return numStr; // Từ 3 ký tự trở lên giữ nguyên
+    }
+
+    async function processBlogPosts() {
+        try {
+            let pageToken = null;
+            let postsProcessed = 0;
+            let postsUpdated = 0;
+
+            do {
+                let requestParams = {
+                    blogId: BLOG_ID,
+                    maxResults: 50,
+                    fetchBodies: true
+                };
+                if (pageToken) requestParams.pageToken = pageToken;
+
+                let response = await gapi.client.blogger.posts.list(requestParams);
+                let posts = response.result.items;
+
+                if (!posts || posts.length === 0) {
+                    logMessage('Không tìm thấy bài viết nào.');
+                    break;
+                }
+
+                for (let post of posts) {
+                    postsProcessed++;
+                    let labels = post.labels || [];
+                    
+                    // Kiểm tra xem bài viết có chứa nhãn "VN" và nhãn số đồng thời không
+                    let hasVN = labels.includes('VN');
+                    let numberLabel = labels.find(l => /^\d+$/.test(l));
+
+                    if (hasVN && numberLabel) {
+                        let formattedNum = formatLabelNumber(numberLabel);
+                        
+                        // Chuẩn bị nội dung chèn dựa theo nhãn số đã được định dạng
+                        let snippetToInsert = `<small>Tem cùng bộ</small><span><a href="/search/label/${formattedNum}" rel="nofollow">Xem thêm</a></span>`;
+                        let content = post.content || '';
+
+                        // Vị trí cần tìm để chèn ngay phía sau
+                        let targetPattern = /<small>Số lượng<\/small><span>[^<]*<\/span>/i;
+                        
+                        // Kiểm tra xem vị trí đích tồn tại và nội dung chưa được chèn trước đó
+                        if (targetPattern.test(content) && !content.includes(snippetToInsert)) {
+                            let updatedContent = content.replace(targetPattern, (match) => {
+                                return match + snippetToInsert;
+                            });
+
+                            // GIỮ NGUYÊN HOÀN TOÀN danh sách nhãn gốc của bài viết (bao gồm cả các nhãn bị lặp nếu có)
+                            let updateBody = {
+                                id: post.id,
+                                content: updatedContent,
+                                labels: labels 
+                            };
+
+                            await gapi.client.blogger.posts.update({
+                                blogId: BLOG_ID,
+                                postId: post.id,
+                                resource: updateBody
+                            });
+
+                            postsUpdated++;
+                            logMessage(`Đã cập nhật bài viết: "${post.title}" (ID: ${post.id}) với nhãn số [${formattedNum}]`);
+                        }
+                    }
+                }
+
+                pageToken = response.result.nextPageToken;
+            } while (pageToken);
+
+            logMessage(`Hoàn tất! Đã quét ${postsProcessed} bài, cập nhật thành công nội dung cho ${postsUpdated} bài viết (giữ nguyên nhãn gốc).`);
+
+        } catch (err) {
+            logMessage(`Lỗi xảy ra: ${err.message || JSON.stringify(err)}`);
+            console.error(err);
+        }
+    }
+</script>
+
+</body>
+</html>
