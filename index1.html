@@ -836,56 +836,73 @@
                 let newImagesProcessed = 0;
 
                 for (let i = 0; i < postsToProcess.length; i++) {
-                    const post = postsToProcess[i];
-                    const cachedPost = existingMap.get(post.postId);
-                    const updatedEmbeddings = [];
-                    const totalPostImgs = post.images.length;
+    const post = postsToProcess[i];
+    const cachedPost = existingMap.get(post.postId);
+    const updatedEmbeddings = [];
+    const totalPostImgs = post.images.length;
+    
+    // Thêm biến kiểm tra xem có ảnh mới hoặc thay đổi stat hay không
+    let hasChanges = false; 
 
-                    for (let j = 0; j < totalPostImgs; j++) {
-                        const imgObj = post.images[j];
-                        const rawImgUrl = imgObj.url;
-                        const imgStat = imgObj.stat;
-                        const cleanUrl = normalizeBloggerUrl(rawImgUrl);
-                        const cached = cachedPost?.embeddings?.find(e => e.url === cleanUrl || e.rawUrl === rawImgUrl);
-                        
-                        if (cached) {
-                            cached.stat = imgStat; // Cập nhật lại stat cho chắc chắn
-                            updatedEmbeddings.push(cached);
-                            currentImgIndex++;
-                            updateProgress(currentImgIndex, totalImgs);
-                            continue;
-                        }
+    for (let j = 0; j < totalPostImgs; j++) {
+        const imgObj = post.images[j];
+        const rawImgUrl = imgObj.url;
+        const imgStat = imgObj.stat;
+        const cleanUrl = normalizeBloggerUrl(rawImgUrl);
+        const cached = cachedPost?.embeddings?.find(e => e.url === cleanUrl || e.rawUrl === rawImgUrl);
+        
+        if (cached) {
+            // Nếu phát hiện stat bị đổi (ví dụ từ search sang searchp), cũng tính là có thay đổi
+            if (cached.stat !== imgStat) {
+                cached.stat = imgStat;
+                hasChanges = true;
+            }
+            updatedEmbeddings.push(cached);
+            currentImgIndex++;
+            updateProgress(currentImgIndex, totalImgs);
+            continue;
+        }
 
-                        newImagesProcessed++;
-                        ui.modelStatus.textContent = `Đang xử lý ảnh (${newImagesProcessed}): "${post.title.substring(0, 20)}..."`;
-                        
-                        try {
-                            const blob = await fetchImageBlobSafe(rawImgUrl);
-                            const blobUrl = URL.createObjectURL(blob);
-                            const rawImage = await RawImage.fromURL(blobUrl);
+        // Nếu chạy xuống đây nghĩa là có ảnh MỚI chưa có trong cache
+        hasChanges = true; 
+        newImagesProcessed++;
+        ui.modelStatus.textContent = `Đang xử lý ảnh (${newImagesProcessed}): "${post.title.substring(0, 20)}..."`;
+        
+        try {
+            const blob = await fetchImageBlobSafe(rawImgUrl);
+            const blobUrl = URL.createObjectURL(blob);
+            const rawImage = await RawImage.fromURL(blobUrl);
 
-                            const inputs = await processor(rawImage);
-                            const { image_embeds } = await model(inputs);
+            const inputs = await processor(rawImage);
+            const { image_embeds } = await model(inputs);
 
-                            updatedEmbeddings.push({
-                                url: cleanUrl,
-                                rawUrl: rawImgUrl,
-                                stat: imgStat, // Lưu thêm thuộc tính stat vào DB
-                                vector: Array.from(image_embeds.data)
-                            });
+            updatedEmbeddings.push({
+                url: cleanUrl,
+                rawUrl: rawImgUrl,
+                stat: imgStat,
+                vector: Array.from(image_embeds.data)
+            });
 
-                            URL.revokeObjectURL(blobUrl);
-                        } catch (err) {}
+            URL.revokeObjectURL(blobUrl);
+        } catch (err) {}
 
-                        currentImgIndex++;
-                        updateProgress(currentImgIndex, totalImgs);
-                    }
+        currentImgIndex++;
+        updateProgress(currentImgIndex, totalImgs);
+    }
 
-                    post.embeddings = updatedEmbeddings;
-                    // Cập nhật lại ngày lấy dữ liệu nếu có xử lý mới hoặc đã tồn tại
-                    post.fetchedDate = todayStr;
-                    await dbSavePost(post);
-                }
+    post.embeddings = updatedEmbeddings;
+    
+    // CHỈ CẬP NHẬT NGÀY HIỆN TẠI NẾU: bài viết mới hoàn toàn, hoặc có ảnh mới/thay đổi
+    if (!cachedPost || hasChanges) {
+        post.fetchedDate = todayStr;
+        await dbSavePost(post);
+    } else {
+        // Nếu không có ảnh mới, giữ nguyên ngày cũ của cache để không bị xuất ra file update.json
+        post.fetchedDate = cachedPost.fetchedDate; 
+        // Vẫn lưu lại để đảm bảo cấu trúc mảng embeddings an toàn
+        await dbSavePost(post); 
+    }
+}
 
                 ui.modelStatus.textContent = "AI đã sẵn sàng!";
                 
