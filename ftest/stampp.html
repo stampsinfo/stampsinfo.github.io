@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tách Dấu Mộc Phức Tạp Tự Động (Offline)</title>
+  <title>Công Cụ Tách Dấu Mộc Phức Tạp (Thuần JS)</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -13,37 +13,9 @@
       background-color: #f8f9fa;
       color: #212529;
     }
-    h2 { text-align: center; color: #1a73e8; }
+    h2 { text-align: center; color: #1a73e8; margin-bottom: 5px; }
+    p.subtitle { text-align: center; color: #5f6368; font-size: 0.9em; margin-bottom: 20px; }
     
-    .status-container {
-      background: #ffffff;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      margin-bottom: 20px;
-    }
-    .status-info {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-weight: 600;
-      color: #1a73e8;
-      font-size: 0.95em;
-    }
-    .progress-bar-bg {
-      width: 100%;
-      height: 12px;
-      background-color: #e0e0e0;
-      border-radius: 6px;
-      overflow: hidden;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      width: 0%;
-      background-color: #1a73e8;
-      transition: width 0.2s ease, background-color 0.3s ease;
-    }
-
     .panel {
       background: #ffffff;
       padding: 20px;
@@ -53,7 +25,7 @@
     }
     .controls {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 15px;
       align-items: end;
     }
@@ -78,6 +50,7 @@
     }
     button:hover { background-color: #1557b0; }
     button:disabled { background-color: #ccc; cursor: not-allowed; }
+    
     .preview-container {
       display: flex;
       gap: 20px;
@@ -105,37 +78,28 @@
 </head>
 <body>
 
-  <h2>Công Cụ Tách Dấu Mộc Phức Tạp (OpenCV)</h2>
-
-  <div class="status-container">
-    <div class="status-info">
-      <span id="statusText">Đang khởi tạo thư viện...</span>
-      <span id="statusPercent">0%</span>
-    </div>
-    <div class="progress-bar-bg">
-      <div id="progressFill" class="progress-bar-fill"></div>
-    </div>
-  </div>
+  <h2>Công Cụ Tách Dấu Mộc Bưu Chính & Dấu Phức Tạp</h2>
+  <p class="subtitle">Tự động tách nền trong suốt • Hoạt động 100% Offline • Không phụ thuộc thư viện ngoài</p>
 
   <div class="panel">
     <div class="controls">
       <div class="control-group">
         <label for="upload">1. Chọn ảnh con dấu:</label>
-        <input type="file" id="upload" accept="image/*" disabled>
+        <input type="file" id="upload" accept="image/*">
       </div>
 
       <div class="control-group">
-        <label for="stampType">2. Loại dấu / Màu sắc:</label>
-        <select id="stampType" disabled>
-          <option value="red">Dấu mộc Đỏ (Chuẩn / Bưu chính)</option>
-          <option value="blue">Dấu mộc Xanh (Con dấu tròn / chữ ký)</option>
-          <option value="black">Dấu Đen / Tối màu (Phân ngưỡng cao cấp)</option>
+        <label for="stampMode">2. Chế độ xử lý:</label>
+        <select id="stampMode">
+          <option value="red_hsv">Dấu Đỏ / Bưu Chính (Lọc HSV)</option>
+          <option value="blue_hsv">Dấu Xanh (Con dấu tròn / Chữ ký)</option>
+          <option value="adaptive">Dấu Đen / Tối màu (Tự động thích nghi)</option>
         </select>
       </div>
 
       <div class="control-group">
-        <label for="denoise">3. Khử nhiễu hạt nền:</label>
-        <input type="range" id="denoise" min="0" max="5" value="1" disabled>
+        <label for="threshold">3. Độ nhạy lọc (Threshold): <span id="threshVal">40</span></label>
+        <input type="range" id="threshold" min="10" max="100" value="40">
       </div>
 
       <div class="control-group">
@@ -156,73 +120,39 @@
   </div>
 
   <script>
-    let cvReady = false;
-    let imgElement = new Image();
-
-    const statusText = document.getElementById('statusText');
-    const statusPercent = document.getElementById('statusPercent');
-    const progressFill = document.getElementById('progressFill');
-
     const uploadInput = document.getElementById('upload');
-    const stampTypeSelect = document.getElementById('stampType');
-    const denoiseInput = document.getElementById('denoise');
+    const stampModeSelect = document.getElementById('stampMode');
+    const thresholdInput = document.getElementById('threshold');
+    const threshVal = document.getElementById('threshVal');
     const downloadBtn = document.getElementById('downloadBtn');
 
-    // Hàm load an toàn tuyệt đối
-    function loadOpenCVSafely() {
-      // Cấu hình callback khởi tạo cho OpenCV
-      window.Module = {
-        onRuntimeInitialized() {
-          cvReady = true;
-          progressFill.style.width = '100%';
-          statusPercent.innerText = '100%';
-          statusText.innerText = "Thư viện đã sẵn sàng! Vui lòng chọn ảnh con dấu.";
-          statusText.style.color = "#137333";
-          progressFill.style.backgroundColor = "#137333";
-          
-          uploadInput.disabled = false;
-          stampTypeSelect.disabled = false;
-          denoiseInput.disabled = false;
-        }
-      };
+    const canvasIn = document.getElementById('canvasInput');
+    const canvasOut = document.getElementById('canvasOutput');
+    const ctxIn = canvasIn.getContext('2d', { willReadFrequently: true });
+    const ctxOut = canvasOut.getContext('2d', { willReadFrequently: true });
 
-      statusText.innerText = "Đang tải thư viện OpenCV...";
-      
-      // Giả lập tiến trình chạy thanh Status trong lúc biên dịch WebAssembly
-      let fakeProgress = 10;
-      const timer = setInterval(() => {
-        if (cvReady) {
-          clearInterval(timer);
-          return;
-        }
-        if (fakeProgress < 90) {
-          fakeProgress += 5;
-          progressFill.style.width = fakeProgress + '%';
-          statusPercent.innerText = fakeProgress + '%';
-        }
-      }, 150);
+    let imgElement = new Image();
 
-      // Thêm thẻ Script nhúng file OpenCV local hoặc CDN dự phòng
-      const script = document.createElement('script');
-      script.src = './opencv.js'; // Ưu tiên file opencv.js đặt cùng thư mục
-      
-      script.onerror = () => {
-        // Nếu không có file opencv.js ở local, tự động dùng CDN
-        console.warn("Không tìm thấy ./opencv.js local, tải từ CDN...");
-        const cdnScript = document.createElement('script');
-        cdnScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/opencv/4.7.0/opencv.js';
-        cdnScript.onerror = () => {
-          statusText.innerText = "Lỗi: Không thể kết nối hoặc tải OpenCV!";
-          statusText.style.color = "#d93025";
-          progressFill.style.backgroundColor = "#d93025";
-        };
-        document.body.appendChild(cdnScript);
-      };
+    // Chuyển RGB sang HSV
+    function rgbToHsv(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      let max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h, s, v = max;
+      let d = max - min;
+      s = max === 0 ? 0 : d / max;
 
-      document.body.appendChild(script);
+      if (max === min) {
+        h = 0;
+      } else {
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      return [h * 360, s * 100, v * 100];
     }
-
-    loadOpenCVSafely();
 
     uploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -231,13 +161,13 @@
       const reader = new FileReader();
       reader.onload = (event) => {
         imgElement.onload = () => {
-          let canvasIn = document.getElementById('canvasInput');
           canvasIn.width = imgElement.width;
           canvasIn.height = imgElement.height;
-          let ctxIn = canvasIn.getContext('2d');
-          ctxIn.drawImage(imgElement, 0, 0);
+          canvasOut.width = imgElement.width;
+          canvasOut.height = imgElement.height;
 
-          processStamp();
+          ctxIn.drawImage(imgElement, 0, 0);
+          processImage();
           downloadBtn.disabled = false;
         };
         imgElement.src = event.target.result;
@@ -245,84 +175,71 @@
       reader.readAsDataURL(file);
     });
 
-    stampTypeSelect.addEventListener('change', processStamp);
-    denoiseInput.addEventListener('input', processStamp);
+    thresholdInput.addEventListener('input', () => {
+      threshVal.innerText = thresholdInput.value;
+      processImage();
+    });
 
-    function processStamp() {
-      if (!cvReady || !imgElement.src) return;
+    stampModeSelect.addEventListener('change', processImage);
 
-      let src = cv.imread('canvasInput');
-      let hsv = new cv.Mat();
-      let mask = new cv.Mat();
-      
-      cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
-      cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
+    function processImage() {
+      if (!imgElement.src) return;
 
-      let stampType = stampTypeSelect.value;
+      const width = canvasIn.width;
+      const height = canvasIn.height;
+      const imgData = ctxIn.getImageData(0, 0, width, height);
+      const data = imgData.data;
 
-      if (stampType === 'red') {
-        let mask1 = new cv.Mat();
-        let mask2 = new cv.Mat();
+      const outImgData = ctxOut.createImageData(width, height);
+      const outData = outImgData.data;
 
-        let low1 = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [0, 40, 40, 0]);
-        let high1 = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [12, 255, 255, 0]);
-        let low2 = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [155, 40, 40, 0]);
-        let high2 = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [180, 255, 255, 0]);
+      const mode = stampModeSelect.value;
+      const sensitivity = parseFloat(thresholdInput.value);
 
-        cv.inRange(hsv, low1, high1, mask1);
-        cv.inRange(hsv, low2, high2, mask2);
-        cv.bitwise_or(mask1, mask2, mask);
+      for (let i = 0; i < data.length; i += 4) {
+        let r = data[i];
+        let g = data[i + 1];
+        let b = data[i + 2];
+        let isStamp = false;
 
-        mask1.delete(); mask2.delete(); low1.delete(); high1.delete(); low2.delete(); high2.delete();
-
-      } else if (stampType === 'blue') {
-        let low = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [90, 40, 40, 0]);
-        let high = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [135, 255, 255, 0]);
-        cv.inRange(hsv, low, high, mask);
-        low.delete(); high.delete();
-
-      } else if (stampType === 'black') {
-        let gray = new cv.Mat();
-        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-        cv.adaptiveThreshold(gray, mask, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 15, 8);
-        gray.delete();
-      }
-
-      let denoiseVal = parseInt(denoiseInput.value);
-      if (denoiseVal > 0) {
-        let M = cv.Mat.ones(denoiseVal, denoiseVal, cv.CV_8U);
-        cv.morphologyEx(mask, mask, cv.MORPH_OPEN, M);
-        M.delete();
-      }
-
-      let dst = new cv.Mat(src.rows, src.cols, cv.CV_8UC4);
-      for (let i = 0; i < src.rows; i++) {
-        for (let j = 0; j < src.cols; j++) {
-          let maskVal = mask.ucharPtr(i, j)[0];
-          let srcPix = src.ucharPtr(i, j);
-
-          if (maskVal > 0) {
-            dst.ucharPtr(i, j)[0] = srcPix[0];
-            dst.ucharPtr(i, j)[1] = srcPix[1];
-            dst.ucharPtr(i, j)[2] = srcPix[2];
-            dst.ucharPtr(i, j)[3] = 255; 
-          } else {
-            dst.ucharPtr(i, j)[0] = 0;
-            dst.ucharPtr(i, j)[1] = 0;
-            dst.ucharPtr(i, j)[2] = 0;
-            dst.ucharPtr(i, j)[3] = 0;
+        if (mode === 'red_hsv') {
+          // Lọc sắc độ màu đỏ trong không gian HSV
+          let [h, s, v] = rgbToHsv(r, g, b);
+          let isRedHue = (h <= 25 || h >= 330);
+          if (isRedHue && s >= sensitivity && v >= 20) {
+            isStamp = true;
           }
+        } else if (mode === 'blue_hsv') {
+          // Lọc sắc độ màu xanh
+          let [h, s, v] = rgbToHsv(r, g, b);
+          let isBlueHue = (h >= 170 && h <= 260);
+          if (isBlueHue && s >= sensitivity && v >= 20) {
+            isStamp = true;
+          }
+        } else if (mode === 'adaptive') {
+          // Phân ngưỡng độ sáng tối thích nghi
+          let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+          if (gray < (255 - sensitivity * 1.8)) {
+            isStamp = true;
+          }
+        }
+
+        if (isStamp) {
+          outData[i] = r;
+          outData[i + 1] = g;
+          outData[i + 2] = b;
+          outData[i + 3] = 255; // Giữ lại nét mộc
+        } else {
+          outData[i + 3] = 0;   // Xóa nền thành trong suốt
         }
       }
 
-      cv.imshow('canvasOutput', dst);
-      src.delete(); hsv.delete(); mask.delete(); dst.delete();
+      ctxOut.putImageData(outImgData, 0, 0);
     }
 
     downloadBtn.addEventListener('click', () => {
-      const canvasOut = document.getElementById('canvasOutput');
       const link = document.createElement('a');
-      link.download = 'dau-moc-tu-dong-opencv.png';
+      link.download = 'dau-moc-tach-nen.png';
       link.href = canvasOut.toDataURL('image/png');
       link.click();
     });
