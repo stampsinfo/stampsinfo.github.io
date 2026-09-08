@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tách Dấu Đen Thuần Túy - Loại Bỏ Nền Màu</title>
+  <title>Tự Động Nhận Diện & Tách Mộc Bưu Chính</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -77,12 +77,19 @@
       background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
     }
     .hint { font-size: 0.8em; color: #d93025; font-weight: bold; }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 5px;
+    }
+    .checkbox-group input { width: auto; cursor: pointer; }
   </style>
 </head>
 <body>
 
-  <h2>Công Cụ Lọc Nét Mực Đen Thuần Túy</h2>
-  <p class="subtitle">Khoanh vùng con dấu & Lọc triệt để các mảng màu xanh, đỏ, vàng xung quanh</p>
+  <h2>Công Cụ Tự Động Định Hình & Tách Mộc Tròn</h2>
+  <p class="subtitle">Tự động ép khung hình tròn/elip & Lọc đốm mộc nhiễu xung quanh</p>
 
   <div class="panel">
     <div class="controls">
@@ -92,17 +99,25 @@
       </div>
 
       <div class="control-group">
-        <label for="darkness">2. Độ đậm nét mực đen: <span id="darkVal">120</span></label>
+        <label for="darkness">2. Độ đậm mực đen: <span id="darkVal">120</span></label>
         <input type="range" id="darkness" min="30" max="180" value="120">
       </div>
 
       <div class="control-group">
-        <label for="colorFilter">3. Kháng màu (Loại bỏ màu xanh/đỏ): <span id="colorFilterVal">18</span></label>
+        <label for="colorFilter">3. Kháng màu xung quanh: <span id="colorFilterVal">18</span></label>
         <input type="range" id="colorFilter" min="5" max="40" value="18">
       </div>
 
       <div class="control-group">
-        <button id="resetCropBtn" class="btn-reset" disabled>Bỏ vùng khoanh</button>
+        <label>4. Tính năng tự động:</label>
+        <div class="checkbox-group">
+          <input type="checkbox" id="circleMask" checked>
+          <label for="circleMask" style="font-weight:normal;">Mặt nạ Khung Tròn / Elip</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="removeNoise" checked>
+          <label for="removeNoise" style="font-weight:normal;">Xóa đốm nhiễu nhỏ</label>
+        </div>
       </div>
 
       <div class="control-group">
@@ -113,11 +128,11 @@
 
   <div class="preview-container">
     <div class="preview-box">
-      <h4>Ảnh gốc <span class="hint">(Kéo chuột khoanh vùng con dấu)</span></h4>
+      <h4>Ảnh gốc <span class="hint">(Khoanh sát viền con dấu)</span></h4>
       <canvas id="canvasInput"></canvas>
     </div>
     <div class="preview-box">
-      <h4>Kết quả chỉ giữ lại mực đen</h4>
+      <h4>Kết quả tự động định hình mộc</h4>
       <canvas id="canvasOutput"></canvas>
     </div>
   </div>
@@ -126,9 +141,10 @@
     const uploadInput = document.getElementById('upload');
     const darknessInput = document.getElementById('darkness');
     const colorFilterInput = document.getElementById('colorFilter');
+    const circleMaskCheck = document.getElementById('circleMask');
+    const removeNoiseCheck = document.getElementById('removeNoise');
     const darkVal = document.getElementById('darkVal');
     const colorFilterVal = document.getElementById('colorFilterVal');
-    const resetCropBtn = document.getElementById('resetCropBtn');
     const downloadBtn = document.getElementById('downloadBtn');
 
     const canvasIn = document.getElementById('canvasInput');
@@ -154,8 +170,6 @@
           canvasOut.height = imgElement.height;
 
           cropRect = null;
-          resetCropBtn.disabled = true;
-
           ctxIn.drawImage(imgElement, 0, 0);
           processImage();
           downloadBtn.disabled = false;
@@ -165,15 +179,10 @@
       reader.readAsDataURL(file);
     });
 
-    darknessInput.addEventListener('input', () => {
-      darkVal.innerText = darknessInput.value;
-      processImage();
-    });
-
-    colorFilterInput.addEventListener('input', () => {
-      colorFilterVal.innerText = colorFilterInput.value;
-      processImage();
-    });
+    darknessInput.addEventListener('input', () => { darkVal.innerText = darknessInput.value; processImage(); });
+    colorFilterInput.addEventListener('input', () => { colorFilterVal.innerText = colorFilterInput.value; processImage(); });
+    circleMaskCheck.addEventListener('change', processImage);
+    removeNoiseCheck.addEventListener('change', processImage);
 
     // --- KHOANH VÙNG (ROI) ---
     function getCanvasCoordinates(e) {
@@ -201,7 +210,18 @@
       ctxIn.strokeStyle = '#d93025';
       ctxIn.lineWidth = Math.max(2, canvasIn.width / 300);
       ctxIn.setLineDash([6, 6]);
-      ctxIn.strokeRect(startX, startY, coords.x - startX, coords.y - startY);
+      
+      let w = coords.x - startX;
+      let h = coords.y - startY;
+
+      if (circleMaskCheck.checked) {
+        // Vẽ khung elip xem trước
+        ctxIn.beginPath();
+        ctxIn.ellipse(startX + w/2, startY + h/2, Math.abs(w/2), Math.abs(h/2), 0, 0, 2 * Math.PI);
+        ctxIn.stroke();
+      } else {
+        ctxIn.strokeRect(startX, startY, w, h);
+      }
     });
 
     canvasIn.addEventListener('mouseup', (e) => {
@@ -216,7 +236,6 @@
 
       if (w > 10 && h > 10) {
         cropRect = { x, y, w, h };
-        resetCropBtn.disabled = false;
       } else {
         cropRect = null;
       }
@@ -226,19 +245,19 @@
         ctxIn.strokeStyle = '#1a73e8';
         ctxIn.lineWidth = Math.max(2, canvasIn.width / 300);
         ctxIn.setLineDash([]);
-        ctxIn.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+        
+        if (circleMaskCheck.checked) {
+          ctxIn.beginPath();
+          ctxIn.ellipse(cropRect.x + cropRect.w/2, cropRect.y + cropRect.h/2, cropRect.w/2, cropRect.h/2, 0, 0, 2 * Math.PI);
+          ctxIn.stroke();
+        } else {
+          ctxIn.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+        }
       }
       processImage();
     });
 
-    resetCropBtn.addEventListener('click', () => {
-      cropRect = null;
-      resetCropBtn.disabled = true;
-      ctxIn.drawImage(imgElement, 0, 0);
-      processImage();
-    });
-
-    // --- THUẬT TOÁN LỌC MÀU ĐEN NGUYÊN CHẤT ---
+    // --- THUẬT TOÁN TỰ ĐỘNG XÁC ĐỊNH MỘC & LỌC NHIỄU ---
     function processImage() {
       if (!imgElement.src) return;
 
@@ -251,18 +270,40 @@
       const outData = outImgData.data;
 
       const maxDarkness = parseFloat(darknessInput.value);
-      const maxColorDiff = parseFloat(colorFilterInput.value); // Ngưỡng chênh lệch màu
+      const maxColorDiff = parseFloat(colorFilterInput.value);
+      const useCircleMask = circleMaskCheck.checked;
+      const useNoiseFilter = removeNoiseCheck.checked;
+
+      // Tính thông số khung Elip nếu có khoanh vùng
+      let cx = 0, cy = 0, rx = 0, ry = 0;
+      if (cropRect) {
+        cx = cropRect.x + cropRect.w / 2;
+        cy = cropRect.y + cropRect.h / 2;
+        rx = cropRect.w / 2;
+        ry = cropRect.h / 2;
+      }
+
+      // Mảng lưu trạng thái pixel mộc để lọc đốm nhiễu (0: Nền, 1: Mộc)
+      let mask = new Uint8Array(width * height);
 
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-          const i = (y * width + x) * 4;
+          const idx = y * width + x;
+          const i = idx * 4;
 
-          // Bỏ qua nếu ngoài vùng khoanh
+          // 1. Kiểm tra phạm vi khoanh vùng
           if (cropRect) {
-            if (x < cropRect.x || x > cropRect.x + cropRect.w ||
-                y < cropRect.y || y > cropRect.y + cropRect.h) {
-              outData[i + 3] = 0;
+            if (x < cropRect.x || x > cropRect.x + cropRect.w || y < cropRect.y || y > cropRect.y + cropRect.h) {
               continue;
+            }
+
+            // 2. TỰ ĐỘNG ÉP PHẠM VI KHUNG TRÒN / ELIP
+            if (useCircleMask) {
+              let dx = (x - cx) / rx;
+              let dy = (y - cy) / ry;
+              if ((dx * dx + dy * dy) > 1.0) { 
+                continue; // Nằm ngoài vòng tròn mộc -> XÓA TỰ ĐỘNG
+              }
             }
           }
 
@@ -270,29 +311,60 @@
           let g = data[i + 1];
           let b = data[i + 2];
 
-          // 1. Kiểm tra độ tối
           let brightness = (r + g + b) / 3;
+          let maxDiff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
 
-          // 2. Tính độ lệch sắc màu giữa R, G, B
-          let diffRG = Math.abs(r - g);
-          let diffRB = Math.abs(r - b);
-          let diffGB = Math.abs(g - b);
-          let maxDiff = Math.max(diffRG, diffRB, diffGB);
-
-          // ĐIỀU KIỆN MỰC ĐEN NGUYÊN CHẤT:
-          // - Độ sáng thấp hơn ngưỡng (brightness < maxDarkness)
-          // - Độ chênh lệch giữa các màu cực kỳ nhỏ (maxDiff < maxColorDiff) -> Loại bỏ hoàn toàn mảng xanh/đỏ
-          let isPureBlackInk = (brightness < maxDarkness) && (maxDiff <= maxColorDiff);
-
-          if (isPureBlackInk) {
-            // Giữ nguyên nét đen của dấu
+          // 3. Điều kiện nhận diện mực đen
+          if (brightness < maxDarkness && maxDiff <= maxColorDiff) {
+            mask[idx] = 1;
             outData[i] = r;
             outData[i + 1] = g;
             outData[i + 2] = b;
             outData[i + 3] = 255;
-          } else {
-            // Xóa nền màu xanh, nền tem, nền giấy thành trong suốt
-            outData[i + 3] = 0;
+          }
+        }
+      }
+
+      // 4. THUẬT TOÁN XÓA ĐỐM NHIỄU LẺ TẺ (Blob Filter)
+      if (useNoiseFilter && cropRect) {
+        let visited = new Uint8Array(width * height);
+        let minBlobSize = 12; // Các cụm hạt dưới 12 pixel sẽ bị xóa tự động
+
+        for (let y = cropRect.y; y < cropRect.y + cropRect.h; y++) {
+          for (let x = cropRect.x; x < cropRect.x + cropRect.w; x++) {
+            let idx = Math.floor(y) * width + Math.floor(x);
+            if (mask[idx] === 1 && visited[idx] === 0) {
+              // BFS tìm cụm pixel liên thông
+              let queue = [idx];
+              let blob = [idx];
+              visited[idx] = 1;
+
+              let head = 0;
+              while(head < queue.length) {
+                let curr = queue[head++];
+                let cx = curr % width;
+                let cy = Math.floor(curr / width);
+
+                let neighbors = [
+                  curr - 1, curr + 1, curr - width, curr + width
+                ];
+
+                for (let n of neighbors) {
+                  if (n >= 0 && n < mask.length && mask[n] === 1 && visited[n] === 0) {
+                    visited[n] = 1;
+                    queue.push(n);
+                    blob.push(n);
+                  }
+                }
+              }
+
+              // Nếu cụm quá nhỏ (nhiễu/đốm dơ) -> Tự động xóa
+              if (blob.length < minBlobSize) {
+                for (let pixelIdx of blob) {
+                  outData[pixelIdx * 4 + 3] = 0;
+                }
+              }
+            }
           }
         }
       }
@@ -302,7 +374,7 @@
 
     downloadBtn.addEventListener('click', () => {
       const link = document.createElement('a');
-      link.download = 'con-dau-den-nguyen-chat.png';
+      link.download = 'moc-tron-da-loc-sach.png';
       link.href = canvasOut.toDataURL('image/png');
       link.click();
     });
