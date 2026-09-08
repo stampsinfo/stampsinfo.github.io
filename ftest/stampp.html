@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tách Dấu Mộc Đen Bưu Chính</title>
+  <title>Tách Dấu Đen Thuần Túy - Loại Bỏ Nền Màu</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -64,11 +64,6 @@
       min-width: 350px;
       text-align: center;
     }
-    .canvas-wrapper {
-      position: relative;
-      display: inline-block;
-      max-width: 100%;
-    }
     canvas {
       max-width: 100%;
       height: auto;
@@ -81,28 +76,33 @@
       background-size: 20px 20px;
       background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
     }
-    .hint { font-size: 0.8em; color: #d93025; margin-top: 4px; font-weight: bold; }
+    .hint { font-size: 0.8em; color: #d93025; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <h2>Công Cụ Tách Dấu Đen Bưu Chính</h2>
-  <p class="subtitle">Kéo chuột trên ảnh gốc để khoanh vùng con dấu cần lấy</p>
+  <h2>Công Cụ Lọc Nét Mực Đen Thuần Túy</h2>
+  <p class="subtitle">Khoanh vùng con dấu & Lọc triệt để các mảng màu xanh, đỏ, vàng xung quanh</p>
 
   <div class="panel">
     <div class="controls">
       <div class="control-group">
-        <label for="upload">1. Chọn ảnh bì thư / tem:</label>
+        <label for="upload">1. Chọn ảnh FDC / Tem:</label>
         <input type="file" id="upload" accept="image/*">
       </div>
 
       <div class="control-group">
-        <label for="darkness">2. Độ đậm nét con dấu: <span id="darkVal">120</span></label>
-        <input type="range" id="darkness" min="40" max="200" value="120">
+        <label for="darkness">2. Độ đậm nét mực đen: <span id="darkVal">120</span></label>
+        <input type="range" id="darkness" min="30" max="180" value="120">
       </div>
 
       <div class="control-group">
-        <button id="resetCropBtn" class="btn-reset" disabled>Bỏ vùng khoanh (Lấy toàn bộ)</button>
+        <label for="colorFilter">3. Kháng màu (Loại bỏ màu xanh/đỏ): <span id="colorFilterVal">18</span></label>
+        <input type="range" id="colorFilter" min="5" max="40" value="18">
+      </div>
+
+      <div class="control-group">
+        <button id="resetCropBtn" class="btn-reset" disabled>Bỏ vùng khoanh</button>
       </div>
 
       <div class="control-group">
@@ -113,13 +113,11 @@
 
   <div class="preview-container">
     <div class="preview-box">
-      <h4>Ảnh gốc <span class="hint">(Nhấp & Kéo chuột để khoanh vùng dấu)</span></h4>
-      <div class="canvas-wrapper">
-        <canvas id="canvasInput"></canvas>
-      </div>
+      <h4>Ảnh gốc <span class="hint">(Kéo chuột khoanh vùng con dấu)</span></h4>
+      <canvas id="canvasInput"></canvas>
     </div>
     <div class="preview-box">
-      <h4>Kết quả tách riêng con dấu</h4>
+      <h4>Kết quả chỉ giữ lại mực đen</h4>
       <canvas id="canvasOutput"></canvas>
     </div>
   </div>
@@ -127,7 +125,9 @@
   <script>
     const uploadInput = document.getElementById('upload');
     const darknessInput = document.getElementById('darkness');
+    const colorFilterInput = document.getElementById('colorFilter');
     const darkVal = document.getElementById('darkVal');
+    const colorFilterVal = document.getElementById('colorFilterVal');
     const resetCropBtn = document.getElementById('resetCropBtn');
     const downloadBtn = document.getElementById('downloadBtn');
 
@@ -137,11 +137,9 @@
     const ctxOut = canvasOut.getContext('2d', { willReadFrequently: true });
 
     let imgElement = new Image();
-    
-    // Tọa độ vùng khoanh (ROI)
     let isDrawing = false;
     let startX = 0, startY = 0;
-    let cropRect = null; // { x, y, w, h } theo kích thước thật của ảnh
+    let cropRect = null;
 
     uploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -172,7 +170,12 @@
       processImage();
     });
 
-    // --- XỬ LÝ KÉO CHUỘT KHOANH VÙNG (CROP ROI) ---
+    colorFilterInput.addEventListener('input', () => {
+      colorFilterVal.innerText = colorFilterInput.value;
+      processImage();
+    });
+
+    // --- KHOANH VÙNG (ROI) ---
     function getCanvasCoordinates(e) {
       const rect = canvasIn.getBoundingClientRect();
       const scaleX = canvasIn.width / rect.width;
@@ -194,15 +197,11 @@
     canvasIn.addEventListener('mousemove', (e) => {
       if (!isDrawing) return;
       const coords = getCanvasCoordinates(e);
-      const currentX = coords.x;
-      const currentY = coords.y;
-
-      // Vẽ lại ảnh gốc và khung hình chữ nhật chọn
       ctxIn.drawImage(imgElement, 0, 0);
       ctxIn.strokeStyle = '#d93025';
       ctxIn.lineWidth = Math.max(2, canvasIn.width / 300);
       ctxIn.setLineDash([6, 6]);
-      ctxIn.strokeRect(startX, startY, currentX - startX, currentY - startY);
+      ctxIn.strokeRect(startX, startY, coords.x - startX, coords.y - startY);
     });
 
     canvasIn.addEventListener('mouseup', (e) => {
@@ -215,7 +214,6 @@
       let w = Math.abs(coords.x - startX);
       let h = Math.abs(coords.y - startY);
 
-      // Nếu vùng chọn đủ lớn mới tính là khoanh vùng
       if (w > 10 && h > 10) {
         cropRect = { x, y, w, h };
         resetCropBtn.disabled = false;
@@ -240,7 +238,7 @@
       processImage();
     });
 
-    // --- THUẬT TOÁN LỌC DẤU ĐEN ---
+    // --- THUẬT TOÁN LỌC MÀU ĐEN NGUYÊN CHẤT ---
     function processImage() {
       if (!imgElement.src) return;
 
@@ -253,16 +251,17 @@
       const outData = outImgData.data;
 
       const maxDarkness = parseFloat(darknessInput.value);
+      const maxColorDiff = parseFloat(colorFilterInput.value); // Ngưỡng chênh lệch màu
 
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const i = (y * width + x) * 4;
 
-          // Nếu có vùng khoanh, điểm nằm ngoài vùng khoanh sẽ bị bỏ qua
+          // Bỏ qua nếu ngoài vùng khoanh
           if (cropRect) {
             if (x < cropRect.x || x > cropRect.x + cropRect.w ||
                 y < cropRect.y || y > cropRect.y + cropRect.h) {
-              outData[i + 3] = 0; // Trong suốt
+              outData[i + 3] = 0;
               continue;
             }
           }
@@ -271,29 +270,29 @@
           let g = data[i + 1];
           let b = data[i + 2];
 
-          // 1. Độ sáng trung bình
+          // 1. Kiểm tra độ tối
           let brightness = (r + g + b) / 3;
 
-          // 2. Kiểm tra độ lệch màu để loại bỏ màu đỏ/nâu của hình vẽ và tem màu
-          let colorDiff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
+          // 2. Tính độ lệch sắc màu giữa R, G, B
+          let diffRG = Math.abs(r - g);
+          let diffRB = Math.abs(r - b);
+          let diffGB = Math.abs(g - b);
+          let maxDiff = Math.max(diffRG, diffRB, diffGB);
 
-          // Điều kiện nhận diện mực con dấu màu đen/xám:
-          // - Độ sáng phải tối (brightness < maxDarkness)
-          // - Màu sắc phải trung tính/xám/đen (colorDiff thấp) hoặc màu mực đen pha sắc xanh nhẹ
-          let isBlackInk = (brightness < maxDarkness) && (colorDiff < 45 || (b > r && b > g && brightness < maxDarkness * 0.9));
+          // ĐIỀU KIỆN MỰC ĐEN NGUYÊN CHẤT:
+          // - Độ sáng thấp hơn ngưỡng (brightness < maxDarkness)
+          // - Độ chênh lệch giữa các màu cực kỳ nhỏ (maxDiff < maxColorDiff) -> Loại bỏ hoàn toàn mảng xanh/đỏ
+          let isPureBlackInk = (brightness < maxDarkness) && (maxDiff <= maxColorDiff);
 
-          // Loại bỏ riêng nét mực đỏ của hình vẽ bên trái (R cao hơn hẳn G và B)
-          if (r > g + 25 && r > b + 25) {
-            isBlackInk = false;
-          }
-
-          if (isBlackInk) {
+          if (isPureBlackInk) {
+            // Giữ nguyên nét đen của dấu
             outData[i] = r;
             outData[i + 1] = g;
             outData[i + 2] = b;
-            outData[i + 3] = 255; // Giữ lại
+            outData[i + 3] = 255;
           } else {
-            outData[i + 3] = 0;   // Xóa nền
+            // Xóa nền màu xanh, nền tem, nền giấy thành trong suốt
+            outData[i + 3] = 0;
           }
         }
       }
@@ -303,7 +302,7 @@
 
     downloadBtn.addEventListener('click', () => {
       const link = document.createElement('a');
-      link.download = 'con-dau-ha-noi.png';
+      link.download = 'con-dau-den-nguyen-chat.png';
       link.href = canvasOut.toDataURL('image/png');
       link.click();
     });
