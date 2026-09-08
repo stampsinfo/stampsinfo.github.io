@@ -1,361 +1,378 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tách Mộc Bưu Chính Chuyên Nghiệp - Bóc Nền Tem</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      max-width: 1100px;
-      margin: 20px auto;
-      padding: 0 20px;
-      background-color: #f8f9fa;
-      color: #212529;
-    }
-    h2 { text-align: center; color: #1a73e8; margin-bottom: 5px; }
-    p.subtitle { text-align: center; color: #5f6368; font-size: 0.9em; margin-bottom: 20px; }
-    
-    .panel {
-      background: #ffffff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      margin-bottom: 20px;
-    }
-    .controls {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-      align-items: end;
-    }
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-    label { font-size: 0.85em; font-weight: 600; }
-    select, input, button {
-      padding: 8px 12px;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
-      font-size: 0.9em;
-    }
-    button {
-      background-color: #1a73e8;
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    button:hover { background-color: #1557b0; }
-    button:disabled { background-color: #ccc; cursor: not-allowed; }
-    
-    .preview-container {
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .preview-box {
-      flex: 1;
-      min-width: 350px;
-      text-align: center;
-    }
-    canvas {
-      max-width: 100%;
-      height: auto;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      background-image: linear-gradient(45deg, #eee 25%, transparent 25%), 
-                        linear-gradient(-45deg, #eee 25%, transparent 25%), 
-                        linear-gradient(45deg, transparent 75%, #eee 75%), 
-                        linear-gradient(-45deg, transparent 75%, #eee 75%);
-      background-size: 20px 20px;
-      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-    }
-    .hint { font-size: 0.8em; color: #d93025; font-weight: bold; }
-    .checkbox-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 5px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Công cụ Tách Nền Dấu Mộc Bưu Chính - Postal Stamp Segmenter</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- OpenCV.js -->
+    <script async src="https://docs.opencv.org/4.7.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+    <style>
+        .canvas-container {
+            position: relative;
+            background-color: #1a202c;
+            background-image: linear-gradient(45deg, #2d3748 25%, transparent 25%), 
+                              linear-gradient(-45deg, #2d3748 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #2d3748 75%), 
+                              linear-gradient(-45deg, transparent 75%, #2d3748 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #3b82f6;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
-<body>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
 
-  <h2>Công Cụ Tách Mộc Bưu Chính Thuần JS - Chống Mất Nét Trên Tem</h2>
-  <p class="subtitle">Sử dụng thuật toán Phân tích tương phản cục bộ (Local Contrast Subtraction)</p>
-
-  <div class="panel">
-    <div class="controls">
-      <div class="control-group">
-        <label for="upload">1. Chọn ảnh FDC / Bì Thư:</label>
-        <input type="file" id="upload" accept="image/*">
-      </div>
-
-      <div class="control-group">
-        <label for="sensitivity">2. Độ nhạy bắt nét mộc: <span id="sensVal">25</span></label>
-        <input type="range" id="sensitivity" min="10" max="60" value="25">
-      </div>
-
-      <div class="control-group">
-        <label for="colorTolerance">3. Kháng màu tem (Xanh/Cam/Đỏ): <span id="colorTolVal">20</span></label>
-        <input type="range" id="colorTolerance" min="5" max="50" value="20">
-      </div>
-
-      <div class="control-group">
-        <label>4. Chế độ định hình:</label>
-        <div class="checkbox-group">
-          <input type="checkbox" id="circleMask" checked>
-          <label for="circleMask">Cắt khung tròn / elip</label>
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 py-4 px-6 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-stamp text-red-500 text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-wide bg-gradient-to-r from-red-400 to-amber-300 bg-clip-text text-transparent">
+                    Postal Stamp Background Remover (OpenCV.js)
+                </h1>
+            </div>
+            <div id="status-badge" class="flex items-center space-x-2 bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-xs font-semibold border border-amber-500/30">
+                <div class="spinner border-2 w-3 h-3 border-t-transparent border-amber-300 animate-spin"></div>
+                <span>Đang tải thư viện OpenCV.js...</span>
+            </div>
         </div>
-      </div>
+    </header>
 
-      <div class="control-group">
-        <button id="downloadBtn" disabled>Tải ảnh PNG Nền Suốt</button>
-      </div>
-    </div>
-  </div>
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
 
-  <div class="preview-container">
-    <div class="preview-box">
-      <h4>Ảnh gốc <span class="hint">(Kéo chuột khoanh sát mộc)</span></h4>
-      <canvas id="canvasInput"></canvas>
-    </div>
-    <div class="preview-box">
-      <h4>Kết quả bóc mộc nguyên vẹn</h4>
-      <canvas id="canvasOutput"></canvas>
-    </div>
-  </div>
+        <!-- Controls Sidebar -->
+        <aside class="lg:col-span-1 bg-slate-800 border border-slate-700 rounded-xl p-5 flex flex-col space-y-6 shadow-xl h-fit">
+            
+            <!-- File Upload -->
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">1. Chọn Ảnh Dấu Mộc</label>
+                <div id="drop-zone" class="border-2 border-dashed border-slate-600 hover:border-blue-500 rounded-lg p-4 text-center cursor-pointer transition-colors bg-slate-800/50">
+                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2"></i>
+                    <p class="text-xs text-slate-400">Kéo thả ảnh vào đây hoặc <span class="text-blue-400 font-semibold">Tải lên</span></p>
+                    <input type="file" id="image-input" accept="image/*" class="hidden">
+                </div>
+            </div>
 
-  <script>
-    const uploadInput = document.getElementById('upload');
-    const sensitivityInput = document.getElementById('sensitivity');
-    const colorTolInput = document.getElementById('colorTolerance');
-    const circleMaskCheck = document.getElementById('circleMask');
-    const sensVal = document.getElementById('sensVal');
-    const colorTolVal = document.getElementById('colorTolVal');
-    const downloadBtn = document.getElementById('downloadBtn');
+            <!-- Color Threshold Mode -->
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">2. Loại Dấu Mộc (Màu Sắc)</label>
+                <select id="color-mode" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option value="red">Dấu Mộc Đỏ / Cam (HSV Red Segment)</option>
+                    <option value="blue">Dấu Mộc Xanh Dương (HSV Blue Segment)</option>
+                    <option value="black">Dấu Mộc Đen / Xám (Grayscale Adaptive)</option>
+                    <option value="custom">Tùy Chỉnh Khoảng HSV (Custom HSV)</option>
+                </select>
+            </div>
 
-    const canvasIn = document.getElementById('canvasInput');
-    const canvasOut = document.getElementById('canvasOutput');
-    const ctxIn = canvasIn.getContext('2d', { willReadFrequently: true });
-    const ctxOut = canvasOut.getContext('2d', { willReadFrequently: true });
+            <!-- HSV Controls -->
+            <div id="hsv-controls" class="space-y-4 border-t border-slate-700 pt-4">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Cấu Hình Lọc HSV</h3>
+                
+                <!-- Hue Min/Max -->
+                <div>
+                    <div class="flex justify-between text-xs text-slate-300 mb-1">
+                        <span>Hue (Sắc độ) Min - Max</span>
+                        <span id="hue-val" class="text-blue-400 font-mono">0 - 10</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <input type="range" id="h-min" min="0" max="180" value="0" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        <input type="range" id="h-max" min="0" max="180" value="10" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    </div>
+                </div>
 
-    let imgElement = new Image();
-    let isDrawing = false;
-    let startX = 0, startY = 0;
-    let cropRect = null;
+                <!-- Saturation Min -->
+                <div>
+                    <div class="flex justify-between text-xs text-slate-300 mb-1">
+                        <span>Saturation Min (Độ bão hòa)</span>
+                        <span id="sat-val" class="text-blue-400 font-mono">50</span>
+                    </div>
+                    <input type="range" id="s-min" min="0" max="255" value="50" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
 
-    uploadInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+                <!-- Value Min -->
+                <div>
+                    <div class="flex justify-between text-xs text-slate-300 mb-1">
+                        <span>Value Min (Độ sáng)</span>
+                        <span id="val-val" class="text-blue-400 font-mono">50</span>
+                    </div>
+                    <input type="range" id="v-min" min="0" max="255" value="50" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+            </div>
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        imgElement.onload = () => {
-          canvasIn.width = imgElement.width;
-          canvasIn.height = imgElement.height;
-          canvasOut.width = imgElement.width;
-          canvasOut.height = imgElement.height;
+            <!-- Morphological Clean Up -->
+            <div class="border-t border-slate-700 pt-4 space-y-4">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Khử Nhiễu & Làm Sạch (Morphology)</h3>
+                
+                <div>
+                    <div class="flex justify-between text-xs text-slate-300 mb-1">
+                        <span>Kích thước Kernel Khử Nhiễu</span>
+                        <span id="kernel-val" class="text-blue-400 font-mono">3x3</span>
+                    </div>
+                    <input type="range" id="kernel-size" min="1" max="7" step="2" value="3" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
 
-          cropRect = null;
-          ctxIn.drawImage(imgElement, 0, 0);
-          processImage();
-          downloadBtn.disabled = false;
-        };
-        imgElement.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="invert-mask" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500">
+                    <label for="invert-mask" class="text-xs text-slate-300">Đảo ngược Mask (Invert)</label>
+                </div>
+            </div>
 
-    sensitivityInput.addEventListener('input', () => { sensVal.innerText = sensitivityInput.value; processImage(); });
-    colorTolInput.addEventListener('input', () => { colorTolVal.innerText = colorTolInput.value; processImage(); });
-    circleMaskCheck.addEventListener('change', processImage);
+            <!-- Action Buttons -->
+            <div class="pt-2 flex flex-col space-y-3">
+                <button id="process-btn" disabled class="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg shadow transition-colors flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Tách Nền Ngay</span>
+                </button>
+                
+                <button id="download-btn" disabled class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg shadow transition-colors flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Tải Ảnh PNG Tách Nền</span>
+                </button>
+            </div>
+        </aside>
 
-    // --- KHOANH VÙNG ROI ---
-    function getCanvasCoordinates(e) {
-      const rect = canvasIn.getBoundingClientRect();
-      const scaleX = canvasIn.width / rect.width;
-      const scaleY = canvasIn.height / rect.height;
-      return {
-        x: (e.clientX - rect.left) * scaleX,
-        y: (e.clientY - rect.top) * scaleY
-      };
-    }
+        <!-- Canvas Display Area -->
+        <section class="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- Original Image Display -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col shadow-xl">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-semibold text-slate-300 flex items-center space-x-2">
+                        <i class="fa-regular fa-image text-blue-400"></i>
+                        <span>Ảnh Gốc (Original)</span>
+                    </h2>
+                    <span id="orig-size" class="text-xs font-mono text-slate-400">0 x 0</span>
+                </div>
+                <div class="flex-1 canvas-container rounded-lg border border-slate-700 flex items-center justify-center min-h-[300px] overflow-hidden p-2">
+                    <canvas id="canvas-src" class="max-w-full max-h-[500px] object-contain rounded"></canvas>
+                </div>
+            </div>
 
-    canvasIn.addEventListener('mousedown', (e) => {
-      if (!imgElement.src) return;
-      isDrawing = true;
-      const coords = getCanvasCoordinates(e);
-      startX = coords.x;
-      startY = coords.y;
-    });
+            <!-- Processed Result Display -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col shadow-xl">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-semibold text-slate-300 flex items-center space-x-2">
+                        <i class="fa-solid fa-layer-group text-emerald-400"></i>
+                        <span>Dấu Mộc Đã Tách Nền (Transparent PNG)</span>
+                    </h2>
+                    <span id="proc-status" class="text-xs text-slate-400">Chờ ảnh...</span>
+                </div>
+                <div class="flex-1 canvas-container rounded-lg border border-slate-700 flex items-center justify-center min-h-[300px] overflow-hidden p-2">
+                    <canvas id="canvas-dst" class="max-w-full max-h-[500px] object-contain rounded"></canvas>
+                </div>
+            </div>
 
-    canvasIn.addEventListener('mousemove', (e) => {
-      if (!isDrawing) return;
-      const coords = getCanvasCoordinates(e);
-      ctxIn.drawImage(imgElement, 0, 0);
-      ctxIn.strokeStyle = '#d93025';
-      ctxIn.lineWidth = Math.max(2, canvasIn.width / 300);
-      ctxIn.setLineDash([6, 6]);
-      
-      let w = coords.x - startX;
-      let h = coords.y - startY;
+        </section>
 
-      if (circleMaskCheck.checked) {
-        ctxIn.beginPath();
-        ctxIn.ellipse(startX + w/2, startY + h/2, Math.abs(w/2), Math.abs(h/2), 0, 0, 2 * Math.PI);
-        ctxIn.stroke();
-      } else {
-        ctxIn.strokeRect(startX, startY, w, h);
-      }
-    });
+    </main>
 
-    canvasIn.addEventListener('mouseup', (e) => {
-      if (!isDrawing) return;
-      isDrawing = false;
-      const coords = getCanvasCoordinates(e);
+    <!-- Footer -->
+    <footer class="bg-slate-800 border-t border-slate-700 py-3 text-center text-xs text-slate-500">
+        Phát triển dựa trên OpenCV.js & Web Canvas API | Dùng cho bưu chính & tài liệu
+    </footer>
 
-      let x = Math.min(startX, coords.x);
-      let y = Math.min(startY, coords.y);
-      let w = Math.abs(coords.x - startX);
-      let h = Math.abs(coords.y - startY);
+    <!-- Application JavaScript Logic -->
+    <script>
+        let cvReady = false;
+        let imgElement = null;
 
-      if (w > 10 && h > 10) {
-        cropRect = { x, y, w, h };
-      } else {
-        cropRect = null;
-      }
+        const dropZone = document.getElementById('drop-zone');
+        const imageInput = document.getElementById('image-input');
+        const colorModeSelect = document.getElementById('color-mode');
+        const hMinInput = document.getElementById('h-min');
+        const hMaxInput = document.getElementById('h-max');
+        const sMinInput = document.getElementById('s-min');
+        const vMinInput = document.getElementById('v-min');
+        const kernelInput = document.getElementById('kernel-size');
+        const invertCheckbox = document.getElementById('invert-mask');
 
-      ctxIn.drawImage(imgElement, 0, 0);
-      if (cropRect) {
-        ctxIn.strokeStyle = '#1a73e8';
-        ctxIn.lineWidth = Math.max(2, canvasIn.width / 300);
-        ctxIn.setLineDash([]);
-        
-        if (circleMaskCheck.checked) {
-          ctxIn.beginPath();
-          ctxIn.ellipse(cropRect.x + cropRect.w/2, cropRect.y + cropRect.h/2, cropRect.w/2, cropRect.h/2, 0, 0, 2 * Math.PI);
-          ctxIn.stroke();
-        } else {
-          ctxIn.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+        const processBtn = document.getElementById('process-btn');
+        const downloadBtn = document.getElementById('download-btn');
+
+        function onOpenCvReady() {
+            cvReady = true;
+            const badge = document.getElementById('status-badge');
+            badge.className = "flex items-center space-x-2 bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-500/30";
+            badge.innerHTML = `<i class="fa-solid fa-circle-check"></i><span>OpenCV.js Đã Sẵn Sàng</span>`;
+            if (imgElement) processBtn.disabled = false;
         }
-      }
-      processImage();
-    });
 
-    // --- THUẬT TOÁN BÓC MỘC TRÊN NỀN TEM (LOCAL CONTRAST DILATION) ---
-    function processImage() {
-      if (!imgElement.src) return;
+        dropZone.addEventListener('click', () => imageInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-blue-500'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
 
-      const width = canvasIn.width;
-      const height = canvasIn.height;
-      const imgData = ctxIn.getImageData(0, 0, width, height);
-      const data = imgData.data;
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                imgElement = new Image();
+                imgElement.onload = () => {
+                    const canvasSrc = document.getElementById('canvas-src');
+                    canvasSrc.width = imgElement.width;
+                    canvasSrc.height = imgElement.height;
+                    const ctx = canvasSrc.getContext('2d');
+                    ctx.drawImage(imgElement, 0, 0);
 
-      const outImgData = ctxOut.createImageData(width, height);
-      const outData = outImgData.data;
+                    document.getElementById('orig-size').innerText = `${imgElement.width} x ${imgElement.height} px`;
 
-      const sens = parseFloat(sensitivityInput.value);
-      const colorTol = parseFloat(colorTolInput.value);
-      const useCircleMask = circleMaskCheck.checked;
+                    if (cvReady) {
+                        processBtn.disabled = false;
+                        processImage();
+                    }
+                };
+                imgElement.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
 
-      // Bước 1: Tạo bản đồ độ xám (Grayscale)
-      const gray = new Float32Array(width * height);
-      for (let i = 0; i < data.length; i += 4) {
-        gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      }
-
-      // Bước 2: Tạo bản đồ nền cục bộ bằng thuật toán Max-Filter (Morphological Dilation)
-      // Giúp ước lượng độ sáng của nền ngay xung quanh từng pixel
-      const bgMap = new Float32Array(width * height);
-      const radius = 6; // Bán kính quét nền xung quanh
-
-      let cx = 0, cy = 0, rx = 0, ry = 0;
-      if (cropRect) {
-        cx = cropRect.x + cropRect.w / 2;
-        cy = cropRect.y + cropRect.h / 2;
-        rx = cropRect.w / 2;
-        ry = cropRect.h / 2;
-      }
-
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const idx = y * width + x;
-
-          // Bỏ qua pixel ngoài vùng khoanh
-          if (cropRect) {
-            if (x < cropRect.x || x > cropRect.x + cropRect.w || y < cropRect.y || y > cropRect.y + cropRect.h) continue;
-            if (useCircleMask) {
-              let dx = (x - cx) / rx;
-              let dy = (y - cy) / ry;
-              if ((dx * dx + dy * dy) > 1.0) continue;
+        colorModeSelect.addEventListener('change', () => {
+            const mode = colorModeSelect.value;
+            if (mode === 'red') {
+                hMinInput.value = 0; hMaxInput.value = 10;
+                sMinInput.value = 70; vMinInput.value = 50;
+            } else if (mode === 'blue') {
+                hMinInput.value = 90; hMaxInput.value = 130;
+                sMinInput.value = 50; vMinInput.value = 50;
+            } else if (mode === 'black') {
+                hMinInput.value = 0; hMaxInput.value = 180;
+                sMinInput.value = 0; vMinInput.value = 0;
             }
-          }
+            updateValueLabels();
+            if (imgElement && cvReady) processImage();
+        });
 
-          // Tìm giá trị độ sáng lớn nhất (nền sáng nhất) trong bán kính lân cận
-          let maxVal = gray[idx];
-          for (let dy = -radius; dy <= radius; dy += 3) {
-            let ny = y + dy;
-            if (ny < 0 || ny >= height) continue;
-            for (let dx = -radius; dx <= radius; dx += 3) {
-              let nx = x + dx;
-              if (nx < 0 || nx >= width) continue;
-              let nVal = gray[ny * width + nx];
-              if (nVal > maxVal) maxVal = nVal;
+        [hMinInput, hMaxInput, sMinInput, vMinInput, kernelInput, invertCheckbox].forEach(el => {
+            el.addEventListener('input', () => {
+                updateValueLabels();
+                if (imgElement && cvReady) processImage();
+            });
+        });
+
+        function updateValueLabels() {
+            document.getElementById('hue-val').innerText = `${hMinInput.value} - ${hMaxInput.value}`;
+            document.getElementById('sat-val').innerText = sMinInput.value;
+            document.getElementById('val-val').innerText = vMinInput.value;
+            document.getElementById('kernel-val').innerText = `${kernelInput.value}x${kernelInput.value}`;
+        }
+
+        processBtn.addEventListener('click', () => {
+            if (cvReady && imgElement) processImage();
+        });
+
+        // Xử lý tách nền bằng OpenCV.js
+        function processImage() {
+            try {
+                const src = cv.imread('canvas-src');
+                const hsv = new cv.Mat();
+                const mask = new cv.Mat();
+                const mask1 = new cv.Mat();
+                const mask2 = new cv.Mat();
+                const dst = new cv.Mat(src.rows, src.cols, cv.CV_8UC4, new cv.Scalar(0, 0, 0, 0));
+
+                const mode = colorModeSelect.value;
+
+                if (mode === 'black') {
+                    const gray = new cv.Mat();
+                    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                    cv.adaptiveThreshold(gray, mask, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 15, 8);
+                    gray.delete();
+                } else {
+                    cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
+                    cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
+
+                    const lowH = parseFloat(hMinInput.value);
+                    const highH = parseFloat(hMaxInput.value);
+                    const lowS = parseFloat(sMinInput.value);
+                    const lowV = parseFloat(vMinInput.value);
+
+                    if (mode === 'red' && lowH === 0) {
+                        let low1 = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, lowS, lowV, 0]);
+                        let high1 = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [10, 255, 255, 255]);
+                        let low2 = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [170, lowS, lowV, 0]);
+                        let high2 = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [180, 255, 255, 255]);
+
+                        cv.inRange(hsv, low1, high1, mask1);
+                        cv.inRange(hsv, low2, high2, mask2);
+                        cv.bitwise_or(mask1, mask2, mask);
+
+                        low1.delete(); high1.delete(); low2.delete(); high2.delete();
+                    } else {
+                        let low = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [lowH, lowS, lowV, 0]);
+                        let high = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [highH, 255, 255, 255]);
+                        cv.inRange(hsv, low, high, mask);
+                        low.delete(); high.delete();
+                    }
+                }
+
+                if (invertCheckbox.checked) {
+                    cv.bitwise_not(mask, mask);
+                }
+
+                const kSize = parseInt(kernelInput.value);
+                if (kSize > 1) {
+                    const M = cv.Mat.ones(kSize, kSize, cv.CV_8U);
+                    const anchor = new cv.Point(-1, -1);
+                    cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, M, anchor, 1);
+                    cv.morphologyEx(mask, mask, cv.MORPH_OPEN, M, anchor, 1);
+                    M.delete();
+                }
+
+                for (let i = 0; i < src.rows; i++) {
+                    for (let j = 0; j < src.cols; j++) {
+                        const maskVal = mask.ucharPtr(i, j)[0];
+                        if (maskVal > 0) {
+                            const pixel = src.ucharPtr(i, j);
+                            dst.ucharPtr(i, j)[0] = pixel[0];
+                            dst.ucharPtr(i, j)[1] = pixel[1];
+                            dst.ucharPtr(i, j)[2] = pixel[2];
+                            dst.ucharPtr(i, j)[3] = 255;
+                        }
+                    }
+                }
+
+                cv.imshow('canvas-dst', dst);
+                src.delete(); hsv.delete(); mask.delete(); mask1.delete(); mask2.delete(); dst.delete();
+
+                document.getElementById('proc-status').innerText = "Tách nền thành công!";
+                downloadBtn.disabled = false;
+
+            } catch (err) {
+                console.error("OpenCV Processing Error:", err);
+                document.getElementById('proc-status').innerText = "Lỗi xử lý hình ảnh";
             }
-          }
-          bgMap[idx] = maxVal;
         }
-      }
 
-      // Bước 3: Lọc lấy nét mộc dựa trên độ tương phản cục bộ & Loại trừ sắc màu tem
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const idx = y * width + x;
-          const i = idx * 4;
-
-          if (bgMap[idx] === 0) continue;
-
-          let r = data[i];
-          let g = data[i + 1];
-          let b = data[i + 2];
-
-          // Độ chênh lệch giữa nền xung quanh và điểm hiện tại
-          let diff = bgMap[idx] - gray[idx];
-
-          // Kiểm tra độ trung tính màu (Mực dấu là đen/xám nên R,G,B tương đương nhau)
-          let maxColorDiff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
-
-          // ĐIỀU KIỆN LỌC NÂNG CAO:
-          // 1. Điểm đó phải tối hơn nền xung quanh ít nhất 'sens' đơn vị (Tự thích nghi theo màu tem)
-          // 2. Điểm đó không được mang màu sắc đậm của tem (maxColorDiff <= colorTol)
-          if (diff > sens && maxColorDiff <= colorTol) {
-            // Giữ lại nét mực đen thật
-            outData[i] = r;
-            outData[i + 1] = g;
-            outData[i + 2] = b;
-            outData[i + 3] = 255;
-          } else {
-            // Xóa nền tem cam, tem xanh, nền thư
-            outData[i + 3] = 0;
-          }
-        }
-      }
-
-      ctxOut.putImageData(outImgData, 0, 0);
-    }
-
-    downloadBtn.addEventListener('click', () => {
-      const link = document.createElement('a');
-      link.download = 'boc-moc-chuyen-nghiep.png';
-      link.href = canvasOut.toDataURL('image/png');
-      link.click();
-    });
-  </script>
-
+        downloadBtn.addEventListener('click', () => {
+            const canvasDst = document.getElementById('canvas-dst');
+            const link = document.createElement('a');
+            link.download = 'postal_stamp_segmented.png';
+            link.href = canvasDst.toDataURL('image/png');
+            link.click();
+        });
+    </script>
 </body>
 </html>
