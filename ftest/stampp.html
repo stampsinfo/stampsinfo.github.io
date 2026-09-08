@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tách Dấu Mộc Phức Tạp Tự Động (OpenCV)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 0 20px;
+      background-color: #f8f9fa;
+      color: #212529;
+    }
+    h2 { text-align: center; color: #1a73e8; }
+    .status-bar {
+      text-align: center;
+      padding: 8px;
+      background: #e8f0fe;
+      color: #1a73e8;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+    .panel {
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      align-items: end;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    label { font-size: 0.85em; font-weight: 600; }
+    select, input, button {
+      padding: 8px 12px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    button {
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background-color: #1557b0; }
+    button:disabled { background-color: #ccc; cursor: not-allowed; }
+    .preview-container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .preview-box {
+      flex: 1;
+      min-width: 300px;
+      text-align: center;
+    }
+    canvas {
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-image: linear-gradient(45deg, #eee 25%, transparent 25%), 
+                        linear-gradient(-45deg, #eee 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #eee 75%), 
+                        linear-gradient(-45deg, transparent 75%, #eee 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+  </style>
+  <!-- Nhúng OpenCV.js từ CDN -->
+  <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady()"></script>
+</head>
+<body>
+
+  <h2>Công Cụ Tách Dấu Mộc Phức Tạp (OpenCV)</h2>
+  <div id="status" class="status-bar">Đang tải thư viện OpenCV (vui lòng chờ vài giây)...</div>
+
+  <div class="panel">
+    <div class="controls">
+      <div class="control-group">
+        <label for="upload">1. Chọn ảnh con dấu:</label>
+        <input type="file" id="upload" accept="image/*" disabled>
+      </div>
+
+      <div class="control-group">
+        <label for="stampType">2. Loại dấu / Màu sắc:</label>
+        <select id="stampType" disabled>
+          <option value="red">Dấu mộc Đỏ (Chuẩn / Bưu chính)</option>
+          <option value="blue">Dấu mộc Xanh (Con dấu tròn / chữ ký)</option>
+          <option value="black">Dấu Đen / Tối màu (Phân ngưỡng cao cấp)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="denoise">3. Khử nhiễu hạt nền:</label>
+        <input type="range" id="denoise" min="0" max="5" value="1" disabled>
+      </div>
+
+      <div class="control-group">
+        <button id="downloadBtn" disabled>Tải ảnh PNG Nền Trong Suốt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="preview-container">
+    <div class="preview-box">
+      <h4>Ảnh gốc</h4>
+      <canvas id="canvasInput"></canvas>
+    </div>
+    <div class="preview-box">
+      <h4>Kết quả tách tự động</h4>
+      <canvas id="canvasOutput"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let cvReady = false;
+    let imgElement = new Image();
+
+    const statusText = document.getElementById('status');
+    const uploadInput = document.getElementById('upload');
+    const stampTypeSelect = document.getElementById('stampType');
+    const denoiseInput = document.getElementById('denoise');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    function onOpenCvReady() {
+      cvReady = true;
+      statusText.innerText = "Thư viện đã sẵn sàng! Vui lòng chọn ảnh con dấu.";
+      statusText.style.background = "#e6f4ea";
+      statusText.style.color = "#137333";
+      uploadInput.disabled = false;
+      stampTypeSelect.disabled = false;
+      denoiseInput.disabled = false;
+    }
+
+    uploadInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        imgElement.onload = () => {
+          // Hiển thị ảnh gốc
+          let canvasIn = document.getElementById('canvasInput');
+          canvasIn.width = imgElement.width;
+          canvasIn.height = imgElement.height;
+          let ctxIn = canvasIn.getContext('2d');
+          ctxIn.drawImage(imgElement, 0, 0);
+
+          processStamp();
+          downloadBtn.disabled = false;
+        };
+        imgElement.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    stampTypeSelect.addEventListener('change', processStamp);
+    denoiseInput.addEventListener('input', processStamp);
+
+    function processStamp() {
+      if (!cvReady || !imgElement.src) return;
+
+      // 1. Đọc ảnh từ Canvas gốc vào OpenCV Mat
+      let src = cv.imread('canvasInput');
+      let hsv = new cv.Mat();
+      let mask = new cv.Mat();
+      
+      // Chuyển sang hệ màu HSV để tách riêng sắc độ (Hue)
+      cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
+      cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
+
+      let stampType = stampTypeSelect.value;
+
+      if (stampType === 'red') {
+        // Màu đỏ trong HSV nằm ở 2 dải: [0-10] và [160-180]
+        let mask1 = new cv.Mat();
+        let mask2 = new cv.Mat();
+
+        let low1 = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [0, 40, 40, 0]);
+        let high1 = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [12, 255, 255, 0]);
+        let low2 = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [155, 40, 40, 0]);
+        let high2 = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [180, 255, 255, 0]);
+
+        cv.inRange(hsv, low1, high1, mask1);
+        cv.inRange(hsv, low2, high2, mask2);
+        cv.bitwise_or(mask1, mask2, mask);
+
+        mask1.delete(); mask2.delete(); low1.delete(); high1.delete(); low2.delete(); high2.delete();
+
+      } else if (stampType === 'blue') {
+        // Màu xanh lục/xanh dương
+        let low = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [90, 40, 40, 0]);
+        let high = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [135, 255, 255, 0]);
+        cv.inRange(hsv, low, high, mask);
+        low.delete(); high.delete();
+
+      } else if (stampType === 'black') {
+        // Dấu đen: Dùng Adaptive Threshold trên Kênh Xám (Gray)
+        let gray = new cv.Mat();
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+        cv.adaptiveThreshold(gray, mask, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 15, 8);
+        gray.delete();
+      }
+
+      // Khử nhiễu mộc nếu thanh cuộn > 0 (Morphology Opening)
+      let denoiseVal = parseInt(denoiseInput.value);
+      if (denoiseVal > 0) {
+        let M = cv.Mat.ones(denoiseVal, denoiseVal, cv.CV_8U);
+        cv.morphologyEx(mask, mask, cv.MORPH_OPEN, M);
+        M.delete();
+      }
+
+      // Tạo ảnh RGBA kết quả có kênh Alpha trong suốt
+      let dst = new cv.Mat(src.rows, src.cols, cv.CV_8UC4);
+      for (let i = 0; i < src.rows; i++) {
+        for (let j = 0; j < src.cols; j++) {
+          let maskVal = mask.ucharPtr(i, j)[0];
+          let srcPix = src.ucharPtr(i, j);
+
+          if (maskVal > 0) {
+            // Giữ lại màu gốc của con dấu tại điểm đó, gắn Alpha = 255 (rõ nét)
+            dst.ucharPtr(i, j)[0] = srcPix[0];
+            dst.ucharPtr(i, j)[1] = srcPix[1];
+            dst.ucharPtr(i, j)[2] = srcPix[2];
+            dst.ucharPtr(i, j)[3] = 255; 
+          } else {
+            // Nền trong suốt hoàn toàn
+            dst.ucharPtr(i, j)[0] = 0;
+            dst.ucharPtr(i, j)[1] = 0;
+            dst.ucharPtr(i, j)[2] = 0;
+            dst.ucharPtr(i, j)[3] = 0;
+          }
+        }
+      }
+
+      // Hiển thị ra Canvas đầu ra
+      cv.imshow('canvasOutput', dst);
+
+      // Giải phóng bộ nhớ C++ của OpenCV
+      src.delete(); hsv.delete(); mask.delete(); dst.delete();
+    }
+
+    // Tải về PNG trong suốt
+    downloadBtn.addEventListener('click', () => {
+      const canvasOut = document.getElementById('canvasOutput');
+      const link = document.createElement('a');
+      link.download = 'dau-moc-tu-dong-opencv.png';
+      link.href = canvasOut.toDataURL('image/png');
+      link.click();
+    });
+  </script>
+
+</body>
+</html>
