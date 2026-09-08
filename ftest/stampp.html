@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Công Cụ Tách Dấu Mộc Phức Tạp (Thuần JS)</title>
+  <title>Tách Dấu Mộc Đen Bưu Chính</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      max-width: 1000px;
+      max-width: 1100px;
       margin: 20px auto;
       padding: 0 20px;
       background-color: #f8f9fa;
@@ -50,7 +50,9 @@
     }
     button:hover { background-color: #1557b0; }
     button:disabled { background-color: #ccc; cursor: not-allowed; }
-    
+    .btn-reset { background-color: #6c757d; }
+    .btn-reset:hover { background-color: #5a6268; }
+
     .preview-container {
       display: flex;
       gap: 20px;
@@ -59,8 +61,13 @@
     }
     .preview-box {
       flex: 1;
-      min-width: 300px;
+      min-width: 350px;
       text-align: center;
+    }
+    .canvas-wrapper {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
     }
     canvas {
       max-width: 100%;
@@ -74,56 +81,54 @@
       background-size: 20px 20px;
       background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
     }
+    .hint { font-size: 0.8em; color: #d93025; margin-top: 4px; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <h2>Công Cụ Tách Dấu Mộc Bưu Chính & Dấu Phức Tạp</h2>
-  <p class="subtitle">Tự động tách nền trong suốt • Hoạt động 100% Offline • Không phụ thuộc thư viện ngoài</p>
+  <h2>Công Cụ Tách Dấu Đen Bưu Chính</h2>
+  <p class="subtitle">Kéo chuột trên ảnh gốc để khoanh vùng con dấu cần lấy</p>
 
   <div class="panel">
     <div class="controls">
       <div class="control-group">
-        <label for="upload">1. Chọn ảnh con dấu:</label>
+        <label for="upload">1. Chọn ảnh bì thư / tem:</label>
         <input type="file" id="upload" accept="image/*">
       </div>
 
       <div class="control-group">
-        <label for="stampMode">2. Chế độ xử lý:</label>
-        <select id="stampMode">
-          <option value="red_hsv">Dấu Đỏ / Bưu Chính (Lọc HSV)</option>
-          <option value="blue_hsv">Dấu Xanh (Con dấu tròn / Chữ ký)</option>
-          <option value="adaptive">Dấu Đen / Tối màu (Tự động thích nghi)</option>
-        </select>
+        <label for="darkness">2. Độ đậm nét con dấu: <span id="darkVal">120</span></label>
+        <input type="range" id="darkness" min="40" max="200" value="120">
       </div>
 
       <div class="control-group">
-        <label for="threshold">3. Độ nhạy lọc (Threshold): <span id="threshVal">40</span></label>
-        <input type="range" id="threshold" min="10" max="100" value="40">
+        <button id="resetCropBtn" class="btn-reset" disabled>Bỏ vùng khoanh (Lấy toàn bộ)</button>
       </div>
 
       <div class="control-group">
-        <button id="downloadBtn" disabled>Tải ảnh PNG Nền Trong Suốt</button>
+        <button id="downloadBtn" disabled>Tải ảnh con dấu PNG</button>
       </div>
     </div>
   </div>
 
   <div class="preview-container">
     <div class="preview-box">
-      <h4>Ảnh gốc</h4>
-      <canvas id="canvasInput"></canvas>
+      <h4>Ảnh gốc <span class="hint">(Nhấp & Kéo chuột để khoanh vùng dấu)</span></h4>
+      <div class="canvas-wrapper">
+        <canvas id="canvasInput"></canvas>
+      </div>
     </div>
     <div class="preview-box">
-      <h4>Kết quả tách tự động</h4>
+      <h4>Kết quả tách riêng con dấu</h4>
       <canvas id="canvasOutput"></canvas>
     </div>
   </div>
 
   <script>
     const uploadInput = document.getElementById('upload');
-    const stampModeSelect = document.getElementById('stampMode');
-    const thresholdInput = document.getElementById('threshold');
-    const threshVal = document.getElementById('threshVal');
+    const darknessInput = document.getElementById('darkness');
+    const darkVal = document.getElementById('darkVal');
+    const resetCropBtn = document.getElementById('resetCropBtn');
     const downloadBtn = document.getElementById('downloadBtn');
 
     const canvasIn = document.getElementById('canvasInput');
@@ -132,27 +137,11 @@
     const ctxOut = canvasOut.getContext('2d', { willReadFrequently: true });
 
     let imgElement = new Image();
-
-    // Chuyển RGB sang HSV
-    function rgbToHsv(r, g, b) {
-      r /= 255; g /= 255; b /= 255;
-      let max = Math.max(r, g, b), min = Math.min(r, g, b);
-      let h, s, v = max;
-      let d = max - min;
-      s = max === 0 ? 0 : d / max;
-
-      if (max === min) {
-        h = 0;
-      } else {
-        switch (max) {
-          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-          case g: h = (b - r) / d + 2; break;
-          case b: h = (r - g) / d + 4; break;
-        }
-        h /= 6;
-      }
-      return [h * 360, s * 100, v * 100];
-    }
+    
+    // Tọa độ vùng khoanh (ROI)
+    let isDrawing = false;
+    let startX = 0, startY = 0;
+    let cropRect = null; // { x, y, w, h } theo kích thước thật của ảnh
 
     uploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -166,6 +155,9 @@
           canvasOut.width = imgElement.width;
           canvasOut.height = imgElement.height;
 
+          cropRect = null;
+          resetCropBtn.disabled = true;
+
           ctxIn.drawImage(imgElement, 0, 0);
           processImage();
           downloadBtn.disabled = false;
@@ -175,13 +167,80 @@
       reader.readAsDataURL(file);
     });
 
-    thresholdInput.addEventListener('input', () => {
-      threshVal.innerText = thresholdInput.value;
+    darknessInput.addEventListener('input', () => {
+      darkVal.innerText = darknessInput.value;
       processImage();
     });
 
-    stampModeSelect.addEventListener('change', processImage);
+    // --- XỬ LÝ KÉO CHUỘT KHOANH VÙNG (CROP ROI) ---
+    function getCanvasCoordinates(e) {
+      const rect = canvasIn.getBoundingClientRect();
+      const scaleX = canvasIn.width / rect.width;
+      const scaleY = canvasIn.height / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
 
+    canvasIn.addEventListener('mousedown', (e) => {
+      if (!imgElement.src) return;
+      isDrawing = true;
+      const coords = getCanvasCoordinates(e);
+      startX = coords.x;
+      startY = coords.y;
+    });
+
+    canvasIn.addEventListener('mousemove', (e) => {
+      if (!isDrawing) return;
+      const coords = getCanvasCoordinates(e);
+      const currentX = coords.x;
+      const currentY = coords.y;
+
+      // Vẽ lại ảnh gốc và khung hình chữ nhật chọn
+      ctxIn.drawImage(imgElement, 0, 0);
+      ctxIn.strokeStyle = '#d93025';
+      ctxIn.lineWidth = Math.max(2, canvasIn.width / 300);
+      ctxIn.setLineDash([6, 6]);
+      ctxIn.strokeRect(startX, startY, currentX - startX, currentY - startY);
+    });
+
+    canvasIn.addEventListener('mouseup', (e) => {
+      if (!isDrawing) return;
+      isDrawing = false;
+      const coords = getCanvasCoordinates(e);
+
+      let x = Math.min(startX, coords.x);
+      let y = Math.min(startY, coords.y);
+      let w = Math.abs(coords.x - startX);
+      let h = Math.abs(coords.y - startY);
+
+      // Nếu vùng chọn đủ lớn mới tính là khoanh vùng
+      if (w > 10 && h > 10) {
+        cropRect = { x, y, w, h };
+        resetCropBtn.disabled = false;
+      } else {
+        cropRect = null;
+      }
+
+      ctxIn.drawImage(imgElement, 0, 0);
+      if (cropRect) {
+        ctxIn.strokeStyle = '#1a73e8';
+        ctxIn.lineWidth = Math.max(2, canvasIn.width / 300);
+        ctxIn.setLineDash([]);
+        ctxIn.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+      }
+      processImage();
+    });
+
+    resetCropBtn.addEventListener('click', () => {
+      cropRect = null;
+      resetCropBtn.disabled = true;
+      ctxIn.drawImage(imgElement, 0, 0);
+      processImage();
+    });
+
+    // --- THUẬT TOÁN LỌC DẤU ĐEN ---
     function processImage() {
       if (!imgElement.src) return;
 
@@ -193,44 +252,49 @@
       const outImgData = ctxOut.createImageData(width, height);
       const outData = outImgData.data;
 
-      const mode = stampModeSelect.value;
-      const sensitivity = parseFloat(thresholdInput.value);
+      const maxDarkness = parseFloat(darknessInput.value);
 
-      for (let i = 0; i < data.length; i += 4) {
-        let r = data[i];
-        let g = data[i + 1];
-        let b = data[i + 2];
-        let isStamp = false;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
 
-        if (mode === 'red_hsv') {
-          // Lọc sắc độ màu đỏ trong không gian HSV
-          let [h, s, v] = rgbToHsv(r, g, b);
-          let isRedHue = (h <= 25 || h >= 330);
-          if (isRedHue && s >= sensitivity && v >= 20) {
-            isStamp = true;
+          // Nếu có vùng khoanh, điểm nằm ngoài vùng khoanh sẽ bị bỏ qua
+          if (cropRect) {
+            if (x < cropRect.x || x > cropRect.x + cropRect.w ||
+                y < cropRect.y || y > cropRect.y + cropRect.h) {
+              outData[i + 3] = 0; // Trong suốt
+              continue;
+            }
           }
-        } else if (mode === 'blue_hsv') {
-          // Lọc sắc độ màu xanh
-          let [h, s, v] = rgbToHsv(r, g, b);
-          let isBlueHue = (h >= 170 && h <= 260);
-          if (isBlueHue && s >= sensitivity && v >= 20) {
-            isStamp = true;
-          }
-        } else if (mode === 'adaptive') {
-          // Phân ngưỡng độ sáng tối thích nghi
-          let gray = 0.299 * r + 0.587 * g + 0.114 * b;
-          if (gray < (255 - sensitivity * 1.8)) {
-            isStamp = true;
-          }
-        }
 
-        if (isStamp) {
-          outData[i] = r;
-          outData[i + 1] = g;
-          outData[i + 2] = b;
-          outData[i + 3] = 255; // Giữ lại nét mộc
-        } else {
-          outData[i + 3] = 0;   // Xóa nền thành trong suốt
+          let r = data[i];
+          let g = data[i + 1];
+          let b = data[i + 2];
+
+          // 1. Độ sáng trung bình
+          let brightness = (r + g + b) / 3;
+
+          // 2. Kiểm tra độ lệch màu để loại bỏ màu đỏ/nâu của hình vẽ và tem màu
+          let colorDiff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
+
+          // Điều kiện nhận diện mực con dấu màu đen/xám:
+          // - Độ sáng phải tối (brightness < maxDarkness)
+          // - Màu sắc phải trung tính/xám/đen (colorDiff thấp) hoặc màu mực đen pha sắc xanh nhẹ
+          let isBlackInk = (brightness < maxDarkness) && (colorDiff < 45 || (b > r && b > g && brightness < maxDarkness * 0.9));
+
+          // Loại bỏ riêng nét mực đỏ của hình vẽ bên trái (R cao hơn hẳn G và B)
+          if (r > g + 25 && r > b + 25) {
+            isBlackInk = false;
+          }
+
+          if (isBlackInk) {
+            outData[i] = r;
+            outData[i + 1] = g;
+            outData[i + 2] = b;
+            outData[i + 3] = 255; // Giữ lại
+          } else {
+            outData[i + 3] = 0;   // Xóa nền
+          }
         }
       }
 
@@ -239,7 +303,7 @@
 
     downloadBtn.addEventListener('click', () => {
       const link = document.createElement('a');
-      link.download = 'dau-moc-tach-nen.png';
+      link.download = 'con-dau-ha-noi.png';
       link.href = canvasOut.toDataURL('image/png');
       link.click();
     });
