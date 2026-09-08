@@ -14,15 +14,37 @@
       color: #212529;
     }
     h2 { text-align: center; color: #1a73e8; }
-    .status-bar {
-      text-align: center;
-      padding: 8px;
-      background: #e8f0fe;
-      color: #1a73e8;
-      border-radius: 4px;
-      font-weight: bold;
-      margin-bottom: 15px;
+    
+    /* Khung hiển thị trạng thái và tiến trình */
+    .status-container {
+      background: #ffffff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
     }
+    .status-info {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #1a73e8;
+      font-size: 0.95em;
+    }
+    .progress-bar-bg {
+      width: 100%;
+      height: 12px;
+      background-color: #e0e0e0;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background-color: #1a73e8;
+      transition: width 0.2s ease, background-color 0.3s ease;
+    }
+
     .panel {
       background: #ffffff;
       padding: 20px;
@@ -81,13 +103,21 @@
       background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
     }
   </style>
-  <!-- Nhúng OpenCV.js từ CDN -->
-  <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady()"></script>
 </head>
 <body>
 
   <h2>Công Cụ Tách Dấu Mộc Phức Tạp (OpenCV)</h2>
-  <div id="status" class="status-bar">Đang tải thư viện OpenCV (vui lòng chờ vài giây)...</div>
+
+  <!-- Thanh tiến trình tải OpenCV -->
+  <div class="status-container">
+    <div class="status-info">
+      <span id="statusText">Khởi tạo kết nối...</span>
+      <span id="statusPercent">0%</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div id="progressFill" class="progress-bar-fill"></div>
+    </div>
+  </div>
 
   <div class="panel">
     <div class="controls">
@@ -131,21 +161,78 @@
     let cvReady = false;
     let imgElement = new Image();
 
-    const statusText = document.getElementById('status');
+    const statusText = document.getElementById('statusText');
+    const statusPercent = document.getElementById('statusPercent');
+    const progressFill = document.getElementById('progressFill');
+
     const uploadInput = document.getElementById('upload');
     const stampTypeSelect = document.getElementById('stampType');
     const denoiseInput = document.getElementById('denoise');
     const downloadBtn = document.getElementById('downloadBtn');
 
-    function onOpenCvReady() {
-      cvReady = true;
-      statusText.innerText = "Thư viện đã sẵn sàng! Vui lòng chọn ảnh con dấu.";
-      statusText.style.background = "#e6f4ea";
-      statusText.style.color = "#137333";
-      uploadInput.disabled = false;
-      stampTypeSelect.disabled = false;
-      denoiseInput.disabled = false;
+    // Hàm tự tải OpenCV.js bằng Fetch API để đo %
+    async function loadOpenCVWithProgress() {
+      const url = 'https://docs.opencv.org/4.8.0/opencv.js';
+      statusText.innerText = "Đang tải thư viện OpenCV.js...";
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Không thể tải thư viện');
+
+        const contentLength = response.headers.get('content-length');
+        // Dung lượng ước tính ~9.2MB nếu CDN không trả về Content-Length
+        const total = contentLength ? parseInt(contentLength, 10) : 9600000; 
+
+        const reader = response.body.getReader();
+        let loaded = 0;
+        let chunks = [];
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          chunks.push(value);
+          loaded += value.length;
+
+          const percent = Math.min(100, Math.round((loaded / total) * 100));
+          progressFill.style.width = percent + '%';
+          statusPercent.innerText = percent + '%';
+        }
+
+        statusText.innerText = "Đang biên dịch WebAssembly...";
+        
+        // Tạo file script từ các dữ liệu đã nhận
+        const blob = new Blob(chunks, { type: 'application/javascript' });
+        const scriptUrl = URL.createObjectURL(blob);
+        const script = document.createElement('script');
+        script.src = scriptUrl;
+        
+        // Đợi WebAssembly khởi tạo xong
+        window.Module = {
+          onRuntimeInitialized() {
+            cvReady = true;
+            statusText.innerText = "Thư viện đã sẵn sàng! Vui lòng chọn ảnh con dấu.";
+            statusText.style.color = "#137333";
+            progressFill.style.backgroundColor = "#137333";
+            
+            uploadInput.disabled = false;
+            stampTypeSelect.disabled = false;
+            denoiseInput.disabled = false;
+          }
+        };
+
+        document.body.appendChild(script);
+
+      } catch (err) {
+        statusText.innerText = "Lỗi khi tải thư viện OpenCV!";
+        statusText.style.color = "#d93025";
+        progressFill.style.backgroundColor = "#d93025";
+        console.error(err);
+      }
     }
+
+    // Chạy tiến trình tải ngay khi mở trang
+    loadOpenCVWithProgress();
 
     uploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -154,7 +241,6 @@
       const reader = new FileReader();
       reader.onload = (event) => {
         imgElement.onload = () => {
-          // Hiển thị ảnh gốc
           let canvasIn = document.getElementById('canvasInput');
           canvasIn.width = imgElement.width;
           canvasIn.height = imgElement.height;
@@ -175,19 +261,16 @@
     function processStamp() {
       if (!cvReady || !imgElement.src) return;
 
-      // 1. Đọc ảnh từ Canvas gốc vào OpenCV Mat
       let src = cv.imread('canvasInput');
       let hsv = new cv.Mat();
       let mask = new cv.Mat();
       
-      // Chuyển sang hệ màu HSV để tách riêng sắc độ (Hue)
       cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
       cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
 
       let stampType = stampTypeSelect.value;
 
       if (stampType === 'red') {
-        // Màu đỏ trong HSV nằm ở 2 dải: [0-10] và [160-180]
         let mask1 = new cv.Mat();
         let mask2 = new cv.Mat();
 
@@ -203,21 +286,18 @@
         mask1.delete(); mask2.delete(); low1.delete(); high1.delete(); low2.delete(); high2.delete();
 
       } else if (stampType === 'blue') {
-        // Màu xanh lục/xanh dương
         let low = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [90, 40, 40, 0]);
         let high = new cv.Mat(hsv.rows(), hsv.cols(), hsv.type(), [135, 255, 255, 0]);
         cv.inRange(hsv, low, high, mask);
         low.delete(); high.delete();
 
       } else if (stampType === 'black') {
-        // Dấu đen: Dùng Adaptive Threshold trên Kênh Xám (Gray)
         let gray = new cv.Mat();
         cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
         cv.adaptiveThreshold(gray, mask, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 15, 8);
         gray.delete();
       }
 
-      // Khử nhiễu mộc nếu thanh cuộn > 0 (Morphology Opening)
       let denoiseVal = parseInt(denoiseInput.value);
       if (denoiseVal > 0) {
         let M = cv.Mat.ones(denoiseVal, denoiseVal, cv.CV_8U);
@@ -225,7 +305,6 @@
         M.delete();
       }
 
-      // Tạo ảnh RGBA kết quả có kênh Alpha trong suốt
       let dst = new cv.Mat(src.rows, src.cols, cv.CV_8UC4);
       for (let i = 0; i < src.rows; i++) {
         for (let j = 0; j < src.cols; j++) {
@@ -233,13 +312,11 @@
           let srcPix = src.ucharPtr(i, j);
 
           if (maskVal > 0) {
-            // Giữ lại màu gốc của con dấu tại điểm đó, gắn Alpha = 255 (rõ nét)
             dst.ucharPtr(i, j)[0] = srcPix[0];
             dst.ucharPtr(i, j)[1] = srcPix[1];
             dst.ucharPtr(i, j)[2] = srcPix[2];
             dst.ucharPtr(i, j)[3] = 255; 
           } else {
-            // Nền trong suốt hoàn toàn
             dst.ucharPtr(i, j)[0] = 0;
             dst.ucharPtr(i, j)[1] = 0;
             dst.ucharPtr(i, j)[2] = 0;
@@ -248,14 +325,10 @@
         }
       }
 
-      // Hiển thị ra Canvas đầu ra
       cv.imshow('canvasOutput', dst);
-
-      // Giải phóng bộ nhớ C++ của OpenCV
       src.delete(); hsv.delete(); mask.delete(); dst.delete();
     }
 
-    // Tải về PNG trong suốt
     downloadBtn.addEventListener('click', () => {
       const canvasOut = document.getElementById('canvasOutput');
       const link = document.createElement('a');
