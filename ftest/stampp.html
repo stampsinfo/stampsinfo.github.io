@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tự Động Nhận Diện & Tách Mộc Bưu Chính</title>
+  <title>Tách Mộc Bưu Chính Chuyên Nghiệp - Bóc Nền Tem</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -50,9 +50,7 @@
     }
     button:hover { background-color: #1557b0; }
     button:disabled { background-color: #ccc; cursor: not-allowed; }
-    .btn-reset { background-color: #6c757d; }
-    .btn-reset:hover { background-color: #5a6268; }
-
+    
     .preview-container {
       display: flex;
       gap: 20px;
@@ -83,68 +81,62 @@
       gap: 8px;
       margin-top: 5px;
     }
-    .checkbox-group input { width: auto; cursor: pointer; }
   </style>
 </head>
 <body>
 
-  <h2>Công Cụ Tự Động Định Hình & Tách Mộc Tròn</h2>
-  <p class="subtitle">Tự động ép khung hình tròn/elip & Lọc đốm mộc nhiễu xung quanh</p>
+  <h2>Công Cụ Tách Mộc Bưu Chính Thuần JS - Chống Mất Nét Trên Tem</h2>
+  <p class="subtitle">Sử dụng thuật toán Phân tích tương phản cục bộ (Local Contrast Subtraction)</p>
 
   <div class="panel">
     <div class="controls">
       <div class="control-group">
-        <label for="upload">1. Chọn ảnh FDC / Tem:</label>
+        <label for="upload">1. Chọn ảnh FDC / Bì Thư:</label>
         <input type="file" id="upload" accept="image/*">
       </div>
 
       <div class="control-group">
-        <label for="darkness">2. Độ đậm mực đen: <span id="darkVal">120</span></label>
-        <input type="range" id="darkness" min="30" max="180" value="120">
+        <label for="sensitivity">2. Độ nhạy bắt nét mộc: <span id="sensVal">25</span></label>
+        <input type="range" id="sensitivity" min="10" max="60" value="25">
       </div>
 
       <div class="control-group">
-        <label for="colorFilter">3. Kháng màu xung quanh: <span id="colorFilterVal">18</span></label>
-        <input type="range" id="colorFilter" min="5" max="40" value="18">
+        <label for="colorTolerance">3. Kháng màu tem (Xanh/Cam/Đỏ): <span id="colorTolVal">20</span></label>
+        <input type="range" id="colorTolerance" min="5" max="50" value="20">
       </div>
 
       <div class="control-group">
-        <label>4. Tính năng tự động:</label>
+        <label>4. Chế độ định hình:</label>
         <div class="checkbox-group">
           <input type="checkbox" id="circleMask" checked>
-          <label for="circleMask" style="font-weight:normal;">Mặt nạ Khung Tròn / Elip</label>
-        </div>
-        <div class="checkbox-group">
-          <input type="checkbox" id="removeNoise" checked>
-          <label for="removeNoise" style="font-weight:normal;">Xóa đốm nhiễu nhỏ</label>
+          <label for="circleMask">Cắt khung tròn / elip</label>
         </div>
       </div>
 
       <div class="control-group">
-        <button id="downloadBtn" disabled>Tải ảnh con dấu PNG</button>
+        <button id="downloadBtn" disabled>Tải ảnh PNG Nền Suốt</button>
       </div>
     </div>
   </div>
 
   <div class="preview-container">
     <div class="preview-box">
-      <h4>Ảnh gốc <span class="hint">(Khoanh sát viền con dấu)</span></h4>
+      <h4>Ảnh gốc <span class="hint">(Kéo chuột khoanh sát mộc)</span></h4>
       <canvas id="canvasInput"></canvas>
     </div>
     <div class="preview-box">
-      <h4>Kết quả tự động định hình mộc</h4>
+      <h4>Kết quả bóc mộc nguyên vẹn</h4>
       <canvas id="canvasOutput"></canvas>
     </div>
   </div>
 
   <script>
     const uploadInput = document.getElementById('upload');
-    const darknessInput = document.getElementById('darkness');
-    const colorFilterInput = document.getElementById('colorFilter');
+    const sensitivityInput = document.getElementById('sensitivity');
+    const colorTolInput = document.getElementById('colorTolerance');
     const circleMaskCheck = document.getElementById('circleMask');
-    const removeNoiseCheck = document.getElementById('removeNoise');
-    const darkVal = document.getElementById('darkVal');
-    const colorFilterVal = document.getElementById('colorFilterVal');
+    const sensVal = document.getElementById('sensVal');
+    const colorTolVal = document.getElementById('colorTolVal');
     const downloadBtn = document.getElementById('downloadBtn');
 
     const canvasIn = document.getElementById('canvasInput');
@@ -179,12 +171,11 @@
       reader.readAsDataURL(file);
     });
 
-    darknessInput.addEventListener('input', () => { darkVal.innerText = darknessInput.value; processImage(); });
-    colorFilterInput.addEventListener('input', () => { colorFilterVal.innerText = colorFilterInput.value; processImage(); });
+    sensitivityInput.addEventListener('input', () => { sensVal.innerText = sensitivityInput.value; processImage(); });
+    colorTolInput.addEventListener('input', () => { colorTolVal.innerText = colorTolInput.value; processImage(); });
     circleMaskCheck.addEventListener('change', processImage);
-    removeNoiseCheck.addEventListener('change', processImage);
 
-    // --- KHOANH VÙNG (ROI) ---
+    // --- KHOANH VÙNG ROI ---
     function getCanvasCoordinates(e) {
       const rect = canvasIn.getBoundingClientRect();
       const scaleX = canvasIn.width / rect.width;
@@ -215,7 +206,6 @@
       let h = coords.y - startY;
 
       if (circleMaskCheck.checked) {
-        // Vẽ khung elip xem trước
         ctxIn.beginPath();
         ctxIn.ellipse(startX + w/2, startY + h/2, Math.abs(w/2), Math.abs(h/2), 0, 0, 2 * Math.PI);
         ctxIn.stroke();
@@ -257,7 +247,7 @@
       processImage();
     });
 
-    // --- THUẬT TOÁN TỰ ĐỘNG XÁC ĐỊNH MỘC & LỌC NHIỄU ---
+    // --- THUẬT TOÁN BÓC MỘC TRÊN NỀN TEM (LOCAL CONTRAST DILATION) ---
     function processImage() {
       if (!imgElement.src) return;
 
@@ -269,12 +259,21 @@
       const outImgData = ctxOut.createImageData(width, height);
       const outData = outImgData.data;
 
-      const maxDarkness = parseFloat(darknessInput.value);
-      const maxColorDiff = parseFloat(colorFilterInput.value);
+      const sens = parseFloat(sensitivityInput.value);
+      const colorTol = parseFloat(colorTolInput.value);
       const useCircleMask = circleMaskCheck.checked;
-      const useNoiseFilter = removeNoiseCheck.checked;
 
-      // Tính thông số khung Elip nếu có khoanh vùng
+      // Bước 1: Tạo bản đồ độ xám (Grayscale)
+      const gray = new Float32Array(width * height);
+      for (let i = 0; i < data.length; i += 4) {
+        gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      }
+
+      // Bước 2: Tạo bản đồ nền cục bộ bằng thuật toán Max-Filter (Morphological Dilation)
+      // Giúp ước lượng độ sáng của nền ngay xung quanh từng pixel
+      const bgMap = new Float32Array(width * height);
+      const radius = 6; // Bán kính quét nền xung quanh
+
       let cx = 0, cy = 0, rx = 0, ry = 0;
       if (cropRect) {
         cx = cropRect.x + cropRect.w / 2;
@@ -283,88 +282,66 @@
         ry = cropRect.h / 2;
       }
 
-      // Mảng lưu trạng thái pixel mộc để lọc đốm nhiễu (0: Nền, 1: Mộc)
-      let mask = new Uint8Array(width * height);
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = y * width + x;
 
+          // Bỏ qua pixel ngoài vùng khoanh
+          if (cropRect) {
+            if (x < cropRect.x || x > cropRect.x + cropRect.w || y < cropRect.y || y > cropRect.y + cropRect.h) continue;
+            if (useCircleMask) {
+              let dx = (x - cx) / rx;
+              let dy = (y - cy) / ry;
+              if ((dx * dx + dy * dy) > 1.0) continue;
+            }
+          }
+
+          // Tìm giá trị độ sáng lớn nhất (nền sáng nhất) trong bán kính lân cận
+          let maxVal = gray[idx];
+          for (let dy = -radius; dy <= radius; dy += 3) {
+            let ny = y + dy;
+            if (ny < 0 || ny >= height) continue;
+            for (let dx = -radius; dx <= radius; dx += 3) {
+              let nx = x + dx;
+              if (nx < 0 || nx >= width) continue;
+              let nVal = gray[ny * width + nx];
+              if (nVal > maxVal) maxVal = nVal;
+            }
+          }
+          bgMap[idx] = maxVal;
+        }
+      }
+
+      // Bước 3: Lọc lấy nét mộc dựa trên độ tương phản cục bộ & Loại trừ sắc màu tem
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const idx = y * width + x;
           const i = idx * 4;
 
-          // 1. Kiểm tra phạm vi khoanh vùng
-          if (cropRect) {
-            if (x < cropRect.x || x > cropRect.x + cropRect.w || y < cropRect.y || y > cropRect.y + cropRect.h) {
-              continue;
-            }
-
-            // 2. TỰ ĐỘNG ÉP PHẠM VI KHUNG TRÒN / ELIP
-            if (useCircleMask) {
-              let dx = (x - cx) / rx;
-              let dy = (y - cy) / ry;
-              if ((dx * dx + dy * dy) > 1.0) { 
-                continue; // Nằm ngoài vòng tròn mộc -> XÓA TỰ ĐỘNG
-              }
-            }
-          }
+          if (bgMap[idx] === 0) continue;
 
           let r = data[i];
           let g = data[i + 1];
           let b = data[i + 2];
 
-          let brightness = (r + g + b) / 3;
-          let maxDiff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
+          // Độ chênh lệch giữa nền xung quanh và điểm hiện tại
+          let diff = bgMap[idx] - gray[idx];
 
-          // 3. Điều kiện nhận diện mực đen
-          if (brightness < maxDarkness && maxDiff <= maxColorDiff) {
-            mask[idx] = 1;
+          // Kiểm tra độ trung tính màu (Mực dấu là đen/xám nên R,G,B tương đương nhau)
+          let maxColorDiff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
+
+          // ĐIỀU KIỆN LỌC NÂNG CAO:
+          // 1. Điểm đó phải tối hơn nền xung quanh ít nhất 'sens' đơn vị (Tự thích nghi theo màu tem)
+          // 2. Điểm đó không được mang màu sắc đậm của tem (maxColorDiff <= colorTol)
+          if (diff > sens && maxColorDiff <= colorTol) {
+            // Giữ lại nét mực đen thật
             outData[i] = r;
             outData[i + 1] = g;
             outData[i + 2] = b;
             outData[i + 3] = 255;
-          }
-        }
-      }
-
-      // 4. THUẬT TOÁN XÓA ĐỐM NHIỄU LẺ TẺ (Blob Filter)
-      if (useNoiseFilter && cropRect) {
-        let visited = new Uint8Array(width * height);
-        let minBlobSize = 12; // Các cụm hạt dưới 12 pixel sẽ bị xóa tự động
-
-        for (let y = cropRect.y; y < cropRect.y + cropRect.h; y++) {
-          for (let x = cropRect.x; x < cropRect.x + cropRect.w; x++) {
-            let idx = Math.floor(y) * width + Math.floor(x);
-            if (mask[idx] === 1 && visited[idx] === 0) {
-              // BFS tìm cụm pixel liên thông
-              let queue = [idx];
-              let blob = [idx];
-              visited[idx] = 1;
-
-              let head = 0;
-              while(head < queue.length) {
-                let curr = queue[head++];
-                let cx = curr % width;
-                let cy = Math.floor(curr / width);
-
-                let neighbors = [
-                  curr - 1, curr + 1, curr - width, curr + width
-                ];
-
-                for (let n of neighbors) {
-                  if (n >= 0 && n < mask.length && mask[n] === 1 && visited[n] === 0) {
-                    visited[n] = 1;
-                    queue.push(n);
-                    blob.push(n);
-                  }
-                }
-              }
-
-              // Nếu cụm quá nhỏ (nhiễu/đốm dơ) -> Tự động xóa
-              if (blob.length < minBlobSize) {
-                for (let pixelIdx of blob) {
-                  outData[pixelIdx * 4 + 3] = 0;
-                }
-              }
-            }
+          } else {
+            // Xóa nền tem cam, tem xanh, nền thư
+            outData[i + 3] = 0;
           }
         }
       }
@@ -374,7 +351,7 @@
 
     downloadBtn.addEventListener('click', () => {
       const link = document.createElement('a');
-      link.download = 'moc-tron-da-loc-sach.png';
+      link.download = 'boc-moc-chuyen-nghiep.png';
       link.href = canvasOut.toDataURL('image/png');
       link.click();
     });
