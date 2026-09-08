@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tách Dấu Mộc Phức Tạp Tự Động (OpenCV)</title>
+  <title>Tách Dấu Mộc Phức Tạp Tự Động (Offline)</title>
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       max-width: 1000px;
       margin: 20px auto;
       padding: 0 20px;
@@ -15,7 +15,6 @@
     }
     h2 { text-align: center; color: #1a73e8; }
     
-    /* Khung hiển thị trạng thái và tiến trình */
     .status-container {
       background: #ffffff;
       padding: 15px;
@@ -108,10 +107,9 @@
 
   <h2>Công Cụ Tách Dấu Mộc Phức Tạp (OpenCV)</h2>
 
-  <!-- Thanh tiến trình tải OpenCV -->
   <div class="status-container">
     <div class="status-info">
-      <span id="statusText">Khởi tạo kết nối...</span>
+      <span id="statusText">Đang khởi tạo thư viện...</span>
       <span id="statusPercent">0%</span>
     </div>
     <div class="progress-bar-bg">
@@ -170,69 +168,61 @@
     const denoiseInput = document.getElementById('denoise');
     const downloadBtn = document.getElementById('downloadBtn');
 
-    // Hàm tự tải OpenCV.js bằng Fetch API để đo %
-    async function loadOpenCVWithProgress() {
-      const url = 'https://cdnjs.cloudflare.com/comlink/opencv/4.7.0/opencv.js';
-      statusText.innerText = "Đang tải thư viện OpenCV.js...";
-
-      try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Không thể tải thư viện');
-
-        const contentLength = response.headers.get('content-length');
-        // Dung lượng ước tính ~9.2MB nếu CDN không trả về Content-Length
-        const total = contentLength ? parseInt(contentLength, 10) : 9600000; 
-
-        const reader = response.body.getReader();
-        let loaded = 0;
-        let chunks = [];
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          chunks.push(value);
-          loaded += value.length;
-
-          const percent = Math.min(100, Math.round((loaded / total) * 100));
-          progressFill.style.width = percent + '%';
-          statusPercent.innerText = percent + '%';
+    // Hàm load an toàn tuyệt đối
+    function loadOpenCVSafely() {
+      // Cấu hình callback khởi tạo cho OpenCV
+      window.Module = {
+        onRuntimeInitialized() {
+          cvReady = true;
+          progressFill.style.width = '100%';
+          statusPercent.innerText = '100%';
+          statusText.innerText = "Thư viện đã sẵn sàng! Vui lòng chọn ảnh con dấu.";
+          statusText.style.color = "#137333";
+          progressFill.style.backgroundColor = "#137333";
+          
+          uploadInput.disabled = false;
+          stampTypeSelect.disabled = false;
+          denoiseInput.disabled = false;
         }
+      };
 
-        statusText.innerText = "Đang biên dịch WebAssembly...";
-        
-        // Tạo file script từ các dữ liệu đã nhận
-        const blob = new Blob(chunks, { type: 'application/javascript' });
-        const scriptUrl = URL.createObjectURL(blob);
-        const script = document.createElement('script');
-        script.src = scriptUrl;
-        
-        // Đợi WebAssembly khởi tạo xong
-        window.Module = {
-          onRuntimeInitialized() {
-            cvReady = true;
-            statusText.innerText = "Thư viện đã sẵn sàng! Vui lòng chọn ảnh con dấu.";
-            statusText.style.color = "#137333";
-            progressFill.style.backgroundColor = "#137333";
-            
-            uploadInput.disabled = false;
-            stampTypeSelect.disabled = false;
-            denoiseInput.disabled = false;
-          }
+      statusText.innerText = "Đang tải thư viện OpenCV...";
+      
+      // Giả lập tiến trình chạy thanh Status trong lúc biên dịch WebAssembly
+      let fakeProgress = 10;
+      const timer = setInterval(() => {
+        if (cvReady) {
+          clearInterval(timer);
+          return;
+        }
+        if (fakeProgress < 90) {
+          fakeProgress += 5;
+          progressFill.style.width = fakeProgress + '%';
+          statusPercent.innerText = fakeProgress + '%';
+        }
+      }, 150);
+
+      // Thêm thẻ Script nhúng file OpenCV local hoặc CDN dự phòng
+      const script = document.createElement('script');
+      script.src = './opencv.js'; // Ưu tiên file opencv.js đặt cùng thư mục
+      
+      script.onerror = () => {
+        // Nếu không có file opencv.js ở local, tự động dùng CDN
+        console.warn("Không tìm thấy ./opencv.js local, tải từ CDN...");
+        const cdnScript = document.createElement('script');
+        cdnScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/opencv/4.7.0/opencv.js';
+        cdnScript.onerror = () => {
+          statusText.innerText = "Lỗi: Không thể kết nối hoặc tải OpenCV!";
+          statusText.style.color = "#d93025";
+          progressFill.style.backgroundColor = "#d93025";
         };
+        document.body.appendChild(cdnScript);
+      };
 
-        document.body.appendChild(script);
-
-      } catch (err) {
-        statusText.innerText = "Lỗi khi tải thư viện OpenCV!";
-        statusText.style.color = "#d93025";
-        progressFill.style.backgroundColor = "#d93025";
-        console.error(err);
-      }
+      document.body.appendChild(script);
     }
 
-    // Chạy tiến trình tải ngay khi mở trang
-    loadOpenCVWithProgress();
+    loadOpenCVSafely();
 
     uploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
