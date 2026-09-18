@@ -4,42 +4,48 @@
     <meta charset="UTF-8">
     <title>Công cụ kiểm tra bài viết Blogger - Stamp.io.vn</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
-        .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; max-width: 800px; }
-        button { padding: 10px 15px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
-        button:disabled { background: #6c757d; }
-        #status { font-weight: bold; margin: 15px 0; color: #333; }
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; color: #333; }
+        .card { border: 1px solid #ccc; padding: 20px; border-radius: 8px; max-width: 950px; background: #fff; }
+        button { padding: 10px 18px; font-size: 15px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        #status { font-weight: bold; margin: 15px 0; color: #0056b3; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        a { color: #007bff; text-decoration: none; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #f8f9fa; }
+        td.title-cell { text-align: left; }
+        a { color: #007bff; text-decoration: none; font-weight: bold; }
         a:hover { text-decoration: underline; }
+        .mark-diban { color: #dc3545; font-weight: bold; font-size: 16px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>Kiểm tra lỗi bài viết Stamp.io.vn</h2>
-    <p>Nhập API Key của Google để bắt đầu quét toàn bộ bài viết trên Blog ID: <code>562661508258286882</code></p>
+    <h2>Kiểm tra logic thẻ Image - Stamp.io.vn</h2>
+    <p>Nhập Google API Key để kiểm tra toàn bộ bài viết trên Blog ID: <code>562661508258286882</code></p>
     
-    <label for="apiKey">Google API Key: </label>
-    <input type="text" id="apiKey" placeholder="Dán Google API Key vào đây" style="width: 350px; padding: 8px;">
-    <button id="startBtn" onclick="startScanning()">Bắt đầu quét</button>
+    <div style="margin-bottom: 15px;">
+        <label for="apiKey"><b>Google API Key:</b> </label>
+        <input type="text" id="apiKey" placeholder="Dán Google API Key vào đây..." style="width: 380px; padding: 8px;">
+        <button id="startBtn" onclick="startScanning()">Bắt đầu quét</button>
+    </div>
 
     <div id="status">Trạng thái: Sẵn sàng</div>
     
-    <h3>Kết quả phát hiện (<span id="count">0</span> bài lỗi):</h3>
+    <h3>Kết quả phát hiện (<span id="count">0</span> bài vi phạm):</h3>
     <table id="resultTable">
         <thead>
             <tr>
-                <th>STT</th>
+                <th style="width: 50px;">STT</th>
                 <th>Tiêu đề bài viết</th>
-                <th>Số thẻ &lt;img&gt;</th>
-                <th>Liên kết</th>
+                <th style="width: 90px;">Dị bản</th>
+                <th style="width: 100px;">Thẻ &lt;img&gt; bài viết</th>
+                <th style="width: 100px;">Thẻ &lt;img&gt; tiêu chuẩn</th>
+                <th style="width: 90px;">Liên kết</th>
             </tr>
         </thead>
         <tbody>
-            <!-- Kết quả sẽ hiển thị ở đây -->
+            <!-- Kết quả sẽ tự động thêm vào đây -->
         </tbody>
     </table>
 </div>
@@ -50,7 +56,7 @@ const BLOG_ID = '562661508258286882';
 async function startScanning() {
     const apiKey = document.getElementById('apiKey').value.trim();
     if (!apiKey) {
-        alert('Vui lòng nhập API Key để gọi Blogger API!');
+        alert('Vui lòng nhập API Key!');
         return;
     }
 
@@ -69,7 +75,7 @@ async function startScanning() {
 
     try {
         do {
-            status.textContent = `Đang tải bài viết... (Đã quét ${totalFetched} bài)`;
+            status.textContent = `Đang tải danh sách bài viết... (Đã quét ${totalFetched} bài)`;
             
             let url = `https://www.googleapis.com/blogger/v3/blogs/${BLOG_ID}/posts?key=${apiKey}&maxResults=50&fetchBodies=true`;
             if (nextPageToken) {
@@ -86,28 +92,55 @@ async function startScanning() {
             const posts = data.items || [];
             totalFetched += posts.length;
 
-            // Xử lý kiểm tra bài viết
             posts.forEach(post => {
                 const content = post.content || '';
                 
-                // 1. Kiểm tra có chứa chuỗi chỉ định không
-                const hasTargetString = content.includes('<small>Số lượng</small><span>1 tem</span>');
-                
-                // 2. Đếm số lượng thẻ <img (không phân biệt chữ hoa/thường)
-                const imgMatches = content.match(/<img\b/gi);
-                const imgCount = imgMatches ? imgMatches.length : 0;
+                // 1. Kiểm tra Dị bản
+                const hasDiBan = content.includes('data-text="Dị bản"');
 
-                // Điều kiện: Có chuỗi + Lớn hơn 1 thẻ <img>
-                if (hasTargetString && imgCount > 1) {
+                // 2. Đếm số lượng thẻ <img thực tế trong bài
+                const actualImgMatches = content.match(/<img\b/gi);
+                const actualImgCount = actualImgMatches ? actualImgMatches.length : 0;
+
+                // 3. Tính toán số lượng thẻ <img tiêu chuẩn
+                let expectedImgCount = null;
+
+                // Regex 1: Dạng X tem + Y bloc
+                const regexTemAndBloc = /<small>Số lượng<\/small>\s*<span>(\d+)\s*tem\s*\+\s*(\d+)\s*bloc<\/span>/i;
+                const matchTemAndBloc = content.match(regexTemAndBloc);
+
+                if (matchTemAndBloc) {
+                    const numTem = parseInt(matchTemAndBloc[1], 10);
+                    const numBloc = parseInt(matchTemAndBloc[2], 10);
+                    expectedImgCount = (numTem + numBloc) * 2 + 1;
+                } else {
+                    // Regex 2: Chỉ dạng X tem
+                    const regexTemOnly = /<small>Số lượng<\/small>\s*<span>(\d+)\s*tem<\/span>/i;
+                    const matchTemOnly = content.match(regexTemOnly);
+
+                    if (matchTemOnly) {
+                        const numTem = parseInt(matchTemOnly[1], 10);
+                        if (numTem === 1) {
+                            expectedImgCount = 1;
+                        } else if (numTem > 1) {
+                            expectedImgCount = numTem * 2 + 1;
+                        }
+                    }
+                }
+
+                // 4. Lọc bài nếu phát hiện thông số hợp lệ VÀ số thẻ img thực tế > tiêu chuẩn
+                if (expectedImgCount !== null && actualImgCount > expectedImgCount) {
                     totalMatched++;
                     countSpan.textContent = totalMatched;
 
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${totalMatched}</td>
-                        <td>${escapeHtml(post.title)}</td>
-                        <td><b>${imgCount}</b> thẻ</td>
-                        <td><a href="${post.url}" target="_blank">Xem bài viết</a></td>
+                        <td class="title-cell">${escapeHtml(post.title)}</td>
+                        <td class="mark-diban">${hasDiBan ? 'x' : ''}</td>
+                        <td><b>${actualImgCount}</b></td>
+                        <td>${expectedImgCount}</td>
+                        <td><a href="${post.url}" target="_blank">Xem</a></td>
                     `;
                     tbody.appendChild(row);
                 }
@@ -117,7 +150,7 @@ async function startScanning() {
 
         } while (nextPageToken);
 
-        status.textContent = `Hoàn tất! Đã quét tổng cộng ${totalFetched} bài viết. Tìm thấy ${totalMatched} bài vi phạm.`;
+        status.textContent = `Hoàn tất! Đã kiểm tra ${totalFetched} bài viết. Tìm thấy ${totalMatched} bài vi phạm logic thẻ img.`;
 
     } catch (error) {
         status.textContent = `Lỗi: ${error.message}`;
